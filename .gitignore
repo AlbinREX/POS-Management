@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.local/
+backups/
+*.tsbuildinfo
+packages/database/src/generated/
+*.log
+infrastructure/nginx/certs/*
+!infrastructure/nginx/certs/.gitkeep

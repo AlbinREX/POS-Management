@@ -1,0 +1,10 @@
+# Requires Docker Compose v2.24.4+ for !override support.
+services:
+  api:
+    environment:
+      NODE_ENV: production
+  nginx:
+    ports: !override ['443:443', '80:80']
+    volumes: !override
+      - ../nginx/production.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../nginx/certs:/etc/nginx/certs:ro

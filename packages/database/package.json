@@ -1,0 +1,15 @@
+{
+  "name": "@restaurant/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "pg": "^8.16.0",
+    "argon2": "^0.44.0",
+    "@restaurant/shared-types": "0.1.0",
+    "@restaurant/validation": "0.1.0"
+  }
+}

@@ -1,0 +1,88 @@
+name: restaurant-local
+services:
+  db:
+    image: postgres:17.10-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant}
+      POSTGRES_USER: ${POSTGRES_USER:-restaurant_migrator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../backups:/backups
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [backend]
+  migrate:
+    build: { context: ../.., dockerfile: infrastructure/docker/Dockerfile, target: migrate }
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-restaurant_migrator}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-restaurant}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD}
+    depends_on:
+      db: { condition: service_healthy }
+    restart: 'no'
+    networks: [backend]
+  api:
+    build: { context: ../.., dockerfile: infrastructure/docker/Dockerfile, target: api }
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://restaurant_app:${APP_DATABASE_PASSWORD}@db:5432/${POSTGRES_DB:-restaurant}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      TRUST_PROXY: '1'
+      PORT: '4000'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          'fetch("http://127.0.0.1:4000/api/health/ready").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [backend]
+  admin:
+    build: { context: ../.., dockerfile: infrastructure/docker/Dockerfile, target: admin }
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:4000
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          'fetch("http://127.0.0.1:3000").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [backend]
+  nginx:
+    image: nginx:1.28-alpine
+    ports: ['127.0.0.1:8080:80']
+    volumes:
+      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api: { condition: service_healthy }
+      admin: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [backend, edge]
+volumes:
+  postgres_data:
+networks:
+  backend:
+    internal: true
+  edge: {}

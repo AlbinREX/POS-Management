@@ -1,0 +1,11 @@
+{
+  "name": "@restaurant/validation",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "zod": "^4.1.0",
+    "@restaurant/shared-types": "0.1.0"
+  }
+}

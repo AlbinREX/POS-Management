@@ -1,0 +1,6 @@
+export type InventoryUnitCode = 'kg' | 'g' | 'l' | 'ml' | 'pcs';
+export interface InventoryItemRecord { id: string; name: string; sku: string; kind: 'INGREDIENT' | 'STOCK_ITEM'; unitCode: InventoryUnitCode; active: boolean; deletedAt: string | null; version: number; }
+export interface WarehouseRecord { id: string; name: string; description: string; active: boolean; deletedAt: string | null; version: number; }
+export interface RecipeRecord { id: string; productId: string; productName: string; version: number; active: boolean; warehouseId: string; warehouseName: string; items: { itemId: string; name: string; quantity: string; unitCode: InventoryUnitCode }[]; }
+export interface StockRecord { id: string; itemId: string; itemName: string; warehouseId: string; warehouseName: string; unitCode: InventoryUnitCode; quantity: string; lowStockThreshold: string; lowStock: boolean; version: number; active: boolean; }
+export interface StockMovementRecord { id: string; kind: 'ADJUSTMENT' | 'WASTE' | 'SALE_CONSUMPTION'; quantity: string; reason: string; enteredQuantity: string; enteredUnit: string; orderId: string | null; orderNumber: string | null; createdAt: string; userName: string; itemId: string; itemName: string; warehouseId: string; warehouseName: string; unitCode: InventoryUnitCode; }
