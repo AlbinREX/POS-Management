@@ -19,7 +19,7 @@ test('Riza POS preserves order commands, modifiers, totals and payment navigatio
     if (m.type() === 'error') errors.push(m.text());
   });
   const login = await page.request.post('/api/auth/login', {
-    headers: { Origin: 'http://localhost:3000' },
+    headers: { Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000' },
     data: {
       organization: 'verification',
       branch: 'main',
@@ -29,7 +29,7 @@ test('Riza POS preserves order commands, modifiers, totals and payment navigatio
   });
   expect(login.status()).toBe(200);
   const headers = {
-    Origin: 'http://localhost:3000',
+    Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
     Authorization: 'Bearer ' + (await login.json()).accessToken,
   };
   const create = async (path: string, data: unknown) => {
@@ -65,7 +65,7 @@ test('Riza POS preserves order commands, modifiers, totals and payment navigatio
     kind: 'products',
     name: prefix + ' burger',
     description: 'Grilled patty, crisp lettuce and house sauce.',
-    imageUrl: 'http://localhost:3000/qa/catalog-image.svg',
+    imageUrl: (process.env.APP_ORIGIN ?? 'http://localhost:3000') + '/qa/catalog-image.svg',
     sku: prefix + '-burger',
     categoryId: category.id,
     sellingPrice: '5.50',
@@ -86,7 +86,10 @@ test('Riza POS preserves order commands, modifiers, totals and payment navigatio
       name: prefix + ' ' + name,
       description,
       ...(name === 'Chicken wrap'
-        ? { imageUrl: 'http://localhost:3000/qa/unavailable-image.png' }
+        ? {
+            imageUrl:
+              (process.env.APP_ORIGIN ?? 'http://localhost:3000') + '/qa/unavailable-image.png',
+          }
         : {}),
       sku: prefix + '-' + name,
       categoryId: category.id,

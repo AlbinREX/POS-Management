@@ -65,7 +65,21 @@ describe('Boundary validation', () => {
   });
   it('grants owner explicit permissions and keeps operational roles out of administration', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.OWNER).toEqual(PERMISSIONS);
-    for (const role of ['STOREKEEPER'] as const) expect(DEFAULT_ROLE_PERMISSIONS[role]).toEqual([]);
+    expect(DEFAULT_ROLE_PERMISSIONS.STOREKEEPER).toEqual([
+      'supplier.read',
+      'supplier.manage',
+      'purchase.read',
+      'purchase.manage',
+      'purchase.receive',
+      'inventory.read',
+      'inventory.manage',
+      'inventory.adjust',
+      'inventory.waste',
+      'recipe.manage',
+    ]);
+    expect(DEFAULT_ROLE_PERMISSIONS.STOREKEEPER).not.toContain('user.manage');
+    expect(DEFAULT_ROLE_PERMISSIONS.STOREKEEPER).not.toContain('payment.collect');
+    expect(DEFAULT_ROLE_PERMISSIONS.STOREKEEPER).not.toContain('supplier.payment.record');
     expect(DEFAULT_ROLE_PERMISSIONS.CASHIER).toContain('payment.collect');
     expect(DEFAULT_ROLE_PERMISSIONS.CASHIER).not.toContain('payment.refund');
     expect(DEFAULT_ROLE_PERMISSIONS.CASHIER).not.toContain('payment.cancel');

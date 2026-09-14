@@ -1,3 +1,4 @@
+export * from './purchasing';
 export * from './inventory';
 import { z } from 'zod';
 import { PERMISSIONS } from '@restaurant/shared-types';

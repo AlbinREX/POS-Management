@@ -532,11 +532,15 @@ model Organization {
 }
 
 model Branch {
-  inventoryItems    InventoryItem[]
-  warehouses        Warehouse[]
-  recipes           Recipe[]
-  inventoryRevision InventoryRevision?
-  inventoryEvents   InventoryEvent[]
+  suppliers          Supplier[]
+  purchaseOrders     PurchaseOrder[]
+  purchasingRevision PurchasingRevision?
+  purchasingEvents   PurchasingEvent[]
+  inventoryItems     InventoryItem[]
+  warehouses         Warehouse[]
+  recipes            Recipe[]
+  inventoryRevision  InventoryRevision?
+  inventoryEvents    InventoryEvent[]
 
   paymentRevision PaymentRevision?
   kitchenRevision KitchenRevision?
@@ -588,9 +592,13 @@ model User {
 }
 
 model BranchMembership {
-  inventoryEvents InventoryEvent[]
-  stockMovements  StockMovement[]
-  inventoryPlans  InventoryPlan[]
+  purchaseOrders   PurchaseOrder[]
+  goodsReceipts    GoodsReceipt[]
+  supplierEntries  SupplierEntry[]
+  purchasingEvents PurchasingEvent[]
+  inventoryEvents  InventoryEvent[]
+  stockMovements   StockMovement[]
+  inventoryPlans   InventoryPlan[]
 
   cashShifts         CashShift[]
   payments           Payment[]
@@ -965,6 +973,7 @@ enum InventoryItemKind {
 }
 
 enum StockMovementKind {
+  PURCHASE
   ADJUSTMENT
   WASTE
   SALE_CONSUMPTION
@@ -978,6 +987,7 @@ model InventoryUnit {
 }
 
 model InventoryItem {
+  purchaseItems  PurchaseItem[]
   id             String            @id @default(uuid()) @db.Uuid
   branchId       String            @db.Uuid
   organizationId String            @db.Uuid
@@ -1001,6 +1011,7 @@ model InventoryItem {
 }
 
 model Warehouse {
+  purchaseOrders PurchaseOrder[]
   id             String          @id @default(uuid()) @db.Uuid
   branchId       String          @db.Uuid
   organizationId String          @db.Uuid
@@ -1132,6 +1143,9 @@ model InventoryPlanItem {
 }
 
 model StockMovement {
+  receiptItemId   String?            @unique @db.Uuid
+  receiptItem     GoodsReceiptItem?  @relation(fields: [receiptItemId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  snapshot        Json
   id              String             @id @default(uuid()) @db.Uuid
   branchId        String             @db.Uuid
   organizationId  String             @db.Uuid
@@ -1150,6 +1164,7 @@ model StockMovement {
   planItem        InventoryPlanItem? @relation(fields: [planItemId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
   settlement      OrderSettlement?   @relation(fields: [orderId, branchId, organizationId], references: [orderId, branchId, organizationId], onDelete: Restrict)
 
+  @@unique([receiptItemId, branchId, organizationId])
   @@unique([planItemId, branchId, organizationId])
   @@index([positionId, branchId, organizationId, createdAt, id])
   @@index([branchId, organizationId, createdAt, id])
@@ -1185,5 +1200,233 @@ model InventoryEvent {
   @@unique([branchId, commandId])
   @@unique([branchId, revision])
   @@index([branchId, organizationId, revision])
+  @@index([userId, branchId, organizationId])
+}
+
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum SupplierEntryKind {
+  CHARGE
+  PAYMENT
+  PAYMENT_REVERSAL
+}
+
+model Supplier {
+  events         PurchasingEvent[]
+  id             String            @id @default(uuid()) @db.Uuid
+  branchId       String            @db.Uuid
+  organizationId String            @db.Uuid
+  name           String            @db.VarChar(160)
+  businessNumber String            @default("") @db.VarChar(80)
+  taxNumber      String            @default("") @db.VarChar(80)
+  contactPerson  String            @default("") @db.VarChar(160)
+  phone          String            @default("") @db.VarChar(60)
+  email          String            @default("") @db.VarChar(254)
+  address        String            @default("") @db.VarChar(500)
+  notes          String            @default("") @db.VarChar(2000)
+  active         Boolean           @default(true)
+  deletedAt      DateTime?         @db.Timestamptz(3)
+  version        Int               @default(1)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+  branch         Branch            @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  orders         PurchaseOrder[]
+
+  @@unique([id, branchId, organizationId])
+  @@index([branchId, organizationId, deletedAt, name, id])
+}
+
+model PurchaseOrder {
+  events             PurchasingEvent[]
+  id                 String            @id @default(uuid()) @db.Uuid
+  branchId           String            @db.Uuid
+  organizationId     String            @db.Uuid
+  supplierId         String            @db.Uuid
+  warehouseId        String            @db.Uuid
+  userId             String            @db.Uuid
+  number             BigInt
+  status             PurchaseStatus    @default(DRAFT)
+  currency           String            @db.Char(3)
+  reference          String            @default("") @db.VarChar(120)
+  notes              String            @default("") @db.VarChar(2000)
+  expectedDate       DateTime?         @db.Date
+  supplierSnapshot   Json
+  warehouseName      String            @db.VarChar(160)
+  subtotal           Decimal           @db.Decimal(14, 2)
+  tax                Decimal           @db.Decimal(14, 2)
+  total              Decimal           @db.Decimal(14, 2)
+  version            Int               @default(1)
+  orderedAt          DateTime?         @db.Timestamptz(3)
+  cancelledAt        DateTime?         @db.Timestamptz(3)
+  cancellationReason String?           @db.VarChar(500)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
+  branch             Branch            @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  supplier           Supplier          @relation(fields: [supplierId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  warehouse          Warehouse         @relation(fields: [warehouseId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  actor              BranchMembership  @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  items              PurchaseItem[]
+  receipts           GoodsReceipt[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([id, supplierId, branchId, organizationId])
+  @@unique([branchId, number])
+  @@index([branchId, organizationId, status, createdAt, id])
+  @@index([supplierId, branchId, organizationId])
+  @@index([warehouseId, branchId, organizationId])
+  @@index([userId, branchId, organizationId])
+}
+
+model PurchaseItem {
+  id              String             @id @default(uuid()) @db.Uuid
+  purchaseOrderId String             @db.Uuid
+  branchId        String             @db.Uuid
+  organizationId  String             @db.Uuid
+  itemId          String             @db.Uuid
+  itemName        String             @db.VarChar(160)
+  sku             String             @db.VarChar(80)
+  stockUnit       String             @db.VarChar(3)
+  unitCode        String             @db.VarChar(3)
+  quantity        Decimal            @db.Decimal(20, 6)
+  stockQuantity   Decimal            @db.Decimal(20, 6)
+  unitPrice       Decimal            @db.Decimal(14, 4)
+  taxRate         Decimal            @db.Decimal(5, 2)
+  subtotal        Decimal            @db.Decimal(14, 2)
+  tax             Decimal            @db.Decimal(14, 2)
+  total           Decimal            @db.Decimal(14, 2)
+  voidedAt        DateTime?          @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  order           PurchaseOrder      @relation(fields: [purchaseOrderId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  item            InventoryItem      @relation(fields: [itemId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  receiptItems    GoodsReceiptItem[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([id, purchaseOrderId, branchId, organizationId])
+  @@index([purchaseOrderId, branchId, organizationId])
+  @@index([itemId, branchId, organizationId])
+}
+
+model GoodsReceipt {
+  id                String             @id @default(uuid()) @db.Uuid
+  purchaseOrderId   String             @db.Uuid
+  supplierId        String             @db.Uuid
+  branchId          String             @db.Uuid
+  organizationId    String             @db.Uuid
+  receivedBy        String             @db.Uuid
+  reference         String             @db.VarChar(120)
+  invoiceNumber     String?            @db.VarChar(120)
+  invoiceDate       DateTime?          @db.Date
+  dueDate           DateTime?          @db.Date
+  documentReference String             @default("") @db.VarChar(1000)
+  notes             String             @default("") @db.VarChar(2000)
+  currency          String             @db.Char(3)
+  subtotal          Decimal            @db.Decimal(14, 2)
+  tax               Decimal            @db.Decimal(14, 2)
+  total             Decimal            @db.Decimal(14, 2)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  order             PurchaseOrder      @relation(fields: [purchaseOrderId, supplierId, branchId, organizationId], references: [id, supplierId, branchId, organizationId], onDelete: Restrict)
+  actor             BranchMembership   @relation(fields: [receivedBy, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  items             GoodsReceiptItem[]
+  entries           SupplierEntry[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([id, purchaseOrderId, branchId, organizationId])
+  @@unique([id, supplierId, branchId, organizationId])
+  @@unique([branchId, supplierId, reference])
+  @@unique([branchId, supplierId, invoiceNumber])
+  @@index([purchaseOrderId, branchId, organizationId])
+  @@index([branchId, organizationId, createdAt, id])
+  @@index([receivedBy, branchId, organizationId])
+}
+
+model GoodsReceiptItem {
+  id              String         @id @default(uuid()) @db.Uuid
+  receiptId       String         @db.Uuid
+  purchaseOrderId String         @db.Uuid
+  purchaseItemId  String         @db.Uuid
+  branchId        String         @db.Uuid
+  organizationId  String         @db.Uuid
+  quantity        Decimal        @db.Decimal(20, 6)
+  stockQuantity   Decimal        @db.Decimal(20, 6)
+  subtotal        Decimal        @db.Decimal(14, 2)
+  tax             Decimal        @db.Decimal(14, 2)
+  total           Decimal        @db.Decimal(14, 2)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  receipt         GoodsReceipt   @relation(fields: [receiptId, purchaseOrderId, branchId, organizationId], references: [id, purchaseOrderId, branchId, organizationId], onDelete: Restrict)
+  purchaseItem    PurchaseItem   @relation(fields: [purchaseItemId, purchaseOrderId, branchId, organizationId], references: [id, purchaseOrderId, branchId, organizationId], onDelete: Restrict)
+  movement        StockMovement?
+
+  @@unique([id, branchId, organizationId])
+  @@unique([receiptId, purchaseItemId])
+  @@index([purchaseItemId, purchaseOrderId, branchId, organizationId])
+}
+
+model SupplierEntry {
+  id             String            @id @default(uuid()) @db.Uuid
+  branchId       String            @db.Uuid
+  organizationId String            @db.Uuid
+  supplierId     String            @db.Uuid
+  receiptId      String            @db.Uuid
+  userId         String            @db.Uuid
+  kind           SupplierEntryKind
+  amount         Decimal           @db.Decimal(14, 2)
+  method         String?           @db.VarChar(20)
+  reference      String?           @db.VarChar(120)
+  reason         String            @db.VarChar(500)
+  reversesId     String?           @unique @db.Uuid
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  receipt        GoodsReceipt      @relation(fields: [receiptId, supplierId, branchId, organizationId], references: [id, supplierId, branchId, organizationId], onDelete: Restrict)
+  actor          BranchMembership  @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  reverses       SupplierEntry?    @relation("SupplierReversal", fields: [reversesId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  reversal       SupplierEntry?    @relation("SupplierReversal")
+
+  @@unique([id, branchId, organizationId])
+  @@unique([reversesId, branchId, organizationId])
+  @@index([supplierId, branchId, organizationId, createdAt, id])
+  @@index([receiptId, branchId, organizationId])
+  @@index([userId, branchId, organizationId])
+}
+
+model PurchasingRevision {
+  branchId       String   @id @db.Uuid
+  organizationId String   @db.Uuid
+  revision       BigInt   @default(0)
+  nextNumber     BigInt   @default(0)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  branch         Branch   @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, organizationId])
+}
+
+model PurchasingEvent {
+  supplier        Supplier?        @relation(fields: [supplierId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  id              String           @id @default(uuid()) @db.Uuid
+  branchId        String           @db.Uuid
+  organizationId  String           @db.Uuid
+  userId          String           @db.Uuid
+  commandId       String           @db.Uuid
+  requestHash     String           @db.Char(64)
+  revision        BigInt
+  action          String           @db.VarChar(100)
+  entityId        String           @db.Uuid
+  supplierId      String?          @db.Uuid
+  purchaseOrderId String?          @db.Uuid
+  response        Json
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  branch          Branch           @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actor           BranchMembership @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, commandId])
+  @@unique([branchId, revision])
+  @@index([branchId, organizationId, revision])
+  @@index([purchaseOrderId, branchId, organizationId])
+  @@index([supplierId, branchId, organizationId])
   @@index([userId, branchId, organizationId])
 }

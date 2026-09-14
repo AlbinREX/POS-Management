@@ -147,3 +147,54 @@ AMOUNT tender: `{method:"CASH",amount:"4.00",tendered:"10.00",shiftId:"uuid"}` o
 ITEMS tenders replace amount with `items:[{itemId:"uuid",quantity:1}]`; server computes their immutable discounted unit amounts. Bill mode cannot change. Limits: 200 payments per order, 100 reversals per payment, 2000 source units in item mode, 20 tenders per command. Zero-priced units may share a positive collection; zero-total bills use explicit settlement. There is no fractional physical unit split or split by seats.
 
 Cancellation is full and only before settlement; a cash cancellation returns applied amount (change was already returned), and card cancellation requires external confirmation. Refunds are bounded by the original payment minus prior reversals and preserve PAID. No frontend action or order command can manually set PAID. Submitted kitchen tickets must be READY/COMPLETED before WAITING_PAYMENT; READY tickets may complete after PAID without changing order totals or order version.
+
+## Inventory (Phase 7)
+
+All paths below are under `/api/inventory`. They require authenticated branch membership and `inventory.read`; mutation keys are listed in PERMISSIONS.md. Branch/user identity always comes from the session. List endpoints accept page, limit (maximum 100), search, optional warehouseId/itemId and includeArchived=true/false. All quantities are decimal strings with at most six fractional digits; version fields are integers. Never convert quantities or monetary values through JavaScript floating-point calculations.
+
+| Method/path                                          | Contract                                                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| GET units                                            | Fixed unit code, dimension and conversion metadata                                                    |
+| GET items / warehouses / recipes / stock / movements | Paginated branch data with items and hasMore                                                          |
+| GET products                                         | Paginated id/name/active picker without price/administrative fields                                   |
+| POST items                                           | commandId, name, sku, kind INGREDIENT/STOCK_ITEM, unitCode                                            |
+| PUT items/:id                                        | commandId, version, name, active                                                                      |
+| POST items/:id/archive                               | commandId, version                                                                                    |
+| POST warehouses                                      | commandId, name, description                                                                          |
+| PUT warehouses/:id                                   | commandId, version, name, description, active                                                         |
+| POST warehouses/:id/archive                          | commandId, version                                                                                    |
+| POST recipes                                         | commandId, productId, warehouseId, version (0 for new), active, items [{itemId,quantity,unitCode}]    |
+| GET recipes/:id/history                              | Paginated immutable revisions                                                                         |
+| POST movements                                       | commandId, warehouseId, itemId, kind ADJUSTMENT/WASTE, quantity, unitCode, reason                     |
+| POST thresholds                                      | commandId, warehouseId, itemId, version (0 for an unregistered position), lowStockThreshold, unitCode |
+| GET events                                           | after decimal-integer string cursor, limit <=100                                                      |
+
+Example movement: `{commandId:"uuid",warehouseId:"uuid",itemId:"uuid",kind:"ADJUSTMENT",quantity:"1.250",unitCode:"kg",reason:"Opening stock count"}`. For an item stored in g this records `1250.000000` g. WASTE takes a positive input and records a negative movement; ADJUSTMENT accepts a signed nonzero delta. Movement inputs cannot forge SALE_CONSUMPTION or source order references. Incompatible units, rounding, stale versions and recipe/archive conflicts are rejected. Reuse the same commandId and body after an uncertain network result; explicit conflict responses require refreshing state before preparing a new command.
+
+
+## Purchasing (Phase 8)
+
+Routes are under `/api/purchasing`; branch, organization and actor are derived from the authenticated session. All writes use commandId UUIDs; repeat an uncertain command with identical input. Stale versions, duplicate reference/invoice, overreceiving and overpayment return conflicts. List endpoints accept page, limit <=100, search, supplierId, purchaseOrderId, optional status and includeArchived. Stock/purchase quantities and money are decimal strings.
+
+| Method/path | Input or result |
+| --- | --- |
+| GET suppliers | Paginated supplier configuration |
+| POST suppliers | commandId, name; optional businessNumber, taxNumber, contactPerson, phone, email, address, notes |
+| PUT suppliers/:id | Supplier fields plus version and active |
+| POST suppliers/:id/archive | commandId, version; no open purchase orders |
+| GET suppliers/:id/account | Currency, receivedValue, outstanding, lastReceiptAt, receiptCount and paginated entries |
+| GET catalog/items / catalog/warehouses / catalog/suppliers | Active branch pickers under purchase.read |
+| GET orders / orders/:id | Purchase snapshots, exact totals and per-item received/remaining quantities |
+| POST orders | commandId, supplierId, warehouseId, reference, notes, expectedDate; items [{itemId,quantity,unitCode,unitPrice,taxRate}] |
+| PUT orders/:id | Draft input plus version; only DRAFT |
+| POST orders/:id/order | commandId, version; confirms and freezes content |
+| POST orders/:id/cancel | commandId, version, reason; only DRAFT or unreceived ORDERED |
+| POST orders/:id/receive | commandId, version, reference, optional invoiceNumber/invoiceDate (together), dueDate, HTTPS documentReference, notes; items [{purchaseItemId,quantity}] |
+| GET receipts / receipts/:id | Immutable goods snapshots, receivedBy, source purchase and current unpaid amount |
+| POST payments | commandId, receiptId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason |
+| POST payments/:id/reverse | commandId, reason; full correction of original supplier payment record |
+| GET events / orders/:id/history | after string bigint cursor, limit <=100; history includes safe response snapshots |
+
+Purchase quantities accept compatible kg/g and l/ml conversion with no rounding. Unit prices are net, up to four decimals; tax is an operator-supplied percentage, up to two decimals. Receipt net amounts round to cents per line, tax rounds from that net amount, then totals sum exactly. Ordered prices cannot be overridden by receiving inputs. Partial deliveries are separately rounded accounting charges; their sum may differ slightly from the original order estimate.
+
+Example receipt items: `[{purchaseItemId:"uuid",quantity:"1.250000"}]` for a kg-based purchase line of an inventory item stored in g creates `1250.000000` g in StockMovement. Posting requires all selected quantities to be positive and within remaining amounts. UI zero quantities are omitted before submission. Receipt reference and any invoice number are unique per supplier/branch ignoring case and surrounding spaces. One receipt represents one delivery/charge; multi-delivery invoice grouping, credit notes/returns, unallocated supplier credits and payment execution are outside Phase 8.

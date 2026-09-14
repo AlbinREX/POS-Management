@@ -19,7 +19,7 @@ test('dine-in and takeaway orders retain snapshots and recover an uncertain save
     if (m.type() === 'error' && !injectingLoss) errors.push(m.text());
   });
   const login = await page.request.post('/api/auth/login', {
-    headers: { Origin: 'http://localhost:3000' },
+    headers: { Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000' },
     data: {
       organization: 'verification',
       branch: 'main',
@@ -29,7 +29,10 @@ test('dine-in and takeaway orders retain snapshots and recover an uncertain save
   });
   expect(login.status()).toBe(200);
   const token = (await login.json()).accessToken;
-  const headers = { Origin: 'http://localhost:3000', Authorization: 'Bearer ' + token };
+  const headers = {
+    Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    Authorization: 'Bearer ' + token,
+  };
   const create = async (path: string, data: unknown) => {
     const response = await page.request.post('/api/' + path, { headers, data });
     expect(response.status(), path).toBe(201);

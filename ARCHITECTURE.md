@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-6: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts. Settlement is the only API path to PAID.
+Status: Phases 1-8: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory and purchasing. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -95,3 +95,12 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 6 payments
 
 [ADR 0006](docs/adr/0006-payments.md) defines append-only Payment/PaymentReversal ledgers, deterministic item-unit allocations, immutable bills/settlements, cash shifts and transactional event receipts. Serialized branch revision rows and optimistic order/shift versions protect concurrent commands. Database constraints verify settlement, cash reconciliation and immutable source records. The existing frontend adds Payments; no new service or Internet dependency is required. Card entries confirm external terminal operations, with provider reconciliation deferred until a specified integration exists.
+
+## Phase 7 inventory
+
+[ADR 0007](docs/adr/0007-inventory.md) defines exact-unit quantities, append-only stock history, immutable recipe versions and inventory plans frozen with bills. Final settlement consumes stock atomically with PAID. The existing local API and Riza frontend host inventory; no additional service or Internet dependency is introduced.
+
+
+## Phase 8 purchasing
+
+Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.

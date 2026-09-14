@@ -27,7 +27,7 @@ The script accepts only a new `restaurant_restore_*` database, uses `pg_restore 
 
 1. Isolate the restored database from restaurant clients.
 2. Point `MIGRATION_DATABASE_URL` to the new database and apply migrations/provision runtime grants with `scripts/migrate.mjs`.
-3. Verify organization, branches, users, memberships, roles, terminals, audit counts and source timestamps. In later phases also reconcile order/payment/refund totals and stock movements against the archive source.
+3. Verify organization, branches, users, memberships, roles, terminals, audit counts and source timestamps. Also reconcile order/payment/refund totals and stock movements against the archive source.
 4. Test login with an authorized recovery account and the restricted runtime connection. Verify audit append-only guards remain active.
 5. Rotate JWT secrets and revoke restored sessions before cutover to avoid replay of previously revoked sessions from an older backup. A privileged operator can run `UPDATE "AuthSession" SET "revokedAt" = now(), "updatedAt" = now() WHERE "revokedAt" IS NULL;` and insert an operator recovery audit event.
 6. Stop writes to the old database, preserve it for diagnosis, update runtime connections to the verified restored database and restart services. Record the recovery action, restored archive, cutoff time, checks and responsible operator.
@@ -37,3 +37,16 @@ The script accepts only a new `restaurant_restore_*` database, uses `pg_restore 
 Internet failure: continue using the LAN server. Database/server failure: stop accepting mutations and restore local service; no client may pretend a payment succeeded. Disk failure: use off-device backup and separately retained deployment configuration. Lost local admin access: use a documented operator credential reset with session revocation and audit; there is no unauthenticated password reset endpoint.
 
 Measure recovery point and recovery time during a drill. A daily-only schedule can lose up to a day of changes. Commercial operations may need shorter intervals, WAL archiving/PITR and a UPS; those are Phase 13 decisions. Run restore drills after schema changes and periodically, and alert on missing archives, nonzero scheduled-task exit codes and low disk space.
+
+## Phase 7 inventory recovery checks
+
+A full database archive includes units, recipe revisions, frozen consumption plans, movements, events and current configuration. Restore these together with orders/payments; restoring only balance-like views loses source history. Compare per-warehouse/item `SUM(StockMovement.quantity)`, movement counts, plan-line counts and settlement counts with the source cutoff. Check that each new settlement's plan lines have matching sale movements and that stock history remains immutable under the runtime role.
+
+Do not rerun paid orders to recreate stock after a restore: their existing movements are the history. Repeated command IDs must replay previous receipts without further deductions. A recovery correction must be an authorized, reasoned stock adjustment, never a direct replacement of historical quantities.
+
+
+## Phase 8 purchasing recovery checks
+
+Restore supplier identities, purchase/item snapshots, goods receipts/items, supplier entries, purchasing events/revision and PURCHASE stock movements together. Compare receipt counts/totals, supplier signed balances, purchase statuses, movement counts and per-position sums with the backup cutoff. Every receipt line must have exactly one matching stock movement and every receipt exactly one charge. Check immutable guards and runtime permissions after reprovisioning the restored database.
+
+Never replay receiving as a reconstruction step: restore its immutable source records. Command replay after recovery must return the original receipt without creating stock twice. Keep the restore target isolated until quantity, payable and source-reference checks pass. A full restore test should include nonempty receiving/payment fixtures in an isolated database, not alter operator purchasing records.

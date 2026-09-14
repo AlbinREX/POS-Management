@@ -8,8 +8,8 @@ test('submit immutable order snapshots and operate a kitchen-only display with r
   let outage = false;
   page.on('pageerror', (e) => errors.push(e.message));
   const admin = await apiRequest.newContext({
-    baseURL: 'http://localhost:3000',
-    extraHTTPHeaders: { Origin: 'http://localhost:3000' },
+    baseURL: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    extraHTTPHeaders: { Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000' },
   });
   const credentials = {
     organization: 'verification',

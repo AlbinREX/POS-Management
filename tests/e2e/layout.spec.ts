@@ -56,7 +56,10 @@ test('configure areas and geometry, drag a table, receive a remote status change
     async (route) => {
       const old = await route.fetch();
       const added = await page.request.post('/api/layout/areas', {
-        headers: { Authorization: `Bearer ${accessToken}`, Origin: 'http://localhost:3000' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+        },
         data: { name: `${prefix} Garden` },
       });
       expect(added.status()).toBe(201);
@@ -102,7 +105,10 @@ test('configure areas and geometry, drag a table, receive a remote status change
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   const remote = await page.request.patch(`/api/layout/tables/${created.id}/status`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Origin: 'http://localhost:3000' },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    },
     data: { version: (await current.json()).version, status: 'RESERVED' },
   });
   expect(remote.status()).toBe(200);
