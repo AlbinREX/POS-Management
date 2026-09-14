@@ -55,7 +55,7 @@ export function PurchasingEditorDialog({
 }) {
   return (
     <dialog
-      className="inventory-dialog purchase-dialog"
+      className="riza-dialog inventory-dialog purchase-dialog"
       aria-label="Purchasing editor"
       ref={(el) => {
         if (el && !el.open) el.showModal();

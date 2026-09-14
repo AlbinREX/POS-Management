@@ -143,8 +143,8 @@ test('purchasing operator orders, receives with retry, checks stock and reconcil
   await expect(dialog).toHaveCount(0);
   await receipt.getByRole('button', { name: 'Open source purchase', exact: true }).click();
   await expect(detail.getByTestId('purchase-detail-status')).toHaveText('received');
-  await detail.getByRole('button', { name: 'Show purchase history', exact: true }).click();
-  await expect(detail.getByText('Deliver to kitchen', { exact: true })).toBeVisible();
+  await detail.getByRole('button', { name: 'Show purchase history', exact: true }).press('Enter');
+  await expect(detail.locator('details').filter({ hasText: 'Deliver to kitchen' }).first()).toBeVisible();
   await views.getByRole('button', { name: 'Supplier balances', exact: true }).click();
   await page
     .getByRole('combobox', { name: 'Filter supplier', exact: true })
