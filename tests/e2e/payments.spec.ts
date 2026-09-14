@@ -17,8 +17,8 @@ test('cash shift, mixed settlement, lost-response retry, refund and counted clos
     if (m.type() === 'error' && !networkTest) consoles.push(m.text());
   });
   const client = await apiRequest.newContext({
-    baseURL: 'http://localhost:3000',
-    extraHTTPHeaders: { Origin: 'http://localhost:3000' },
+    baseURL: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    extraHTTPHeaders: { Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000' },
   });
   const credentials = {
     organization: 'verification',
@@ -150,7 +150,7 @@ test('cash shift, mixed settlement, lost-response retry, refund and counted clos
   );
   expect(errors).toEqual([]);
   expect(consoles).toEqual([]);
-  expect(page.url()).toBe('http://localhost:3000/');
+  expect(page.url()).toBe((process.env.APP_ORIGIN ?? 'http://localhost:3000') + '/');
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   let itemOrder = await post('orders', { commandId: randomUUID(), type: 'TAKEAWAY' });
   for (const command of [

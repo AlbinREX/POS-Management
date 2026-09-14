@@ -86,3 +86,39 @@ Migration `202609120003_payments` adds OrderBill, OrderSettlement, Payment, Paym
 A bill fixes AMOUNT or ITEMS mode. Each item allocation identifies one numbered source unit; line remainder cents are assigned deterministically to earliest units. Active allocations cannot overlap. Full unsettled cancellations release allocations without deleting them. Settlements exactly equal original totals and captures minus cancellations; post-settlement refunds reduce net receipts but do not erase settlement or change PAID. Zero totals require an explicit nonempty settlement. All associated audit/events, table release and cash movements commit together.
 
 Partial indexes permit one OPEN shift per terminal and per branch cashier. Opening, cash in/out, applied payments and reversals form a signed movement ledger. Expected cash is its sum. Close records counted/expected/difference and requires explanation for a discrepancy. Closed shifts and append-only ledgers reject updates/deletes/truncation, including ordinary statements from the migration owner. Runtime grants exclude history mutations. Existing closed orders are never backfilled with invented payments.
+
+## Inventory (Phase 7)
+
+Migration `202609130001_inventory` adds twelve models:
+
+| Model             | Responsibility                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| InventoryUnit     | Immutable kg, g, l, ml, pcs dimensions and exact conversion factors                                          |
+| InventoryItem     | Branch ingredient/stock-item identity, immutable stock unit/SKU/kind, versioned name/active/archive metadata |
+| Warehouse         | Branch versioned, soft-archivable stock location                                                             |
+| StockPosition     | Unique warehouse/item configuration, low-stock threshold and version; no stock quantity column               |
+| Recipe            | Unique branch product recipe identity and current revision pointer                                           |
+| RecipeVersion     | Immutable recipe header, warehouse and active state                                                          |
+| RecipeItem        | Immutable per-product ingredient quantities in each item's stock unit                                        |
+| InventoryPlan     | Immutable recipe snapshot frozen for one order bill                                                          |
+| InventoryPlanItem | Exact source order item/recipe ingredient quantities and historical names                                    |
+| StockMovement     | Append-only ADJUSTMENT, WASTE or SALE_CONSUMPTION quantities, reasons, actor and source references           |
+| InventoryRevision | Branch serialization point and monotonically increasing event cursor                                         |
+| InventoryEvent    | Immutable audit-related event and command receipt for exact replay                                           |
+
+All operational relationships carry organization/branch composite foreign keys. Decimal quantities are `NUMERIC(20,6)` and transported as strings. Current stock is the sum of signed movements; thresholds and configuration edits never overwrite it. Indexed warehouse/item positions, source order/plan lines and branch event cursors support current stock and history reads. Movement snapshots preserve ingredient/warehouse names across later edits.
+
+A recipe revision's ingredient rows can only be inserted with that new revision. Plan completeness and quantity checks run at commit; sale movements must match frozen plan lines and settled source orders. Every new settlement must have a complete inventory plan, including an empty plan when products have no recipes. Plan-line uniqueness prevents double consumption. Runtime grants and triggers prohibit modifying/deleting/truncating inventory history. Product/warehouse/item archives retain all source references.
+
+First payment freezes the plan; partial collections do not deduct quantities. Final/zero settlement records consumption in the existing financial transaction. Rollback leaves neither payments nor stock movements committed. Historical PAID orders are not backfilled; previously partial bills freeze recipes on their next collection. See [ADR 0007](docs/adr/0007-inventory.md).
+
+
+## Purchasing (Phase 8)
+
+Migration `202609140001_purchasing` adds Supplier, PurchaseOrder, PurchaseItem, GoodsReceipt, GoodsReceiptItem, SupplierEntry, PurchasingRevision and PurchasingEvent. All operational references include branch/organization composite keys, including receipt source lines, actor memberships and purchasing event references. StockMovement adds kind PURCHASE and optional unique receiptItemId; existing adjustment, waste and sale source constraints remain active. The PostgreSQL enum extension and new checks run within the migration transaction; new-value checks cast the enum to text so no uncommitted enum value is evaluated.
+
+Supplier is versioned and soft-archivable. PurchaseOrder has a branch sequence number, currency, status/version, supplier/warehouse snapshots, expected date, references, totals and cancellation reason. Draft replacement soft-voids prior PurchaseItem rows. Ordered items are immutable. Item quantities use NUMERIC(20,6), unit purchase costs NUMERIC(14,4), tax rates NUMERIC(5,2) and money totals NUMERIC(14,2). Net line cost rounds half-up before tax; all arithmetic uses Decimal or bigint, with no monetary float calculations.
+
+GoodsReceipt/Items are append-only. Each receipt snapshots delivered quantities using frozen order prices and references source items. Unique case-insensitive trimmed supplier references and nonempty invoice numbers prevent duplicate posting with different command IDs. Deferred checks require complete line totals, exactly matching stock additions, no cumulative overreceiving, an exact supplier charge and correct purchase status. Receipt-line rows can be inserted only with the new receipt transaction. Unique source links prevent double stock.
+
+SupplierEntry records signed CHARGE, PAYMENT and PAYMENT_REVERSAL amounts. One charge per receipt must equal its total; payments cannot exceed its unpaid amount; full correction reversals must match an original payment and cannot repeat. Balances are sums, not mutable columns. Runtime grants plus triggers prohibit update/delete/truncate of receipt, stock, supplier-entry and event history. All writes use Serializable transactions, branch serialization and idempotent command receipts; inventory failure rolls back the payable and receipt as well.

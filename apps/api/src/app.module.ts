@@ -1,3 +1,7 @@
+import { PurchasingController } from './purchasing/purchasing.controller';
+import { PurchasingService } from './purchasing/purchasing.service';
+import { InventoryController } from './inventory/inventory.controller';
+import { InventoryService } from './inventory/inventory.service';
 import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments/payments.controller';
 import { PaymentsService } from './payments/payments.service';
@@ -19,6 +23,8 @@ import { LayoutController } from './layout/layout.controller';
 import { LayoutService } from './layout/layout.service';
 @Module({
   controllers: [
+    PurchasingController,
+    InventoryController,
     PaymentsController,
     KitchenController,
     OrdersController,
@@ -29,6 +35,8 @@ import { LayoutService } from './layout/layout.service';
     LayoutController,
   ],
   providers: [
+    PurchasingService,
+    InventoryService,
     PaymentsService,
     KitchenService,
     OrdersService,

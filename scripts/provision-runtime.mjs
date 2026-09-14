@@ -38,6 +38,11 @@ export async function provisionRuntime(
     await client.query(
       'GRANT DELETE ON "RolePermission", "UserBranchRole", "ProductModifierGroup", "ProductKitchenStation" TO restaurant_app',
     );
+    await client.query(
+      'REVOKE UPDATE, DELETE, TRUNCATE ON "InventoryUnit", "RecipeVersion", "RecipeItem", "InventoryPlan", "InventoryPlanItem", "StockMovement", "InventoryEvent" FROM restaurant_app',
+    );
+    await client.query('REVOKE INSERT ON "InventoryUnit" FROM restaurant_app');
+    await client.query('REVOKE UPDATE, DELETE, TRUNCATE ON "GoodsReceipt", "GoodsReceiptItem", "SupplierEntry", "PurchasingEvent" FROM restaurant_app');
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

@@ -69,3 +69,18 @@ Back up the Phase 4 database, rebuild the existing Docker targets and apply `202
 Take a database backup before deploying `202609120003_payments`; then rebuild api/admin/migrate, run Compose migration/provisioning and start the stack. Seed is idempotent and preserves installed role customizations; OWNER must explicitly grant payment keys to existing cashiers/managers in Roles. Register active POS terminals before opening cash shifts. No payment examples or open drawers are seeded. Verify cash/card mixed settlement, receipt replay, counted shift close and restart persistence through Nginx. See docs/PHASE_6_VERIFICATION.md.
 
 Card recording does not move funds: staff must inspect the separate terminal approval/reversal receipt. Configure LAN HTTPS and managed cashier devices before live operations. Printed fiscal receipts, ATK rules and tax certification are not supplied by Phase 6.
+
+## Phase 7 upgrade
+
+Build api/admin/migrate images, take a verified backup, then stop the old API before applying `202609130001_inventory` with the migration service. The migration adds mandatory inventory-plan checks to new settlements, so the old API must not accept payments against the upgraded database. Start the matching API/frontend images together and reload Nginx upstream resolution. The migration is transactional, inserts only unit/permission reference data, and reprovisions immutable-ledger runtime grants. Existing business records and passwords remain intact.
+
+Configure warehouses, stock items, opening adjustments, low-stock thresholds and product recipes through Inventory before relying on consumption figures. An unset recipe intentionally has no consumption. Grant inventory permissions to existing staff through OWNER; seed never replaces customized grants. No new service or public-cloud dependency is required. Check stock/history access, forbidden cross-branch requests and payment settlement against an isolated test database before deployment. See [Phase 7 verification](docs/PHASE_7_VERIFICATION.md).
+
+
+## Phase 8 upgrade
+
+Back up before applying `202609140001_purchasing`. Build matching api/admin/migrate images, stop the old API, run the migration service (including restricted runtime provisioning), start API/admin and reload Nginx. Preserve the PostgreSQL volume and existing secrets. No business examples or supplier balances are seeded. New StockMovement references are nullable for existing stock history; historical sales/payments are not rewritten.
+
+OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplier records and use the branch's existing Inventory warehouses/items. Purchase costs are net per selected unit; enter tax from actual supplier documents. Verify a staged partial receipt, command replay, remaining quantities and supplier balance before live receiving. Supplier payment entry is a recording action; bank/card execution and POS cash-shift movements remain separate. Posted receipt reversal/credit notes and closing an unfulfilled partially received order are not implemented.
+
+The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.

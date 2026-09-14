@@ -1,3 +1,5 @@
+BEGIN;
+
 -- CreateEnum
 CREATE TYPE "InventoryItemKind" AS ENUM ('INGREDIENT', 'STOCK_ITEM');
 
@@ -358,3 +360,108 @@ ALTER TABLE "InventoryEvent" ADD CONSTRAINT "InventoryEvent_branchId_organizatio
 
 -- AddForeignKey
 ALTER TABLE "InventoryEvent" ADD CONSTRAINT "InventoryEvent_userId_branchId_organizationId_fkey" FOREIGN KEY ("userId", "branchId", "organizationId") REFERENCES "BranchMembership"("userId", "branchId", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+INSERT INTO "InventoryUnit" (code,dimension,factor) VALUES ('kg','MASS',1000),('g','MASS',1),('l','VOLUME',1000),('ml','VOLUME',1),('pcs','COUNT',1);
+ALTER TABLE "InventoryUnit" ADD CONSTRAINT inventory_known_units CHECK ((code,dimension,factor) IN (('kg','MASS',1000),('g','MASS',1),('l','VOLUME',1000),('ml','VOLUME',1),('pcs','COUNT',1)));
+ALTER TABLE "InventoryItem" ADD CONSTRAINT inventory_item_valid CHECK (version>0 AND length(trim(name))>0 AND length(trim(sku))>0 AND ("deletedAt" IS NULL OR NOT active));
+ALTER TABLE "Warehouse" ADD CONSTRAINT inventory_warehouse_valid CHECK (version>0 AND length(trim(name))>0 AND ("deletedAt" IS NULL OR NOT active));
+ALTER TABLE "StockPosition" ADD CONSTRAINT stock_threshold_valid CHECK (version>0 AND "lowStockThreshold">=0);
+ALTER TABLE "Recipe" ADD CONSTRAINT recipe_version_positive CHECK (version>0);
+ALTER TABLE "RecipeVersion" ADD CONSTRAINT recipe_revision_positive CHECK (version>0);
+ALTER TABLE "RecipeItem" ADD CONSTRAINT recipe_quantity_positive CHECK (quantity>0);
+ALTER TABLE "InventoryPlanItem" ADD CONSTRAINT plan_quantity_positive CHECK (quantity>0);
+ALTER TABLE "StockMovement" ADD CONSTRAINT stock_movement_valid CHECK (quantity<>0 AND length(trim(reason))>0 AND "enteredUnit" IN ('kg','g','l','ml','pcs') AND ((kind='ADJUSTMENT' AND "planItemId" IS NULL AND "orderId" IS NULL) OR (kind='WASTE' AND quantity<0 AND "planItemId" IS NULL AND "orderId" IS NULL) OR (kind='SALE_CONSUMPTION' AND quantity<0 AND "planItemId" IS NOT NULL AND "orderId" IS NOT NULL)));
+
+CREATE FUNCTION reject_inventory_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Inventory history is immutable' USING ERRCODE='42501'; END; $$;
+DO $$ DECLARE t TEXT; BEGIN
+ FOREACH t IN ARRAY ARRAY['InventoryUnit','RecipeVersion','RecipeItem','InventoryPlan','InventoryPlanItem','StockMovement','InventoryEvent'] LOOP
+  EXECUTE format('CREATE TRIGGER inventory_no_change BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION reject_inventory_mutation()',t);
+  EXECUTE format('CREATE TRIGGER inventory_no_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION reject_inventory_mutation()',t);
+ END LOOP;
+ FOREACH t IN ARRAY ARRAY['InventoryItem','Warehouse','Recipe','StockPosition'] LOOP
+  EXECUTE format('CREATE TRIGGER inventory_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION reject_inventory_mutation()',t);
+  EXECUTE format('CREATE TRIGGER inventory_no_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION reject_inventory_mutation()',t);
+ END LOOP;
+END $$;
+
+CREATE FUNCTION guard_inventory_identity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF (NEW.id,NEW."branchId",NEW."organizationId",NEW."createdAt") IS DISTINCT FROM (OLD.id,OLD."branchId",OLD."organizationId",OLD."createdAt") OR NEW.version<>OLD.version+1 THEN RAISE EXCEPTION 'Inventory identity/version is immutable' USING ERRCODE='23514'; END IF;
+ IF TG_TABLE_NAME='InventoryItem' THEN
+  IF (NEW."unitCode",NEW.sku,NEW.kind) IS DISTINCT FROM (OLD."unitCode",OLD.sku,OLD.kind) OR OLD."deletedAt" IS NOT NULL THEN RAISE EXCEPTION 'Inventory stock unit and historical identity are immutable' USING ERRCODE='42501'; END IF;
+ ELSIF TG_TABLE_NAME='Warehouse' THEN
+  IF OLD."deletedAt" IS NOT NULL THEN RAISE EXCEPTION 'Archived warehouse is immutable' USING ERRCODE='42501'; END IF;
+ ELSIF TG_TABLE_NAME='Recipe' THEN
+  IF NEW."productId"<>OLD."productId" THEN RAISE EXCEPTION 'Recipe product is immutable' USING ERRCODE='42501'; END IF;
+ ELSIF TG_TABLE_NAME='StockPosition' THEN
+  IF (NEW."warehouseId",NEW."itemId") IS DISTINCT FROM (OLD."warehouseId",OLD."itemId") THEN RAISE EXCEPTION 'Stock identity is immutable' USING ERRCODE='42501'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+DO $$ DECLARE t TEXT; BEGIN FOREACH t IN ARRAY ARRAY['InventoryItem','Warehouse','Recipe','StockPosition'] LOOP
+ EXECUTE format('CREATE TRIGGER inventory_identity BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION guard_inventory_identity()',t);
+END LOOP; END $$;
+
+CREATE FUNCTION guard_inventory_plan_line() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE r RECORD; BEGIN
+ SELECT ri.quantity AS per_product, oi.quantity AS product_quantity, oi."voidedAt", sp."itemId" AS stock_item, ri."itemId" AS recipe_item, sp."warehouseId" AS stock_warehouse, rv."warehouseId" AS recipe_warehouse, recipe."productId" AS recipe_product, oi."productId" AS order_product, plan.xmin::text AS created_tx INTO r
+ FROM "InventoryPlan" plan JOIN "OrderItem" oi ON oi.id=NEW."orderItemId" AND oi."orderId"=plan."orderId"
+ JOIN "RecipeItem" ri ON ri.id=NEW."recipeItemId" JOIN "RecipeVersion" rv ON rv.id=ri."recipeVersionId"
+ JOIN "Recipe" recipe ON recipe.id=rv."recipeId" JOIN "StockPosition" sp ON sp.id=NEW."positionId" WHERE plan."orderId"=NEW."orderId";
+ IF NOT FOUND OR r.created_tx<>(txid_current()%4294967296)::text OR r."voidedAt" IS NOT NULL OR r.stock_item<>r.recipe_item OR r.stock_warehouse<>r.recipe_warehouse OR r.recipe_product<>r.order_product OR NEW.quantity<>r.per_product*r.product_quantity THEN RAISE EXCEPTION 'Inventory plan must match the frozen order and recipe' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER inventory_plan_line_insert BEFORE INSERT ON "InventoryPlanItem" FOR EACH ROW EXECUTE FUNCTION guard_inventory_plan_line();
+
+CREATE FUNCTION guard_recipe_line_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM "RecipeVersion" WHERE id=NEW."recipeVersionId" AND xmin::text=(txid_current()%4294967296)::text) THEN RAISE EXCEPTION 'Cannot append to a committed recipe version' USING ERRCODE='42501'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER recipe_line_insert BEFORE INSERT ON "RecipeItem" FOR EACH ROW EXECUTE FUNCTION guard_recipe_line_insert();
+
+CREATE FUNCTION check_recipe_complete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM "RecipeVersion" rv JOIN "RecipeItem" ri ON ri."recipeVersionId"=rv.id WHERE rv."recipeId"=NEW.id AND rv.version=NEW.version) THEN RAISE EXCEPTION 'Recipe revision must contain ingredients' USING ERRCODE='23514'; END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER recipe_complete AFTER INSERT OR UPDATE ON "Recipe" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_recipe_complete();
+
+CREATE FUNCTION guard_sale_stock_movement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF NEW.kind='SALE_CONSUMPTION' AND NOT EXISTS (SELECT 1 FROM "InventoryPlanItem" WHERE id=NEW."planItemId" AND "orderId"=NEW."orderId" AND "positionId"=NEW."positionId" AND quantity=-NEW.quantity) THEN RAISE EXCEPTION 'Sale movement must match inventory plan' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER sale_stock_source BEFORE INSERT ON "StockMovement" FOR EACH ROW EXECUTE FUNCTION guard_sale_stock_movement();
+
+CREATE FUNCTION check_inventory_settlement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM "InventoryPlan" WHERE "orderId"=NEW."orderId") OR EXISTS (SELECT 1 FROM "InventoryPlanItem" line LEFT JOIN "StockMovement" movement ON movement."planItemId"=line.id WHERE line."orderId"=NEW."orderId" AND movement.id IS NULL) THEN RAISE EXCEPTION 'Settlement requires complete inventory consumption' USING ERRCODE='23514'; END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER settlement_inventory_complete AFTER INSERT ON "OrderSettlement" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_inventory_settlement();
+
+ALTER TABLE "StockMovement" ADD COLUMN snapshot JSONB NOT NULL;
+ALTER TABLE "StockMovement" ADD CONSTRAINT stock_snapshot_valid CHECK (jsonb_typeof(snapshot->'ingredientName')='string' AND snapshot ? 'ingredientName' AND jsonb_typeof(snapshot->'warehouseName')='string' AND snapshot ? 'warehouseName' AND snapshot ? 'unitCode' AND snapshot->>'unitCode' IN ('kg','g','l','ml','pcs'));
+
+CREATE FUNCTION check_inventory_plan_complete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF EXISTS (
+  SELECT 1 FROM "OrderItem" oi JOIN "Recipe" r ON r."productId"=oi."productId" AND r.active
+  JOIN "RecipeVersion" rv ON rv."recipeId"=r.id AND rv.version=r.version
+  JOIN "RecipeItem" ri ON ri."recipeVersionId"=rv.id
+  WHERE oi."orderId"=NEW."orderId" AND oi."voidedAt" IS NULL AND NOT EXISTS
+   (SELECT 1 FROM "InventoryPlanItem" line WHERE line."orderId"=NEW."orderId" AND line."orderItemId"=oi.id AND line."recipeItemId"=ri.id)
+ ) THEN RAISE EXCEPTION 'Inventory plan is missing recipe ingredients' USING ERRCODE='23514'; END IF;
+ IF EXISTS (
+  SELECT 1 FROM "InventoryPlanItem" line JOIN "RecipeItem" ri ON ri.id=line."recipeItemId"
+  JOIN "RecipeVersion" rv ON rv.id=ri."recipeVersionId" JOIN "Recipe" r ON r.id=rv."recipeId"
+  WHERE line."orderId"=NEW."orderId" AND (NOT r.active OR rv.version<>r.version)
+ ) THEN RAISE EXCEPTION 'Inventory plan must use the active recipe revision at freeze time' USING ERRCODE='23514'; END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER inventory_plan_complete AFTER INSERT ON "InventoryPlan" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_inventory_plan_complete();
+
+INSERT INTO "Permission" ("key",description,"updatedAt") VALUES ('inventory.read','inventory read',CURRENT_TIMESTAMP),('inventory.manage','inventory configuration',CURRENT_TIMESTAMP),('inventory.adjust','inventory adjustment',CURRENT_TIMESTAMP),('inventory.waste','inventory waste',CURRENT_TIMESTAMP),('recipe.manage','recipe management',CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING;
+DO $$ DECLARE r RECORD; before_keys JSONB; after_keys JSONB; BEGIN
+ FOR r IN SELECT * FROM "Role" WHERE name='OWNER' AND protected=true LOOP
+ SELECT COALESCE(jsonb_agg("permissionKey" ORDER BY "permissionKey"),'[]'::jsonb) INTO before_keys FROM "RolePermission" WHERE "roleId"=r.id;
+ INSERT INTO "RolePermission" ("roleId","permissionKey") SELECT r.id,key FROM "Permission" WHERE key IN ('inventory.read','inventory.manage','inventory.adjust','inventory.waste','recipe.manage') ON CONFLICT DO NOTHING;
+ SELECT jsonb_agg("permissionKey" ORDER BY "permissionKey") INTO after_keys FROM "RolePermission" WHERE "roleId"=r.id;
+ IF before_keys<>after_keys THEN INSERT INTO "AuditLog" (id,"organizationId",action,"entityType","entityId","beforeData","afterData") VALUES (gen_random_uuid(),r."organizationId",'role.permissions_migrated','Role',r.id::text,jsonb_build_object('permissions',before_keys),jsonb_build_object('permissions',after_keys,'migration','202609130001_inventory')); END IF;
+ END LOOP;
+END $$;
+COMMIT;

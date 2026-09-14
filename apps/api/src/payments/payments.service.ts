@@ -1,3 +1,4 @@
+import { freezeInventoryPlan, consumeInventoryPlan } from '../inventory/inventory.transactions';
 import {
   ConflictException,
   ForbiddenException,
@@ -241,6 +242,7 @@ export class PaymentsService {
         cashierId: p.userId,
       },
     });
+    await consumeInventoryPlan(tx, p, id);
     await tx.order.update({
       where: { ...scope(p), id, version: row.version },
       data: { status: 'PAID', version: { increment: 1 } },
@@ -286,6 +288,7 @@ export class PaymentsService {
           .filter((v) => !v.reversals.some((r) => r.kind === 'CANCELLATION'))
           .flatMap((v) => v.allocations.map((a) => `${a.itemId}:${a.unitNumber}`)),
       );
+      await freezeInventoryPlan(tx, p, id);
       let collected = 0n;
       const receipts = [];
       for (const tender of input.tenders) {

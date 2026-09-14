@@ -37,6 +37,10 @@ async function unusedPort() {
   return port;
 }
 const port = await unusedPort();
+// The OS may reserve port 3000 (e.g. Windows Hyper-V). Browser tests use an available loopback port.
+let browserPort = await unusedPort();
+while (browserPort === port || browserPort === 4000) browserPort = await unusedPort();
+const browserOrigin = `http://localhost:${browserPort}`;
 const suffix = randomBytes(6).toString('hex');
 const clusterDir = resolve('.local', `test-pg-${suffix}`);
 await mkdir('.local', { recursive: true });
@@ -50,7 +54,7 @@ Object.assign(process.env, {
   MIGRATION_DATABASE_URL: migrationUrl,
   APP_DATABASE_PASSWORD: appPassword,
   JWT_SECRET: randomBytes(64).toString('hex'),
-  APP_ORIGIN: 'http://localhost:3000',
+  APP_ORIGIN: browserOrigin,
   PORT: '4000',
   TRUST_PROXY: '0',
   SEED_ORGANIZATION_SLUG: 'verification',
@@ -135,6 +139,14 @@ try {
   app = await createApp();
   const { runPaymentIntegration } = await import('../tests/integration/payments.mjs');
   await runPaymentIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runInventoryIntegration } = await import('../tests/integration/inventory.mjs');
+  await runInventoryIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runPurchasingIntegration } = await import('../tests/integration/purchasing.mjs');
+  await runPurchasingIntegration(app);
   if (process.argv.includes('--browser')) {
     // Fresh limiter state for independent browser acceptance tests.
     await app.close();
@@ -143,7 +155,15 @@ try {
     nextLog = await open(resolve('.local', 'next-test.log'), 'w');
     next = spawn(
       process.execPath,
-      ['node_modules/next/dist/bin/next', 'start', 'apps/admin', '-p', '3000', '-H', '127.0.0.1'],
+      [
+        'node_modules/next/dist/bin/next',
+        'start',
+        'apps/admin',
+        '-p',
+        String(browserPort),
+        '-H',
+        '127.0.0.1',
+      ],
       {
         env: { ...process.env, NODE_ENV: 'production' },
         stdio: ['ignore', nextLog.fd, nextLog.fd],
@@ -155,7 +175,7 @@ try {
       if (next.exitCode !== null)
         throw new Error('Next.js exited before readiness; see .local/next-test.log');
       try {
-        if ((await fetch('http://localhost:3000')).ok) {
+        if ((await fetch(browserOrigin)).ok) {
           ready = true;
           break;
         }

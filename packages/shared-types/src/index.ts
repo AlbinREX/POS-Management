@@ -1,5 +1,13 @@
+export * from './purchasing';
 export * from './inventory';
 export const PERMISSIONS = [
+  'supplier.read',
+  'supplier.manage',
+  'purchase.read',
+  'purchase.manage',
+  'purchase.receive',
+  'supplier.payment.record',
+  'supplier.payment.reverse',
   'inventory.read',
   'inventory.manage',
   'inventory.adjust',
@@ -50,11 +58,18 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]> = {
   OWNER: PERMISSIONS,
   ADMIN: [
-  'inventory.read',
-  'inventory.manage',
-  'inventory.adjust',
-  'inventory.waste',
-  'recipe.manage',
+    'supplier.read',
+    'supplier.manage',
+    'purchase.read',
+    'purchase.manage',
+    'purchase.receive',
+    'supplier.payment.record',
+    'supplier.payment.reverse',
+    'inventory.read',
+    'inventory.manage',
+    'inventory.adjust',
+    'inventory.waste',
+    'recipe.manage',
 
     'payment.read',
     'payment.collect',
@@ -88,11 +103,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
   ],
   // Managers may operate manual table statuses but do not redesign the floor plan.
   MANAGER: [
-  'inventory.read',
-  'inventory.manage',
-  'inventory.adjust',
-  'inventory.waste',
-  'recipe.manage',
+    'supplier.read',
+    'supplier.manage',
+    'purchase.read',
+    'purchase.manage',
+    'purchase.receive',
+    'supplier.payment.record',
+    'supplier.payment.reverse',
+    'inventory.read',
+    'inventory.manage',
+    'inventory.adjust',
+    'inventory.waste',
+    'recipe.manage',
 
     'payment.read',
     'payment.collect',
@@ -129,12 +151,17 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
   WAITER: ['menu.read', 'layout.read', 'order.read', 'order.manage', 'order.submit_kitchen'],
   KITCHEN: ['kitchen.read', 'kitchen.manage'],
   STOREKEEPER: [
-  'inventory.read',
-  'inventory.manage',
-  'inventory.adjust',
-  'inventory.waste',
-  'recipe.manage',
-],
+    'supplier.read',
+    'supplier.manage',
+    'purchase.read',
+    'purchase.manage',
+    'purchase.receive',
+    'inventory.read',
+    'inventory.manage',
+    'inventory.adjust',
+    'inventory.waste',
+    'recipe.manage',
+  ],
 };
 export interface SessionUser {
   id: string;

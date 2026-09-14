@@ -20,6 +20,8 @@ import { RestaurantLayout } from './restaurant-layout';
 import { OrdersWorkspace } from './orders-workspace';
 import { KitchenDisplay } from './kitchen-display';
 import { Brand, NavIcon } from './riza-ui';
+import { PurchasingWorkspace } from './purchasing-workspace';
+import { InventoryWorkspace } from './inventory-workspace';
 import { PaymentsWorkspace } from './payments-workspace';
 
 type Tab =
@@ -33,7 +35,9 @@ type Tab =
   | 'Layout'
   | 'Orders'
   | 'Kitchen'
-  | 'Payments';
+  | 'Payments'
+  | 'Inventory'
+  | 'Purchasing';
 interface Role {
   id: string;
   name: string;
@@ -252,6 +256,8 @@ function Workspace({
   const tabs: Tab[] = [
     'Workspace',
     ...(can('order.read') ? ['POS' as const] : []),
+    ...(can('inventory.read') ? ['Inventory' as const] : []),
+    ...(can('purchase.read') || can('supplier.read') ? ['Purchasing' as const] : []),
     ...(can('menu.read') ? ['Menu' as const] : []),
     ...(can('layout.read') ? ['Layout' as const] : []),
     ...(can('order.read') ? ['Orders' as const] : []),
@@ -312,6 +318,8 @@ function Workspace({
                 Orders: 'Create and manage dine-in and takeaway orders.',
                 Kitchen: 'Station tickets, preparation progress and history.',
                 Payments: 'Collections, payment history and cash register shifts.',
+                Inventory: 'Ingredients, recipes and a complete stock history.',
+                Purchasing: 'Suppliers, purchase orders and goods receiving.',
                 Team: 'Manage the people who can access this branch.',
                 Roles: 'Control what each role can do.',
                 Terminals: 'Register and manage restaurant devices.',
@@ -324,7 +332,16 @@ function Workspace({
               <div className="riza-home-grid">
                 {tabs
                   .filter((item) =>
-                    ['POS', 'Orders', 'Layout', 'Kitchen', 'Menu', 'Payments'].includes(item),
+                    [
+                      'POS',
+                      'Orders',
+                      'Layout',
+                      'Kitchen',
+                      'Menu',
+                      'Payments',
+                      'Inventory',
+                      'Purchasing',
+                    ].includes(item),
                   )
                   .map((item) => (
                     <button key={item} className="riza-home-card" onClick={() => setTab(item)}>
@@ -339,6 +356,8 @@ function Workspace({
               <Overview user={user} />
             </>
           ) : null}
+          {tab === 'Purchasing' ? <PurchasingWorkspace user={user} /> : null}
+          {tab === 'Inventory' ? <InventoryWorkspace user={user} /> : null}
           {tab === 'Menu' ? <MenuCatalog canManage={can('menu.manage')} /> : null}
           {tab === 'POS' ? (
             <OrdersWorkspace

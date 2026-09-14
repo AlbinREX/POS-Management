@@ -14,7 +14,7 @@ Authorization is enforced in the NestJS global guard, using database-resolved pe
 | terminal.manage   | Register, rename, enable or disable same-branch terminals.                  |
 | audit.read        | Read the latest 100 events in the session branch.                           |
 
-Fresh OWNER and ADMIN receive all current keys, including menu.read and menu.manage. MANAGER receives organization.read, branch.read, user.read, role.read, terminal.read and menu.read. CASHIER, WAITER, KITCHEN and STOREKEEPER receive no administrative keys. Their current operational grants are documented in the phase-specific sections below. Inventory and purchasing will grant the requested managerial/storekeeper access when those modules exist.
+Fresh OWNER and ADMIN receive all current keys, including menu.read and menu.manage. MANAGER receives organization.read, branch.read, user.read, role.read, terminal.read and menu.read. CASHIER, WAITER, KITCHEN and STOREKEEPER receive no administrative keys. Their current operational grants are documented in the phase-specific sections below. Inventory grants are listed below; purchasing awaits Phase 8.
 
 Phase 2 adds `menu.read` for all catalog list/detail routes and `menu.manage` for create/update/archive. Writes require both keys. The admin hides the Menu tab without read access and hides editing controls without manage access. Existing installations receive the two new keys only for protected OWNER via migration `202609110001_menu`, with immutable `role.permissions_migrated` organization-level audit events. Existing ADMIN/MANAGER/custom roles keep their prior mappings; an owner can grant new keys in Roles. Organization-level migration audit events are retained in the database; the existing branch audit screen shows branch-scoped user changes.
 
@@ -65,3 +65,30 @@ Fresh OWNER/ADMIN/MANAGER receive all three keys; fresh WAITER receives order.su
 | cash.movement.manage | Cash in/out of own open shift, with cash.shift.read/manage                                  |
 
 Fresh CASHIER receives order.read, payment.read/collect and cash.shift.read/manage plus cash.movement.manage. Refunds and cancellation require separate grants. Fresh OWNER/ADMIN/MANAGER receive all seven new keys. Existing roles are unchanged except the protected OWNER grant, audited by the migration. Merely having order.manage cannot set PAID or edit a billed order. Payment collect/refund cash entries require the actor's own open shift, valid POS terminal and matching currency. The server never accepts a client-selected cashier or branch.
+
+## Phase 7 inventory permissions
+
+| Permission       | Backend authority                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| inventory.read   | Branch stock, items, warehouses, recipes/revision history, movements and event feed; limited product id/name/active picker |
+| inventory.manage | Create/edit/archive stock items and warehouses; configure low-stock thresholds, with inventory.read                        |
+| inventory.adjust | Record signed stock adjustment deltas with reasons, with inventory.read                                                    |
+| inventory.waste  | Record waste with reasons, with inventory.read                                                                             |
+| recipe.manage    | Create/revise/disable product recipes, with inventory.read                                                                 |
+
+Fresh OWNER, ADMIN, MANAGER and STOREKEEPER receive all five keys. Existing customized roles are preserved. Migration grants only the protected OWNER new permissions and audits that change; OWNER must explicitly grant access to other existing staff through Roles. STOREKEEPER does not receive user administration, menu price administration or payment permissions by default. Runtime authorization reloads branch membership and grants on each request. Settlement-driven consumption uses the existing authorized payment workflow and does not require cashiers to have manual stock adjustment authority.
+
+
+## Phase 8 purchasing permissions
+
+| Permission | Authority |
+| --- | --- |
+| supplier.read | Branch supplier directory, account balances and entry history |
+| supplier.manage | Supplier create/edit/archive, with supplier.read |
+| purchase.read | Orders, receipt details including outstanding amounts, purchase history/events and restricted inventory/supplier pickers |
+| purchase.manage | Create/edit drafts, confirm unreceived orders and cancel unreceived purchases, with purchase.read |
+| purchase.receive | Post partial/full goods receipts, with purchase.read |
+| supplier.payment.record | Record externally completed supplier payments, with supplier.read |
+| supplier.payment.reverse | Reverse an erroneous supplier payment record, with supplier.read |
+
+Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh STOREKEEPER receives supplier.read/manage and purchase.read/manage/receive, retaining Phase 7 inventory grants without supplier-payment or POS-payment authority. The migration adds and audits only protected OWNER grants; existing customized roles are preserved. Suppliers and receipt balances stay readable after archival. Cashier payment permissions do not imply supplier-account access. Direct receiving commands cannot choose the actor, branch, receipt totals or stock movement kind.

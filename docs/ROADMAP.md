@@ -1,6 +1,6 @@
 # Delivery phases
 
-Phases 1-6 are implemented under separate user authorizations. Phase 6 adds payment ledgers, deterministic splits, immutable settlement and cash shifts. WebSocket push, physical printing and card-acquirer adapters remain future work. Do not automatically start Phase 7, Inventory or Fiscalization.
+Phases 1-8 are implemented under separate user authorizations. Phase 7 adds the inventory ledger, recipes and settlement consumption; Phase 8 adds suppliers, purchase orders, goods receiving and receipt-backed supplier balances. WebSocket push, physical printing and card-acquirer adapters remain future work. Do not automatically start Phase 9, Company contracts or Fiscalization.
 
 1. Foundation: identity, organization/branch, permission system, terminals, audit, migrations, tests and local deployment scaffold.
 2. Menu: categories, products, modifier groups/modifiers, configurable kitchen stations and product station mappings.

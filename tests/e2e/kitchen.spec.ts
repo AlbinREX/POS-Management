@@ -8,8 +8,8 @@ test('submit immutable order snapshots and operate a kitchen-only display with r
   let outage = false;
   page.on('pageerror', (e) => errors.push(e.message));
   const admin = await apiRequest.newContext({
-    baseURL: 'http://localhost:3000',
-    extraHTTPHeaders: { Origin: 'http://localhost:3000' },
+    baseURL: process.env.APP_ORIGIN ?? 'http://localhost:3000',
+    extraHTTPHeaders: { Origin: process.env.APP_ORIGIN ?? 'http://localhost:3000' },
   });
   const credentials = {
     organization: 'verification',
@@ -127,7 +127,7 @@ test('submit immutable order snapshots and operate a kitchen-only display with r
   );
   await card.getByRole('button', { name: 'Start preparing', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry kitchen command' })).toBeVisible();
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Retry kitchen command' }).click();
   await expect(page.getByRole('button', { name: 'Retry kitchen command' })).toHaveCount(0);
   await expect(card.getByText('PREPARING', { exact: true })).toBeVisible();
