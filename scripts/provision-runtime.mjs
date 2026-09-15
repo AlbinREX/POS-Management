@@ -43,6 +43,7 @@ export async function provisionRuntime(
     );
     await client.query('REVOKE INSERT ON "InventoryUnit" FROM restaurant_app');
     await client.query('REVOKE UPDATE, DELETE, TRUNCATE ON "GoodsReceipt", "GoodsReceiptItem", "SupplierEntry", "PurchasingEvent" FROM restaurant_app');
+    await client.query('REVOKE UPDATE, DELETE, TRUNCATE ON "CompanyLedgerEntry", "CompanyStatement", "CompanyStatementLine", "CompaniesEvent" FROM restaurant_app');
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

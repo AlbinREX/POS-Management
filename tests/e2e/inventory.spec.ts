@@ -175,6 +175,8 @@ test('inventory operator configures stock, recovers a lost save, records waste a
   await views.getByRole('button', { name: 'History', exact: true }).click();
   await page.getByLabel('Search inventory', { exact: true }).fill(prefix);
   await expect(page.getByText(`Order #${order.orderNumber}`, { exact: false })).toBeVisible();
-  await expect(page.getByText('Final order settlement', { exact: true })).toBeVisible();
+  // Other suites settle orders in this shared database, so several movements carry this
+  // reason; the assertion is that a sale consumption is visible for this filtered item.
+  await expect(page.getByText('Final order settlement', { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1,4 +1,5 @@
 import { freezeInventoryPlan, consumeInventoryPlan } from '../inventory/inventory.transactions';
+import { chargeCompanyAccount } from '../companies/companies.service';
 import {
   ConflictException,
   ForbiddenException,
@@ -325,6 +326,7 @@ export class PaymentsService {
             throw new ConflictException('Tendered cash is less than payment');
           }
         }
+        if (tender.method === 'COMPANY_ACCOUNT') this.require(p, 'company.charge');
         const receipt = await tx.payment.create({
           data: {
             ...scope(p),
@@ -336,8 +338,19 @@ export class PaymentsService {
             change,
             shiftId: tender.shiftId,
             transactionReference: tender.transactionReference,
+            companyId: tender.companyId,
+            companyEmployeeId: tender.companyEmployeeId,
           },
         });
+        if (tender.method === 'COMPANY_ACCOUNT')
+          await chargeCompanyAccount(tx, p, {
+            companyId: tender.companyId!,
+            employeeId: tender.companyEmployeeId ?? null,
+            orderId: id,
+            paymentId: receipt.id,
+            amount: money(amount),
+            orderNumber: order.orderNumber.toString(),
+          });
         if (allocations.length)
           await tx.paymentAllocation.createMany({
             data: allocations.map((a) => ({
@@ -454,13 +467,16 @@ export class PaymentsService {
         payment.reversals.length >= 100
       )
         throw new ConflictException('Reversal exceeds original payment or history limit');
+      // Exhaustive per method: a house account takes neither a drawer nor a card reference.
       if (
         payment.method === 'CARD'
           ? !input.transactionReference || input.shiftId !== undefined
-          : !input.shiftId || input.transactionReference !== undefined
+          : payment.method === 'COMPANY_ACCOUNT'
+            ? input.shiftId !== undefined || input.transactionReference !== undefined
+            : !input.shiftId || input.transactionReference !== undefined
       )
         throw new ConflictException(
-          'Use original method: cash needs a shift; card needs external reversal confirmation',
+          'Use original method: cash needs a shift; card needs external reversal confirmation; a company account needs neither',
         );
       if (payment.method === 'CASH') {
         const shift = await this.shift(tx, p, input.shiftId!, true);
@@ -489,6 +505,20 @@ export class PaymentsService {
           input.reason,
           { reversalId: reversal.id },
         );
+      // Returning credit to the company account keeps its balance the authoritative sum.
+      if (payment.method === 'COMPANY_ACCOUNT' && payment.companyId)
+        await tx.companyLedgerEntry.create({
+          data: {
+            ...scope(p),
+            companyId: payment.companyId,
+            userId: p.userId,
+            kind: 'PAYMENT',
+            amount: money(-cents(input.amount)),
+            method: 'OTHER',
+            reference: 'reversal:' + reversal.id,
+            reason: input.reason,
+          },
+        });
       if (input.kind === 'CANCELLATION') {
         await tx.order.update({
           where: { ...scope(p), id: order.id, version: order.version },

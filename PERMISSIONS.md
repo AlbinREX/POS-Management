@@ -92,3 +92,19 @@ Fresh OWNER, ADMIN, MANAGER and STOREKEEPER receive all five keys. Existing cust
 | supplier.payment.reverse | Reverse an erroneous supplier payment record, with supplier.read |
 
 Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh STOREKEEPER receives supplier.read/manage and purchase.read/manage/receive, retaining Phase 7 inventory grants without supplier-payment or POS-payment authority. The migration adds and audits only protected OWNER grants; existing customized roles are preserved. Suppliers and receipt balances stay readable after archival. Cashier payment permissions do not imply supplier-account access. Direct receiving commands cannot choose the actor, branch, receipt totals or stock movement kind.
+
+## Phase 9 company contract permissions
+
+| Permission | Authority |
+| --- | --- |
+| company.read | Branch company directory, contracts, authorized employees, account balances, ledger history and statements |
+| company.manage | Company create/edit/archive and authorized employee administration, with company.read |
+| contract.manage | Contract drafting, editing and status transitions, with company.read |
+| company.charge | Settle an order against a company account using the COMPANY_ACCOUNT payment method |
+| company.payment.record | Record an externally completed company payment against the account balance, with company.read |
+| company.payment.reverse | Reverse an erroneous company payment record, with company.read |
+| company.statement.manage | Generate an immutable period statement, with company.read |
+
+Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh CASHIER receives only company.read and company.charge, so a cashier can settle an order on an existing account without editing contracts, recording account payments or issuing statements. WAITER, KITCHEN and STOREKEEPER receive none. Existing customized roles are preserved; migration `202609150001_companies` grants and audits only protected OWNER.
+
+Collecting on a company account requires the existing payment.read/payment.collect keys **and** company.charge, so payment authority alone cannot extend credit. Charging is additionally refused unless the company holds an ACTIVE contract and the charge stays within its credit limit; a database constraint trigger re-checks both at commit. Account payments and correction reversals remain permitted after a contract expires or is terminated so an outstanding balance can always be settled. Company, contract, employee, ledger and statement reads are branch-scoped: a company belonging to another branch returns 404 from every route, including per-company history.

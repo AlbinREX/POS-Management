@@ -84,3 +84,13 @@ Back up before applying `202609140001_purchasing`. Build matching api/admin/migr
 OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplier records and use the branch's existing Inventory warehouses/items. Purchase costs are net per selected unit; enter tax from actual supplier documents. Verify a staged partial receipt, command replay, remaining quantities and supplier balance before live receiving. Supplier payment entry is a recording action; bank/card execution and POS cash-shift movements remain separate. Posted receipt reversal/credit notes and closing an unfulfilled partially received order are not implemented.
 
 The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.
+
+## Phase 9 upgrade
+
+Back up before applying `202609150001_companies`. Build matching api/admin/migrate images, stop the old API, run the migration service including restricted runtime provisioning, start API/admin and reload Nginx. Preserve the PostgreSQL volume and existing secrets.
+
+The migration is transactional and additive: it creates the eight company tables, adds `COMPANY_ACCOUNT` to the PaymentMethod enum, adds nullable `companyId`/`companyEmployeeId` to Payment, and replaces the `payment_valid` constraint and the `guard_reversal_insert`/`check_payment_integrity` functions so they handle the new method explicitly. Existing cash and card payments are unaffected and no historical row is rewritten. Because the enum value is uncommitted inside the migration transaction, its predicates cast the enum to text; do not "simplify" those casts in a later edit.
+
+**Stop the old API before migrating.** Once the constraint is replaced, an older API build that does not know the new method is still safe for cash and card, but the new company routes and the COMPANY_ACCOUNT tender require the matching build. Start API and admin from the same image set.
+
+No companies, contracts, employees or balances are seeded. OWNER grants the seven Phase 9 permissions to existing staff through Roles; the migration grants and audits only protected OWNER. Before live use, create a company, agree and activate a contract with a real credit limit, authorize its employees, then verify on an isolated test database that a COMPANY_ACCOUNT collection settles the order, writes no cash movement, posts one charge, and is refused once the credit limit is reached. Verify a recorded account payment and a statement for a closed period. Supplier and company account settlement remain separate ledgers; neither touches a POS cash shift.

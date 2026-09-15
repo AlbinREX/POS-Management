@@ -1,3 +1,4 @@
+export * from './companies';
 export * from './purchasing';
 export * from './inventory';
 import { z } from 'zod';
@@ -309,24 +310,33 @@ const selectedUnits = z
   );
 const tender = z
   .object({
-    method: z.enum(['CASH', 'CARD']),
+    method: z.enum(['CASH', 'CARD', 'COMPANY_ACCOUNT']),
     amount: positiveMoney.optional(),
     items: selectedUnits.optional(),
     tendered: decimalAmountSchema.optional(),
     shiftId: id.optional(),
     transactionReference: paymentReference.optional(),
+    companyId: id.optional(),
+    companyEmployeeId: id.optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
-    if (
-      (v.method === 'CASH' && (!v.tendered || !v.shiftId || v.transactionReference)) ||
-      (v.method === 'CARD' &&
-        (!v.transactionReference || v.tendered !== undefined || v.shiftId !== undefined))
-    )
+    // Exhaustive per method: an unhandled method must never pass unvalidated.
+    const company = v.companyId !== undefined || v.companyEmployeeId !== undefined;
+    const invalid =
+      v.method === 'CASH'
+        ? !v.tendered || !v.shiftId || v.transactionReference || company
+        : v.method === 'CARD'
+          ? !v.transactionReference || v.tendered !== undefined || v.shiftId !== undefined || company
+          : !v.companyId ||
+            v.tendered !== undefined ||
+            v.shiftId !== undefined ||
+            v.transactionReference !== undefined;
+    if (invalid)
       ctx.addIssue({
         code: 'custom',
         message:
-          'Cash requires tendered cash and a shift; card requires only an external reference',
+          'Cash requires tendered cash and a shift; card requires only an external reference; a company account requires only its company',
       });
   });
 export const paymentCollectSchema = z
@@ -359,7 +369,11 @@ export const paymentReverseSchema = z
     shiftId: id.optional(),
     transactionReference: paymentReference.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (v) => v.shiftId === undefined || v.transactionReference === undefined,
+    'A reversal uses the original method: a cash shift or an external reference, never both',
+  );
 export const shiftOpenSchema = z
   .object({ commandId: id, terminalId: id, openingAmount: decimalAmountSchema })
   .strict();

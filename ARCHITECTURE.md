@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-8: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory and purchasing. Settlement is the only API path to PAID.
+Status: Phases 1-9: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing and company contracts. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -104,3 +104,7 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 9 company contracts
+
+Companies, contracts, authorized employees, an append-only account ledger and immutable statements extend the same local API and Riza frontend. COMPANY_ACCOUNT is a third payment method: it settles an order through the existing settlement path, writes no cash movement, and posts the company charge in the same Serializable transaction as the payment, settlement, inventory consumption, audit and events. Balances are ledger sums, never stored columns; credit limits are enforced in the service and backstopped by a deferred database trigger. See [ADR 0009](docs/adr/0009-company-contracts.md). No fiscalization is introduced.
