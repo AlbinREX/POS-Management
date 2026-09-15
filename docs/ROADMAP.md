@@ -1,6 +1,6 @@
 # Delivery phases
 
-Phases 1-9 are implemented under separate user authorizations. Phase 7 adds the inventory ledger, recipes and settlement consumption; Phase 8 adds suppliers, purchase orders, goods receiving and receipt-backed supplier balances; Phase 9 adds company contracts, authorized employees, the B2B account ledger, credit limits, monthly statements and COMPANY_ACCOUNT settlement. WebSocket push, physical printing and card-acquirer adapters remain future work. Do not automatically start Phase 10, the Waiter PWA or Fiscalization.
+Phases 1-10 are implemented under separate user authorizations. Phase 10 adds the installable waiter PWA at `/waiter`: table service, mobile ordering, kitchen submission and payment handoff over the existing API, with no schema change and no new permission key. Phase 7 adds the inventory ledger, recipes and settlement consumption; Phase 8 adds suppliers, purchase orders, goods receiving and receipt-backed supplier balances; Phase 9 adds company contracts, authorized employees, the B2B account ledger, credit limits, monthly statements and COMPANY_ACCOUNT settlement. WebSocket push, physical printing and card-acquirer adapters remain future work. Do not automatically start Phase 10, the Waiter PWA or Fiscalization.
 
 1. Foundation: identity, organization/branch, permission system, terminals, audit, migrations, tests and local deployment scaffold.
 2. Menu: categories, products, modifier groups/modifiers, configurable kitchen stations and product station mappings.

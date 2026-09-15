@@ -85,6 +85,12 @@ OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplie
 
 The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.
 
+## Phase 10 upgrade
+
+Phase 10 adds no migration and no schema change, so the database is untouched and backup/restore is unaffected. Rebuild the admin image and recreate the container; the waiter surface is served at `/waiter` by the same deployment, behind the same Nginx route and CSP. The policy gains explicit `worker-src` and `manifest-src` directives.
+
+Install the PWA from a waiter device by opening `/waiter` and choosing the browser's install action. Service workers require a secure context: this works on loopback for evaluation, but a real LAN deployment must serve HTTPS with a certificate the devices trust, per the production profile above. Without TLS the surface still runs as a normal page; only installation and shell precaching are unavailable. Grant existing staff the WAITER role, or the five equivalent keys, through Roles.
+
 ## Phase 9 upgrade
 
 Back up before applying `202609150001_companies`. Build matching api/admin/migrate images, stop the old API, run the migration service including restricted runtime provisioning, start API/admin and reload Nginx. Preserve the PostgreSQL volume and existing secrets.

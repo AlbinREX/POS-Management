@@ -68,6 +68,10 @@ PurchasingEvent provides branch string-bigint cursors, immutable command hashes/
 The responsive Purchasing screen refreshes from the local API every ten seconds and preserves uncertain command bodies in branch/user-scoped sessionStorage for explicit retry. Writes are disabled during stale reads or unresolved saves. This is local LAN operation with replay recovery, not an offline browser write queue or cloud synchronization. Public internet is unnecessary for core purchasing; opening external HTTPS supplier document references may require it. No document content is fetched by the API.
 
 
+## Phase 10 waiter PWA boundary
+
+The waiter service worker precaches the application shell and its icons so an installed device launches without a network round trip. Every `/api` request bypasses the cache entirely: authenticated, branch-scoped responses are never stored on a shared device and never replayed stale at order time. No write is queued offline. Losing the local server pauses ordering with an explicit connection failure, exactly as the desktop surfaces do, and the existing sessionStorage retry receipt remains the recovery path for an uncertain command. Offline ordering, background sync, push delivery and conflict resolution remain Phase 12. Service workers require a secure context, so an installed PWA on a LAN hostname needs the documented TLS deployment; plain HTTP registers a worker only on loopback.
+
 ## Phase 9 company account synchronization boundary
 
 CompaniesEvent provides branch string-bigint cursors with immutable command hashes, responses, actor, company and contract references. A company charge appends its ledger entry, payment, settlement, inventory consumption, audit and events in one transaction, so replication must carry those records together; a derived balance is never conflict-merged, because the ledger rows are the authority and the balance is their sum.

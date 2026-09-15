@@ -1,6 +1,6 @@
 # Restaurant Platform
 
-Phases 1-9 of a local-first restaurant POS platform: authentication, administration, branch-owned menu, layout, orders, kitchen tickets, payments and cash shifts. Dine-in/takeaway orders preserve item snapshots and decimal-safe totals. Kitchen submission routes those snapshots to station tickets, with audited preparation states and printer-ready contracts. Payments support immutable receipts, mixed tenders, item splits, partial collections, reversals and counted cash shifts. Inventory adds exact quantities, immutable stock movements, versioned recipes and atomic consumption at final sale settlement. Purchasing adds supplier records, purchase orders, goods receiving and receipt-backed supplier balances. Company contracts, reporting and fiscalization are not implemented yet.
+Phases 1-10 of a local-first restaurant POS platform: authentication, administration, branch-owned menu, layout, orders, kitchen tickets, payments and cash shifts. Dine-in/takeaway orders preserve item snapshots and decimal-safe totals. Kitchen submission routes those snapshots to station tickets, with audited preparation states and printer-ready contracts. Payments support immutable receipts, mixed tenders, item splits, partial collections, reversals and counted cash shifts. Inventory adds exact quantities, immutable stock movements, versioned recipes and atomic consumption at final sale settlement. Purchasing adds supplier records, purchase orders, goods receiving and receipt-backed supplier balances. Company contracts, reporting and fiscalization are not implemented yet.
 
 ## Stack and applications
 
@@ -82,6 +82,8 @@ Lists currently cap at 200 records; the audit UI shows the latest 100 events. Or
 - [Phase 8 verification](docs/PHASE_8_VERIFICATION.md)
 - [Company contracts architecture decision](docs/adr/0009-company-contracts.md)
 - [Phase 9 verification](docs/PHASE_9_VERIFICATION.md)
+- [Waiter PWA architecture decision](docs/adr/0010-waiter-pwa.md)
+- [Phase 10 verification](docs/PHASE_10_VERIFICATION.md)
 
 Open **Menu** for catalog configuration and product-to-kitchen-station routing. **Layout** provides configurable areas and tables. **Orders** creates dine-in/takeaway drafts with modifiers, discounts and history; open an order and choose **Send to kitchen**. Every active line must have an available route. Open **Kitchen**, or the dedicated **/kds** screen, to prepare, mark ready and complete station tickets. Submitted content is frozen; cancellation preserves ticket history. Request payment after opening an unsubmitted order or after all kitchen stations are ready. In **Payments**, open a registered POS cash shift, select a waiting bill and collect by amount or item quantity. Card entries acknowledge externally approved terminal receipts; this application does not process cards. Exact settlement marks the order PAID and frees its table. Refunds preserve the original order and settlement. No business examples are seeded. On upgrades, OWNER grants new permissions to existing roles in **Roles**. See [Phase 6 verification](docs/PHASE_6_VERIFICATION.md) and [payment decisions](docs/adr/0006-payments.md). See [Phase 7 verification](docs/PHASE_7_VERIFICATION.md) and [inventory decisions](docs/adr/0007-inventory.md). See [Phase 8 verification](docs/PHASE_8_VERIFICATION.md) and [purchasing decisions](docs/adr/0008-purchasing.md). Phase 9 requires separate authorization.
 
@@ -95,6 +97,16 @@ A product without an active recipe does not consume inventory. The first payment
 ## Purchasing and goods receiving (Phase 8)
 
 Open **Purchasing** to add suppliers, prepare purchase-order drafts, confirm orders, post partial/full deliveries and inspect supplier balances. Configure stock items and warehouses in Inventory first. Drafts can be edited; confirmation freezes quantities, names, net unit prices and tax rates. Receive only quantities physically delivered. Each receipt has a unique supplier delivery reference and optional invoice/date, due date and HTTPS document reference. Receiving adds positive PURCHASE movements and the supplier charge atomically.
+
+## Waiter PWA (Phase 10)
+
+Open **/waiter** on a phone or tablet to install the mobile table-service app. It uses the same sign-in, the same branch and the same rules as every other surface: nothing is a separate account or a second engine.
+
+The home view lists your areas and tables with live status — free, occupied, order sent, waiting payment, reserved or disabled. Tap a busy table to open its running bill, or a free one to start a dine-in order. Ordering reuses the existing touch catalogue: categories, search, product images, modifiers, quantities, item and order notes, and totals with the same immutable price and tax snapshots the POS records. Takeaway has its own tab.
+
+**Send to kitchen** routes the order through the existing stations. A sent order is locked, exactly as it is everywhere else: kitchen amendments are not available, so extra items mean a new order for that table. When the guest is ready, **request payment** moves the bill to waiting payment and hands it to the cashier; a waiter never collects money, and company account rules are unchanged. Discounts, cancellation and reassigning another waiter stay with supervisors.
+
+Installing caches only the app shell so it launches quickly. No order, menu or table data is stored on the device. This is not offline ordering: without the restaurant server the app says so instead of accepting work it cannot save. Installation needs HTTPS on a real LAN device; grant staff the WAITER role in **Roles**. See [waiter decisions](docs/adr/0010-waiter-pwa.md).
 
 ## Company contracts and B2B accounts (Phase 9)
 

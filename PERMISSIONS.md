@@ -93,6 +93,10 @@ Fresh OWNER, ADMIN, MANAGER and STOREKEEPER receive all five keys. Existing cust
 
 Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh STOREKEEPER receives supplier.read/manage and purchase.read/manage/receive, retaining Phase 7 inventory grants without supplier-payment or POS-payment authority. The migration adds and audits only protected OWNER grants; existing customized roles are preserved. Suppliers and receipt balances stay readable after archival. Cashier payment permissions do not imply supplier-account access. Direct receiving commands cannot choose the actor, branch, receipt totals or stock movement kind.
 
+## Phase 10 waiter surface
+
+Phase 10 adds no permission key. The waiter PWA is a client over existing grants: fresh WAITER holds `menu.read`, `layout.read`, `order.read`, `order.manage` and `order.submit_kitchen`, which cover the floor plan, catalog, order lifecycle and kitchen submission. Requesting payment is an ordinary order command, so a waiter moves an order to WAITING_PAYMENT with `order.manage` and never holds a payment key; collection stays behind `payment.read`/`payment.collect`, and a company account charge still requires `company.charge`. A waiter therefore cannot discount, cancel, reassign another waiter, read the kitchen display, list eligible waiters or settle money, and the server enforces that regardless of what the mobile client renders.
+
 ## Phase 9 company contract permissions
 
 | Permission | Authority |
