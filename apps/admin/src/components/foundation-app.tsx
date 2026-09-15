@@ -20,6 +20,7 @@ import { RestaurantLayout } from './restaurant-layout';
 import { OrdersWorkspace } from './orders-workspace';
 import { KitchenDisplay } from './kitchen-display';
 import { Brand, NavIcon } from './riza-ui';
+import { CompaniesWorkspace } from './companies-workspace';
 import { PurchasingWorkspace } from './purchasing-workspace';
 import { InventoryWorkspace } from './inventory-workspace';
 import { PaymentsWorkspace } from './payments-workspace';
@@ -37,7 +38,8 @@ type Tab =
   | 'Kitchen'
   | 'Payments'
   | 'Inventory'
-  | 'Purchasing';
+  | 'Purchasing'
+  | 'Companies';
 interface Role {
   id: string;
   name: string;
@@ -258,6 +260,7 @@ function Workspace({
     ...(can('order.read') ? ['POS' as const] : []),
     ...(can('inventory.read') ? ['Inventory' as const] : []),
     ...(can('purchase.read') || can('supplier.read') ? ['Purchasing' as const] : []),
+    ...(can('company.read') ? ['Companies' as const] : []),
     ...(can('menu.read') ? ['Menu' as const] : []),
     ...(can('layout.read') ? ['Layout' as const] : []),
     ...(can('order.read') ? ['Orders' as const] : []),
@@ -320,6 +323,7 @@ function Workspace({
                 Payments: 'Collections, payment history and cash register shifts.',
                 Inventory: 'Ingredients, recipes and a complete stock history.',
                 Purchasing: 'Suppliers, purchase orders and goods receiving.',
+                Companies: 'Company accounts, contracts, employees and statements.',
                 Team: 'Manage the people who can access this branch.',
                 Roles: 'Control what each role can do.',
                 Terminals: 'Register and manage restaurant devices.',
@@ -341,6 +345,7 @@ function Workspace({
                       'Payments',
                       'Inventory',
                       'Purchasing',
+                      'Companies',
                     ].includes(item),
                   )
                   .map((item) => (
@@ -356,6 +361,7 @@ function Workspace({
               <Overview user={user} />
             </>
           ) : null}
+          {tab === 'Companies' ? <CompaniesWorkspace user={user} /> : null}
           {tab === 'Purchasing' ? <PurchasingWorkspace user={user} /> : null}
           {tab === 'Inventory' ? <InventoryWorkspace user={user} /> : null}
           {tab === 'Menu' ? <MenuCatalog canManage={can('menu.manage')} /> : null}

@@ -126,38 +126,39 @@ model OrderCounter {
 }
 
 model Order {
+  companyEntries     CompanyLedgerEntry[]
   bill               OrderBill?
   settlement         OrderSettlement?
   payments           Payment[]
   paymentEvents      PaymentEvent[]
   kitchenSubmission  KitchenSubmission?
-  id                 String             @id @default(uuid()) @db.Uuid
-  branchId           String             @db.Uuid
-  organizationId     String             @db.Uuid
+  id                 String               @id @default(uuid()) @db.Uuid
+  branchId           String               @db.Uuid
+  organizationId     String               @db.Uuid
   orderNumber        BigInt
   type               OrderType
-  status             OrderStatus        @default(DRAFT)
-  tableId            String?            @db.Uuid
-  areaId             String?            @db.Uuid
-  tableName          String?            @db.VarChar(100)
-  areaName           String?            @db.VarChar(160)
-  waiterId           String?            @db.Uuid
-  waiterName         String?            @db.VarChar(100)
-  currency           String             @db.Char(3)
-  subtotal           Decimal            @default(0) @db.Decimal(14, 2)
-  discount           Decimal            @default(0) @db.Decimal(14, 2)
-  tax                Decimal            @default(0) @db.Decimal(14, 2)
-  total              Decimal            @default(0) @db.Decimal(14, 2)
-  discountReason     String?            @db.VarChar(500)
-  cancellationReason String?            @db.VarChar(500)
-  notes              String             @default("") @db.VarChar(2000)
-  version            Int                @default(1)
-  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
-  branch             Branch             @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  table              RestaurantTable?   @relation(fields: [tableId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
-  area               Area?              @relation(fields: [areaId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
-  waiter             BranchMembership?  @relation(fields: [waiterId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  status             OrderStatus          @default(DRAFT)
+  tableId            String?              @db.Uuid
+  areaId             String?              @db.Uuid
+  tableName          String?              @db.VarChar(100)
+  areaName           String?              @db.VarChar(160)
+  waiterId           String?              @db.Uuid
+  waiterName         String?              @db.VarChar(100)
+  currency           String               @db.Char(3)
+  subtotal           Decimal              @default(0) @db.Decimal(14, 2)
+  discount           Decimal              @default(0) @db.Decimal(14, 2)
+  tax                Decimal              @default(0) @db.Decimal(14, 2)
+  total              Decimal              @default(0) @db.Decimal(14, 2)
+  discountReason     String?              @db.VarChar(500)
+  cancellationReason String?              @db.VarChar(500)
+  notes              String               @default("") @db.VarChar(2000)
+  version            Int                  @default(1)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+  branch             Branch               @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  table              RestaurantTable?     @relation(fields: [tableId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  area               Area?                @relation(fields: [areaId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  waiter             BranchMembership?    @relation(fields: [waiterId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
   items              OrderItem[]
   events             OrderEvent[]
 
@@ -532,6 +533,13 @@ model Organization {
 }
 
 model Branch {
+  companies          Company[]
+  companyContracts   CompanyContract[]
+  companyEmployees   CompanyEmployee[]
+  companyEntries     CompanyLedgerEntry[]
+  companyStatements  CompanyStatement[]
+  companiesRevision  CompaniesRevision?
+  companiesEvents    CompaniesEvent[]
   suppliers          Supplier[]
   purchaseOrders     PurchaseOrder[]
   purchasingRevision PurchasingRevision?
@@ -592,13 +600,16 @@ model User {
 }
 
 model BranchMembership {
-  purchaseOrders   PurchaseOrder[]
-  goodsReceipts    GoodsReceipt[]
-  supplierEntries  SupplierEntry[]
-  purchasingEvents PurchasingEvent[]
-  inventoryEvents  InventoryEvent[]
-  stockMovements   StockMovement[]
-  inventoryPlans   InventoryPlan[]
+  companyEntries    CompanyLedgerEntry[]
+  companyStatements CompanyStatement[]
+  companiesEvents   CompaniesEvent[]
+  purchaseOrders    PurchaseOrder[]
+  goodsReceipts     GoodsReceipt[]
+  supplierEntries   SupplierEntry[]
+  purchasingEvents  PurchasingEvent[]
+  inventoryEvents   InventoryEvent[]
+  stockMovements    StockMovement[]
+  inventoryPlans    InventoryPlan[]
 
   cashShifts         CashShift[]
   payments           Payment[]
@@ -754,6 +765,7 @@ model AuditLog {
 enum PaymentMethod {
   CASH
   CARD
+  COMPANY_ACCOUNT
 }
 
 enum BillMode {
@@ -817,6 +829,8 @@ model Payment {
   organizationId       String              @db.Uuid
   cashierId            String              @db.Uuid
   shiftId              String?             @db.Uuid
+  companyId            String?             @db.Uuid
+  companyEmployeeId    String?             @db.Uuid
   method               PaymentMethod
   amount               Decimal             @db.Decimal(14, 2)
   tendered             Decimal?            @db.Decimal(14, 2)
@@ -826,6 +840,9 @@ model Payment {
   order                Order               @relation(fields: [orderId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
   cashier              BranchMembership    @relation(fields: [cashierId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
   shift                CashShift?          @relation(fields: [shiftId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  company              Company?            @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  companyEmployee      CompanyEmployee?    @relation(fields: [companyEmployeeId, companyId, branchId, organizationId], references: [id, companyId, branchId, organizationId], onDelete: Restrict)
+  companyEntry         CompanyLedgerEntry?
   reversals            PaymentReversal[]
   allocations          PaymentAllocation[]
   cashMovement         CashMovement?
@@ -1428,5 +1445,231 @@ model PurchasingEvent {
   @@index([branchId, organizationId, revision])
   @@index([purchaseOrderId, branchId, organizationId])
   @@index([supplierId, branchId, organizationId])
+  @@index([userId, branchId, organizationId])
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  TERMINATED
+}
+
+enum BillingCycle {
+  MONTHLY
+  BIWEEKLY
+  WEEKLY
+}
+
+enum CompanyEntryKind {
+  CHARGE
+  PAYMENT
+  PAYMENT_REVERSAL
+}
+
+model Company {
+  events         CompaniesEvent[]
+  id             String               @id @default(uuid()) @db.Uuid
+  branchId       String               @db.Uuid
+  organizationId String               @db.Uuid
+  name           String               @db.VarChar(160)
+  businessNumber String               @default("") @db.VarChar(80)
+  taxNumber      String               @default("") @db.VarChar(80)
+  address        String               @default("") @db.VarChar(500)
+  phone          String               @default("") @db.VarChar(60)
+  email          String               @default("") @db.VarChar(254)
+  contactPerson  String               @default("") @db.VarChar(160)
+  active         Boolean              @default(true)
+  deletedAt      DateTime?            @db.Timestamptz(3)
+  version        Int                  @default(1)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
+  branch         Branch               @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  contracts      CompanyContract[]
+  employees      CompanyEmployee[]
+  entries        CompanyLedgerEntry[]
+  statements     CompanyStatement[]
+  payments       Payment[]
+
+  @@unique([id, branchId, organizationId])
+  @@index([branchId, organizationId, deletedAt, name, id])
+}
+
+model CompanyContract {
+  events             CompaniesEvent[]
+  id                 String             @id @default(uuid()) @db.Uuid
+  companyId          String             @db.Uuid
+  branchId           String             @db.Uuid
+  organizationId     String             @db.Uuid
+  contractNumber     String             @db.VarChar(80)
+  startDate          DateTime           @db.Date
+  endDate            DateTime?          @db.Date
+  creditLimit        Decimal            @db.Decimal(14, 2)
+  discountPercentage Decimal            @db.Decimal(5, 2)
+  paymentTermsDays   Int
+  billingCycle       BillingCycle       @default(MONTHLY)
+  notes              String             @default("") @db.VarChar(2000)
+  status             ContractStatus     @default(DRAFT)
+  currency           String             @db.Char(3)
+  statusReason       String?            @db.VarChar(500)
+  version            Int                @default(1)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  branch             Branch             @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  company            Company            @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  statements         CompanyStatement[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([id, companyId, branchId, organizationId])
+  @@unique([branchId, contractNumber])
+  @@index([companyId, branchId, organizationId, status, id])
+}
+
+model CompanyEmployee {
+  id             String               @id @default(uuid()) @db.Uuid
+  companyId      String               @db.Uuid
+  branchId       String               @db.Uuid
+  organizationId String               @db.Uuid
+  name           String               @db.VarChar(160)
+  code           String               @default("") @db.VarChar(60)
+  email          String               @default("") @db.VarChar(254)
+  phone          String               @default("") @db.VarChar(60)
+  active         Boolean              @default(true)
+  deletedAt      DateTime?            @db.Timestamptz(3)
+  version        Int                  @default(1)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
+  company        Company              @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  entries        CompanyLedgerEntry[]
+  payments       Payment[]
+  branch         Branch               @relation(fields: [branchId], references: [id])
+
+  @@unique([id, branchId, organizationId])
+  @@unique([id, companyId, branchId, organizationId])
+  @@index([companyId, branchId, organizationId, deletedAt, name])
+}
+
+model CompanyLedgerEntry {
+  id             String                 @id @default(uuid()) @db.Uuid
+  branchId       String                 @db.Uuid
+  organizationId String                 @db.Uuid
+  companyId      String                 @db.Uuid
+  employeeId     String?                @db.Uuid
+  orderId        String?                @db.Uuid
+  paymentId      String?                @unique @db.Uuid
+  userId         String                 @db.Uuid
+  kind           CompanyEntryKind
+  amount         Decimal                @db.Decimal(14, 2)
+  method         String?                @db.VarChar(20)
+  reference      String?                @db.VarChar(120)
+  reason         String                 @db.VarChar(500)
+  reversesId     String?                @unique @db.Uuid
+  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
+  branch         Branch                 @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  company        Company                @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  employee       CompanyEmployee?       @relation(fields: [employeeId, companyId, branchId, organizationId], references: [id, companyId, branchId, organizationId], onDelete: Restrict)
+  order          Order?                 @relation(fields: [orderId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  payment        Payment?               @relation(fields: [paymentId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  actor          BranchMembership       @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  reverses       CompanyLedgerEntry?    @relation("CompanyReversal", fields: [reversesId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  reversal       CompanyLedgerEntry?    @relation("CompanyReversal")
+  statementLines CompanyStatementLine[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([reversesId, branchId, organizationId])
+  @@unique([paymentId, branchId, organizationId])
+  @@index([companyId, branchId, organizationId, createdAt, id])
+  @@index([employeeId, branchId, organizationId])
+  @@index([orderId, branchId, organizationId])
+  @@index([userId, branchId, organizationId])
+}
+
+model CompanyStatement {
+  id             String                 @id @default(uuid()) @db.Uuid
+  branchId       String                 @db.Uuid
+  organizationId String                 @db.Uuid
+  companyId      String                 @db.Uuid
+  contractId     String                 @db.Uuid
+  userId         String                 @db.Uuid
+  number         BigInt
+  periodStart    DateTime               @db.Date
+  periodEnd      DateTime               @db.Date
+  dueDate        DateTime               @db.Date
+  currency       String                 @db.Char(3)
+  openingBalance Decimal                @db.Decimal(14, 2)
+  charges        Decimal                @db.Decimal(14, 2)
+  payments       Decimal                @db.Decimal(14, 2)
+  closingBalance Decimal                @db.Decimal(14, 2)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
+  branch         Branch                 @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  company        Company                @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  contract       CompanyContract        @relation(fields: [contractId, companyId, branchId, organizationId], references: [id, companyId, branchId, organizationId], onDelete: Restrict)
+  actor          BranchMembership       @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  items          CompanyStatementLine[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([branchId, number])
+  @@unique([branchId, companyId, periodStart, periodEnd])
+  @@index([companyId, branchId, organizationId, createdAt, id])
+  @@index([userId, branchId, organizationId])
+}
+
+model CompanyStatementLine {
+  id             String             @id @default(uuid()) @db.Uuid
+  statementId    String             @db.Uuid
+  branchId       String             @db.Uuid
+  organizationId String             @db.Uuid
+  entryId        String             @db.Uuid
+  kind           CompanyEntryKind
+  amount         Decimal            @db.Decimal(14, 2)
+  orderNumber    String?            @db.VarChar(40)
+  employeeName   String?            @db.VarChar(160)
+  reason         String             @db.VarChar(500)
+  occurredAt     DateTime           @db.Timestamptz(3)
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+  statement      CompanyStatement   @relation(fields: [statementId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  entry          CompanyLedgerEntry @relation(fields: [entryId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+
+  @@unique([id, branchId, organizationId])
+  @@unique([statementId, entryId])
+  @@index([entryId, branchId, organizationId])
+}
+
+model CompaniesRevision {
+  branchId       String   @id @db.Uuid
+  organizationId String   @db.Uuid
+  revision       BigInt   @default(0)
+  nextNumber     BigInt   @default(0)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  branch         Branch   @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, organizationId])
+}
+
+model CompaniesEvent {
+  company        Company?         @relation(fields: [companyId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  contract       CompanyContract? @relation(fields: [contractId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  id             String           @id @default(uuid()) @db.Uuid
+  branchId       String           @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  commandId      String           @db.Uuid
+  requestHash    String           @db.Char(64)
+  revision       BigInt
+  action         String           @db.VarChar(100)
+  entityId       String           @db.Uuid
+  companyId      String?          @db.Uuid
+  contractId     String?          @db.Uuid
+  response       Json
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  branch         Branch           @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actor          BranchMembership @relation(fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, commandId])
+  @@unique([branchId, revision])
+  @@index([branchId, organizationId, revision])
+  @@index([companyId, branchId, organizationId])
+  @@index([contractId, branchId, organizationId])
   @@index([userId, branchId, organizationId])
 }

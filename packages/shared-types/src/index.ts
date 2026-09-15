@@ -1,6 +1,14 @@
+export * from './companies';
 export * from './purchasing';
 export * from './inventory';
 export const PERMISSIONS = [
+  'company.read',
+  'company.manage',
+  'contract.manage',
+  'company.charge',
+  'company.payment.record',
+  'company.payment.reverse',
+  'company.statement.manage',
   'supplier.read',
   'supplier.manage',
   'purchase.read',
@@ -58,6 +66,13 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]> = {
   OWNER: PERMISSIONS,
   ADMIN: [
+    'company.read',
+    'company.manage',
+    'contract.manage',
+    'company.charge',
+    'company.payment.record',
+    'company.payment.reverse',
+    'company.statement.manage',
     'supplier.read',
     'supplier.manage',
     'purchase.read',
@@ -103,6 +118,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
   ],
   // Managers may operate manual table statuses but do not redesign the floor plan.
   MANAGER: [
+    'company.read',
+    'company.manage',
+    'contract.manage',
+    'company.charge',
+    'company.payment.record',
+    'company.payment.reverse',
+    'company.statement.manage',
     'supplier.read',
     'supplier.manage',
     'purchase.read',
@@ -141,6 +163,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
     'layout.status.manage',
   ],
   CASHIER: [
+    'company.read',
+    'company.charge',
     'order.read',
     'payment.read',
     'payment.collect',
@@ -190,7 +214,9 @@ export interface PaymentRecord {
   id: string;
   orderId: string;
   cashierId: string;
-  method: 'CASH' | 'CARD';
+  method: 'CASH' | 'CARD' | 'COMPANY_ACCOUNT';
+  companyId?: string | null;
+  companyEmployeeId?: string | null;
   amount: string;
   tendered: string | null;
   change: string | null;

@@ -147,6 +147,10 @@ try {
   app = await createApp();
   const { runPurchasingIntegration } = await import('../tests/integration/purchasing.mjs');
   await runPurchasingIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runCompaniesIntegration } = await import('../tests/integration/companies.mjs');
+  await runCompaniesIntegration(app);
   if (process.argv.includes('--browser')) {
     // Fresh limiter state for independent browser acceptance tests.
     await app.close();

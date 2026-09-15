@@ -993,3 +993,49 @@ details > summary::marker {
     padding: 14px;
   }
 }
+.company-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.company-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 0;
+  list-style: none;
+}
+.company-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+}
+.company-list > li > button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+.company-list > li > button[aria-current='true'] {
+  color: var(--primary);
+}
+.company-list strong {
+  font-weight: 600;
+}
+.company-list span {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+@media (max-width: 680px) {
+  .company-list > li {
+    padding: 12px 14px;
+  }
+}

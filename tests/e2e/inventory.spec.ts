@@ -42,6 +42,19 @@ test('inventory operator configures stock, recovers a lost save, records waste a
   const prefix = `Inventory browser ${info.project.name}`;
   const views = page.getByRole('group', { name: 'Inventory views' });
   const dialog = page.getByRole('dialog', { name: 'Inventory editor' });
+  const inventoryPendingSave = page
+    .locator('div')
+    .filter({
+      has: page.getByText(
+        'A previous save needs confirmation. Review the result by retrying the same command.',
+        { exact: true },
+      ),
+    })
+    .first();
+  const retryInventoryCommand = inventoryPendingSave.getByRole('button', {
+    name: 'Retry inventory command',
+    exact: true,
+  });
   await views.getByRole('button', { name: 'Warehouses', exact: true }).click();
   await page.getByRole('button', { name: 'Add warehouse', exact: true }).click();
   await dialog.getByLabel('Name', { exact: true }).fill(prefix + ' kitchen');
@@ -77,11 +90,18 @@ test('inventory operator configures stock, recovers a lost save, records waste a
     { times: 1 },
   );
   await dialog.getByRole('button', { name: 'Save adjustment' }).click();
-  await expect(page.getByRole('button', { name: 'Retry inventory command' })).toBeAttached();
-  await page.reload();
-  await page.getByRole('button', { name: 'Inventory', exact: true }).click();
-  await page.getByRole('button', { name: 'Retry inventory command' }).click();
-  await expect(page.getByRole('button', { name: 'Retry inventory command' })).toHaveCount(0);
+  await expect(retryInventoryCommand).toBeAttached();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page
+    .getByRole('navigation', { name: 'Administration' })
+    .getByRole('button', { name: 'Inventory', exact: true })
+    .click();
+  await expect(views).toBeVisible();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Refreshing inventory. Changes are paused.' }),
+  ).toHaveCount(0);
+  await retryInventoryCommand.click();
+  await expect(retryInventoryCommand).toHaveCount(0);
   networkTest = false;
   await page.getByLabel('Search inventory', { exact: true }).fill(prefix);
   const card = page.getByRole('article', {
@@ -175,6 +195,8 @@ test('inventory operator configures stock, recovers a lost save, records waste a
   await views.getByRole('button', { name: 'History', exact: true }).click();
   await page.getByLabel('Search inventory', { exact: true }).fill(prefix);
   await expect(page.getByText(`Order #${order.orderNumber}`, { exact: false })).toBeVisible();
-  await expect(page.getByText('Final order settlement', { exact: true })).toBeVisible();
+  // Other suites settle orders in this shared database, so several movements carry this
+  // reason; the assertion is that a sale consumption is visible for this filtered item.
+  await expect(page.getByText('Final order settlement', { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });

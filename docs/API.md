@@ -195,6 +195,28 @@ Routes are under `/api/purchasing`; branch, organization and actor are derived f
 | POST payments/:id/reverse | commandId, reason; full correction of original supplier payment record |
 | GET events / orders/:id/history | after string bigint cursor, limit <=100; history includes safe response snapshots |
 
+## Company contracts (Phase 9)
+
+Routes are under `/api/companies`; branch, organization and actor come from the authenticated session. All writes use commandId UUIDs and replay on identical input. Money is decimal text. List endpoints accept page, limit <=100, search, companyId, contractId, optional status and includeArchived.
+
+| Method/path | Input or result |
+| --- | --- |
+| GET companies | company.read; paginated branch company directory |
+| POST companies | company.read + company.manage; commandId, name; optional businessNumber, taxNumber, address, phone, email, contactPerson |
+| PUT companies/:id | Company fields plus version and active |
+| POST companies/:id/archive | commandId, version; requires terminated contracts and a zero balance |
+| GET companies/:id/account | Currency, contract status, creditLimit, charged, paid, balance, available, orderCount and paginated ledger entries |
+| GET companies/:id/history | Per-company command history; a company in another branch returns 404 |
+| GET/POST companies/directory/contracts | Contract list and creation; PUT and POST .../:id/status manage editing and transitions |
+| GET/POST companies/directory/employees | Authorized employee list with derived consumption, creation, update and archive |
+| POST companies/directory/payments | commandId, companyId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason |
+| POST companies/directory/payments/:id/reverse | commandId, reason; full correction of one recorded account payment |
+| GET/POST companies/directory/statements | Immutable period statements; generation is idempotent per company and period |
+| GET companies/directory/chargeable | company.read + company.charge; restricted picker of companies with an active contract, their discount, limit, balance and authorized employees |
+| GET companies/directory/events | after string bigint cursor, limit <=100 |
+
+A COMPANY_ACCOUNT tender extends the existing collect route: `{method:"COMPANY_ACCOUNT",amount:"10.00",companyId:"uuid",companyEmployeeId:"uuid"}`. It carries no tendered cash, no shift and no card reference, and requires company.charge in addition to payment.collect. It settles the order exactly like cash or card but writes no cash movement; instead it posts a CHARGE to the company ledger in the same transaction. Charging is rejected without an ACTIVE contract, for an employee of another company, or when the balance plus the amount would exceed the credit limit. Reversing a company payment takes neither a shift nor a reference and returns credit as a new account entry; it never rewrites history. Contract discounts are recorded commercial terms and do not retroactively alter immutable order line snapshots.
+
 Purchase quantities accept compatible kg/g and l/ml conversion with no rounding. Unit prices are net, up to four decimals; tax is an operator-supplied percentage, up to two decimals. Receipt net amounts round to cents per line, tax rounds from that net amount, then totals sum exactly. Ordered prices cannot be overridden by receiving inputs. Partial deliveries are separately rounded accounting charges; their sum may differ slightly from the original order estimate.
 
 Example receipt items: `[{purchaseItemId:"uuid",quantity:"1.250000"}]` for a kg-based purchase line of an inventory item stored in g creates `1250.000000` g in StockMovement. Posting requires all selected quantities to be positive and within remaining amounts. UI zero quantities are omitted before submission. Receipt reference and any invoice number are unique per supplier/branch ignoring case and surrounding spaces. One receipt represents one delivery/charge; multi-delivery invoice grouping, credit notes/returns, unallocated supplier credits and payment execution are outside Phase 8.

@@ -98,8 +98,15 @@ test('dine-in and takeaway orders retain snapshots and recover an uncertain save
   );
   await page.getByRole('button', { name: 'Add to order', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry pending command' })).toBeVisible();
-  await page.reload();
-  await page.getByRole('button', { name: 'Orders', exact: true }).click();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  try {
+    await page
+      .getByRole('navigation', { name: 'Administration' })
+      .getByRole('button', { name: 'Orders', exact: true })
+      .click({ timeout: 5000 });
+  } catch {
+    await page.getByRole('button', { name: /^Orders/ }).first().click();
+  }
   await page.getByRole('button', { name: 'Retry pending command' }).click();
   await expect(page.getByRole('button', { name: 'Retry pending command' })).toHaveCount(0);
   await expect(page.getByTestId('order-total')).toHaveText('12.00 EUR');

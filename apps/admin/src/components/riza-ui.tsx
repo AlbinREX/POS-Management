@@ -27,6 +27,7 @@ export function NavIcon({ name }: { name: string }) {
     Purchasing:
       'M3 5h11v12H3ZM14 9h4l4 5v3h-8M6 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4',
     Inventory: 'm12 3 9 5v9l-9 5-9-5V8ZM3 8l9 5 9-5M12 13v9M7 5l10 5',
+    Companies: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2M9 14h2M13 10h2M13 14h2M11 21v-4h2v4',
     Payments: 'M3 5h18v14H3ZM3 10h18M7 15h4',
     Team: 'M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21v-3a6 6 0 0 1 12 0v3M17 4a4 4 0 0 1 0 8M18 15a5 5 0 0 1 4 5',
     Roles: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6ZM8 12l3 3 5-6',
