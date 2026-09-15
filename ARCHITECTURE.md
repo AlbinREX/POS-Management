@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-9: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing and company contracts. Settlement is the only API path to PAID.
+Status: Phases 1-10: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts and the waiter PWA. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -104,6 +104,10 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 10 waiter PWA
+
+The installable waiter surface is a route of the existing Next.js deployment at `/waiter`, mirroring the Phase 5 `/kds` precedent. It adds no table, migration, permission key or business rule: table service, mobile ordering, kitchen submission and payment handoff all run through the existing order, layout, menu and kitchen APIs with their established command, audit, event and idempotency guarantees. The service worker precaches the application shell only and never caches `/api` responses, so no authenticated branch-scoped data is stored on a shared device. This is installability, not offline ordering; a disconnected device reports an explicit failure rather than queueing writes. See [ADR 0010](docs/adr/0010-waiter-pwa.md).
 
 ## Phase 9 company contracts
 

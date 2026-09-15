@@ -28,10 +28,13 @@ async function all<T>(path: string): Promise<T[]> {
 export function OrdersWorkspace({
   user,
   view = 'orders',
+  initialOrderId = '',
   onPayment,
 }: {
   user: SessionUser;
   view?: 'orders' | 'pos';
+  /** Preselects an existing order, so the waiter shell can open a table's live bill. */
+  initialOrderId?: string;
   onPayment?: (id: string, method: string) => void;
 }) {
   const pos = view === 'pos';
@@ -47,7 +50,7 @@ export function OrdersWorkspace({
   const storageKey = `restaurant-pending-order:${user.organizationId}:${user.branchId}:${user.id}`;
   const [orders, setOrders] = useState<OrderRecord[]>([]),
     [order, setOrder] = useState<OrderRecord | null>(null);
-  const [selected, setSelected] = useState(''),
+  const [selected, setSelected] = useState(initialOrderId),
     [page, setPage] = useState(1),
     [hasMore, setHasMore] = useState(false);
   const [products, setProducts] = useState<MenuRecord[]>([]),

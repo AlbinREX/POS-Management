@@ -21,6 +21,7 @@ import { OrdersWorkspace } from './orders-workspace';
 import { KitchenDisplay } from './kitchen-display';
 import { Brand, NavIcon } from './riza-ui';
 import { CompaniesWorkspace } from './companies-workspace';
+import { WaiterApp } from './waiter-app';
 import { PurchasingWorkspace } from './purchasing-workspace';
 import { InventoryWorkspace } from './inventory-workspace';
 import { PaymentsWorkspace } from './payments-workspace';
@@ -106,7 +107,13 @@ function message(error: unknown) {
     : 'Cannot reach the local server. Check your restaurant connection and try again.';
 }
 
-export function FoundationApp({ kitchenOnly = false }: { kitchenOnly?: boolean }) {
+export function FoundationApp({
+  kitchenOnly = false,
+  waiterOnly = false,
+}: {
+  kitchenOnly?: boolean;
+  waiterOnly?: boolean;
+}) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -176,6 +183,28 @@ export function FoundationApp({ kitchenOnly = false }: { kitchenOnly?: boolean }
         ) : (
           <Notice>Kitchen access is not granted to this account.</Notice>
         )}
+      </div>
+    );
+  if (user && waiterOnly)
+    return (
+      <div className="min-h-screen">
+        <div className="waiter-shell">
+          <header className="waiter-header">
+            <Brand />
+            <Button variant="outline" onClick={() => void signOut()} disabled={pending}>
+              Sign out
+            </Button>
+          </header>
+          <p className="text-sm text-muted-foreground">
+            {user.branchName} · {user.name}
+          </p>
+          {error ? <Notice>{error}</Notice> : null}
+          {user.permissions.includes('order.read') ? (
+            <WaiterApp user={user} />
+          ) : (
+            <Notice>Table service is not granted to this account.</Notice>
+          )}
+        </div>
       </div>
     );
   if (user)
