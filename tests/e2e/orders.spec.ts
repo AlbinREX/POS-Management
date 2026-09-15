@@ -98,7 +98,7 @@ test('dine-in and takeaway orders retain snapshots and recover an uncertain save
   );
   await page.getByRole('button', { name: 'Add to order', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry pending command' })).toBeVisible();
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Orders', exact: true }).click();
   await page.getByRole('button', { name: 'Retry pending command' }).click();
   await expect(page.getByRole('button', { name: 'Retry pending command' })).toHaveCount(0);
