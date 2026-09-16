@@ -99,16 +99,13 @@ test('dine-in and takeaway orders retain snapshots and recover an uncertain save
   await page.getByRole('button', { name: 'Add to order', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry pending command' })).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
-  try {
-    await page
-      .getByRole('navigation', { name: 'Administration' })
-      .getByRole('button', { name: 'Orders', exact: true })
-      .click({ timeout: 5000 });
-  } catch {
-    await page.getByRole('button', { name: /^Orders/ }).first().click();
-  }
-  await page.getByRole('button', { name: 'Retry pending command' }).click();
-  await expect(page.getByRole('button', { name: 'Retry pending command' })).toHaveCount(0);
+  const nav = page.getByRole('navigation', { name: 'Administration' });
+  const retryPendingCommand = page.getByRole('button', { name: 'Retry pending command' });
+  await expect(nav).toBeVisible({ timeout: 15000 });
+  await nav.getByRole('button', { name: 'Orders', exact: true }).click();
+  await expect(retryPendingCommand).toBeVisible();
+  await retryPendingCommand.click();
+  await expect(retryPendingCommand).toHaveCount(0);
   await expect(page.getByTestId('order-total')).toHaveText('12.00 EUR');
   expect(await current.getByRole('article').count()).toBe(1);
   injectingLoss = false;
