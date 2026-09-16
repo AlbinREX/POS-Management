@@ -84,6 +84,14 @@ OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplie
 
 The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.
 
+## Phase 12 upgrade
+
+Back up as usual, rebuild the api, admin and migrate images and run Compose. Migration `202609170001_sync` adds the `SyncCheckpoint` table and the `sync.read` permission; it alters no existing table, so restore procedures are unchanged, though the new table is included in archives like any other. Runtime provisioning must be rerun so the runtime role receives INSERT and UPDATE but not DELETE or TRUNCATE on the checkpoint, which `node scripts/migrate.mjs` and the Compose migrate service both do.
+
+Cloud delivery is disabled unless `SYNC_TARGET_URL` is set, which is the default. Leave it unset for a restaurant that does not replicate. With it set, the worker records an explicit transport-not-implemented failure, because no cloud endpoint is specified or certified for this system yet; that is reported as a failed sync rather than a healthy one. Delivery never blocks local operation either way.
+
+After upgrading, verify that the header shows the restaurant server as connected, that stopping the api container changes it to unavailable while the page stays loaded, and that `GET /api/sync/status` lists seven streams for an owner and is refused for a cashier.
+
 ## Phase 11 upgrade
 
 Back up as usual, rebuild the api, admin and migrate images and run Compose. Migration `202609160001_reporting` is data-only: it inserts the `report.read` permission and grants it to protected OWNER with an audit record, and creates or alters no table, column, index or trigger, so the schema, backup and restore procedures are unchanged and `prisma migrate diff` against the schema is empty. OWNER grants `report.read` to existing managers or accountants through Roles; nothing else is seeded. The dashboard is the **Dashboard** tab of the existing frontend behind the same Nginx route and CSP; CSV exports are served by the API as `text/csv` attachments through the same `/api` proxy. Verify after upgrade that an owner sees the Dashboard tab, that today's figures match the Payments and Companies screens, and that a CSV export downloads.
