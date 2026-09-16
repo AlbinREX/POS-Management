@@ -1,3 +1,6 @@
+import { SyncController } from './sync/sync.controller';
+import { SyncService } from './sync/sync.service';
+import { SyncWorker } from './sync/sync.worker';
 import { ReportingController } from './reporting/reporting.controller';
 import { ReportingService } from './reporting/reporting.service';
 import { CompaniesController } from './companies/companies.controller';
@@ -27,6 +30,7 @@ import { LayoutController } from './layout/layout.controller';
 import { LayoutService } from './layout/layout.service';
 @Module({
   controllers: [
+    SyncController,
     ReportingController,
     CompaniesController,
     PurchasingController,
@@ -41,6 +45,8 @@ import { LayoutService } from './layout/layout.service';
     LayoutController,
   ],
   providers: [
+    SyncService,
+    SyncWorker,
     ReportingService,
     CompaniesService,
     PurchasingService,

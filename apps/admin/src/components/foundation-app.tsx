@@ -21,6 +21,7 @@ import { OrdersWorkspace } from './orders-workspace';
 import { KitchenDisplay } from './kitchen-display';
 import { Brand, NavIcon } from './riza-ui';
 import { CompaniesWorkspace } from './companies-workspace';
+import { SyncIndicator } from './sync-indicator';
 import { DashboardWorkspace } from './dashboard-workspace';
 import { WaiterApp } from './waiter-app';
 import { PurchasingWorkspace } from './purchasing-workspace';
@@ -311,6 +312,7 @@ function Workspace({
           <p className="mt-1 text-sm text-muted-foreground">{user.branchName}</p>
         </div>
         <div className="flex items-center gap-5">
+          <SyncIndicator user={user} />
           <div className="text-right">
             <p className="font-medium">{user.name}</p>
             <p className="text-sm text-muted-foreground">{user.email}</p>

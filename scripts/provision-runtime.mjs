@@ -42,8 +42,16 @@ export async function provisionRuntime(
       'REVOKE UPDATE, DELETE, TRUNCATE ON "InventoryUnit", "RecipeVersion", "RecipeItem", "InventoryPlan", "InventoryPlanItem", "StockMovement", "InventoryEvent" FROM restaurant_app',
     );
     await client.query('REVOKE INSERT ON "InventoryUnit" FROM restaurant_app');
-    await client.query('REVOKE UPDATE, DELETE, TRUNCATE ON "GoodsReceipt", "GoodsReceiptItem", "SupplierEntry", "PurchasingEvent" FROM restaurant_app');
-    await client.query('REVOKE UPDATE, DELETE, TRUNCATE ON "CompanyLedgerEntry", "CompanyStatement", "CompanyStatementLine", "CompaniesEvent" FROM restaurant_app');
+    await client.query(
+      'REVOKE UPDATE, DELETE, TRUNCATE ON "GoodsReceipt", "GoodsReceiptItem", "SupplierEntry", "PurchasingEvent" FROM restaurant_app',
+    );
+    await client.query(
+      'REVOKE UPDATE, DELETE, TRUNCATE ON "CompanyLedgerEntry", "CompanyStatement", "CompanyStatementLine", "CompaniesEvent" FROM restaurant_app',
+    );
+    // Phase 12: the delivery checkpoint is operational metadata, not business history.
+    // The runtime role advances it (INSERT/UPDATE) but may never delete or truncate it,
+    // and it holds no business data that could overwrite a local record.
+    await client.query('REVOKE DELETE, TRUNCATE ON "SyncCheckpoint" FROM restaurant_app');
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
