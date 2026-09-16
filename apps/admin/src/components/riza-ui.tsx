@@ -19,6 +19,7 @@ export function Brand() {
 export function NavIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     Workspace: 'm3 10 9-7 9 7v11h-6v-7H9v7H3Z',
+    Dashboard: 'M3 21h18M6 17V10M11 17V5M16 17v-4M21 17V8',
     POS: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
     Orders: 'M6 3h12v18l-3-2-3 2-3-2-3 2ZM9 7h6M9 11h6M9 15h3',
     Layout: 'M4 7h16v10H4ZM7 3v4M17 3v4M7 17v4M17 17v4',

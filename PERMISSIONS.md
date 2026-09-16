@@ -78,20 +78,27 @@ Fresh CASHIER receives order.read, payment.read/collect and cash.shift.read/mana
 
 Fresh OWNER, ADMIN, MANAGER and STOREKEEPER receive all five keys. Existing customized roles are preserved. Migration grants only the protected OWNER new permissions and audits that change; OWNER must explicitly grant access to other existing staff through Roles. STOREKEEPER does not receive user administration, menu price administration or payment permissions by default. Runtime authorization reloads branch membership and grants on each request. Settlement-driven consumption uses the existing authorized payment workflow and does not require cashiers to have manual stock adjustment authority.
 
-
 ## Phase 8 purchasing permissions
 
-| Permission | Authority |
-| --- | --- |
-| supplier.read | Branch supplier directory, account balances and entry history |
-| supplier.manage | Supplier create/edit/archive, with supplier.read |
-| purchase.read | Orders, receipt details including outstanding amounts, purchase history/events and restricted inventory/supplier pickers |
-| purchase.manage | Create/edit drafts, confirm unreceived orders and cancel unreceived purchases, with purchase.read |
-| purchase.receive | Post partial/full goods receipts, with purchase.read |
-| supplier.payment.record | Record externally completed supplier payments, with supplier.read |
-| supplier.payment.reverse | Reverse an erroneous supplier payment record, with supplier.read |
+| Permission               | Authority                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| supplier.read            | Branch supplier directory, account balances and entry history                                                            |
+| supplier.manage          | Supplier create/edit/archive, with supplier.read                                                                         |
+| purchase.read            | Orders, receipt details including outstanding amounts, purchase history/events and restricted inventory/supplier pickers |
+| purchase.manage          | Create/edit drafts, confirm unreceived orders and cancel unreceived purchases, with purchase.read                        |
+| purchase.receive         | Post partial/full goods receipts, with purchase.read                                                                     |
+| supplier.payment.record  | Record externally completed supplier payments, with supplier.read                                                        |
+| supplier.payment.reverse | Reverse an erroneous supplier payment record, with supplier.read                                                         |
 
 Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh STOREKEEPER receives supplier.read/manage and purchase.read/manage/receive, retaining Phase 7 inventory grants without supplier-payment or POS-payment authority. The migration adds and audits only protected OWNER grants; existing customized roles are preserved. Suppliers and receipt balances stay readable after archival. Cashier payment permissions do not imply supplier-account access. Direct receiving commands cannot choose the actor, branch, receipt totals or stock movement kind.
+
+## Phase 11 reporting
+
+| Permission  | Authority                                                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| report.read | Every read-only report and CSV export under `/api/reports`: overview, sales, orders, products, staff, cash, inventory, purchasing and companies |
+
+Reporting is a distinct authority from operating. No other permission implies `report.read`, and `report.read` grants nothing else: a report-only account is refused orders, payments, companies and every other operational route. Fresh OWNER, ADMIN and MANAGER receive the key; CASHIER, WAITER, KITCHEN and STOREKEEPER do not. Existing customized roles are preserved; data-only migration `202609160001_reporting` registers the key and grants and audits only protected OWNER. Reports are branch-scoped through the session, accept no branch or organization identifier, expose only GET routes and write nothing; revoking the key takes effect on the next request of an existing session.
 
 ## Phase 10 waiter surface
 
@@ -99,15 +106,15 @@ Phase 10 adds no permission key. The waiter PWA is a client over existing grants
 
 ## Phase 9 company contract permissions
 
-| Permission | Authority |
-| --- | --- |
-| company.read | Branch company directory, contracts, authorized employees, account balances, ledger history and statements |
-| company.manage | Company create/edit/archive and authorized employee administration, with company.read |
-| contract.manage | Contract drafting, editing and status transitions, with company.read |
-| company.charge | Settle an order against a company account using the COMPANY_ACCOUNT payment method |
-| company.payment.record | Record an externally completed company payment against the account balance, with company.read |
-| company.payment.reverse | Reverse an erroneous company payment record, with company.read |
-| company.statement.manage | Generate an immutable period statement, with company.read |
+| Permission               | Authority                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| company.read             | Branch company directory, contracts, authorized employees, account balances, ledger history and statements |
+| company.manage           | Company create/edit/archive and authorized employee administration, with company.read                      |
+| contract.manage          | Contract drafting, editing and status transitions, with company.read                                       |
+| company.charge           | Settle an order against a company account using the COMPANY_ACCOUNT payment method                         |
+| company.payment.record   | Record an externally completed company payment against the account balance, with company.read              |
+| company.payment.reverse  | Reverse an erroneous company payment record, with company.read                                             |
+| company.statement.manage | Generate an immutable period statement, with company.read                                                  |
 
 Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh CASHIER receives only company.read and company.charge, so a cashier can settle an order on an existing account without editing contracts, recording account payments or issuing statements. WAITER, KITCHEN and STOREKEEPER receive none. Existing customized roles are preserved; migration `202609150001_companies` grants and audits only protected OWNER.
 

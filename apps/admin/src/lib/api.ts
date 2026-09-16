@@ -82,3 +82,22 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   }
   return parse<T>(response);
 }
+// Binary sibling of api() for CSV exports: same bearer token and refresh-retry, but the
+// body is returned as a Blob with the server's filename instead of being parsed as JSON.
+export async function apiBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  const request = () =>
+    fetch(`/api/${path}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${accessToken ?? ''}` },
+    });
+  let response = await request();
+  if (response.status === 401) {
+    await refresh();
+    response = await request();
+  }
+  if (!response.ok) await parse<never>(response);
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return { blob: await response.blob(), filename: match?.[1] ?? 'report.csv' };
+}

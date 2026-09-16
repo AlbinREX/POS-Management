@@ -1144,3 +1144,140 @@ details > summary::marker {
     border-radius: 14px 14px 0 0;
   }
 }
+
+/* Phase 11 owner dashboard. Read-only reports on the Riza charcoal and gold palette. */
+.report-workspace {
+  display: grid;
+  gap: 18px;
+}
+.report-range {
+  font-size: 0.9rem;
+  color: var(--muted-foreground);
+}
+.report-loading {
+  font-size: 0.9rem;
+  color: var(--muted-foreground);
+}
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.report-kpi {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  text-align: left;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.report-kpi:not(:disabled):hover {
+  border-color: var(--primary);
+}
+.report-kpi > span {
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--muted-foreground);
+}
+.report-kpi > strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.report-kpi > small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.report-detail {
+  display: grid;
+  gap: 16px;
+}
+.report-detail h2 {
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+.report-totals {
+  justify-content: flex-start;
+  border-top: 0;
+  padding: 0;
+}
+.report-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.report-table th,
+.report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.report-table th {
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+.report-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.report-table .report-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-row-link {
+  cursor: pointer;
+}
+.report-row-link:hover,
+.report-row-link:focus-visible {
+  background: var(--accent);
+  outline: none;
+}
+.report-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 160px;
+  padding: 8px 4px 0;
+  margin: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.report-bars li {
+  display: flex;
+  flex: 1 0 22px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+.report-bar {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 6px 6px 0 0;
+  background: var(--primary);
+  opacity: 0.85;
+}
+.report-bar-label {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 640px) {
+  .report-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-kpi > strong {
+    font-size: 1.1rem;
+  }
+}

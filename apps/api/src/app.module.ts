@@ -1,3 +1,5 @@
+import { ReportingController } from './reporting/reporting.controller';
+import { ReportingService } from './reporting/reporting.service';
 import { CompaniesController } from './companies/companies.controller';
 import { CompaniesService } from './companies/companies.service';
 import { PurchasingController } from './purchasing/purchasing.controller';
@@ -25,6 +27,7 @@ import { LayoutController } from './layout/layout.controller';
 import { LayoutService } from './layout/layout.service';
 @Module({
   controllers: [
+    ReportingController,
     CompaniesController,
     PurchasingController,
     InventoryController,
@@ -38,6 +41,7 @@ import { LayoutService } from './layout/layout.service';
     LayoutController,
   ],
   providers: [
+    ReportingService,
     CompaniesService,
     PurchasingService,
     InventoryService,

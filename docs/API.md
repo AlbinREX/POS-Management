@@ -171,49 +171,67 @@ All paths below are under `/api/inventory`. They require authenticated branch me
 
 Example movement: `{commandId:"uuid",warehouseId:"uuid",itemId:"uuid",kind:"ADJUSTMENT",quantity:"1.250",unitCode:"kg",reason:"Opening stock count"}`. For an item stored in g this records `1250.000000` g. WASTE takes a positive input and records a negative movement; ADJUSTMENT accepts a signed nonzero delta. Movement inputs cannot forge SALE_CONSUMPTION or source order references. Incompatible units, rounding, stale versions and recipe/archive conflicts are rejected. Reuse the same commandId and body after an uncertain network result; explicit conflict responses require refreshing state before preparing a new command.
 
-
 ## Purchasing (Phase 8)
 
 Routes are under `/api/purchasing`; branch, organization and actor are derived from the authenticated session. All writes use commandId UUIDs; repeat an uncertain command with identical input. Stale versions, duplicate reference/invoice, overreceiving and overpayment return conflicts. List endpoints accept page, limit <=100, search, supplierId, purchaseOrderId, optional status and includeArchived. Stock/purchase quantities and money are decimal strings.
 
-| Method/path | Input or result |
-| --- | --- |
-| GET suppliers | Paginated supplier configuration |
-| POST suppliers | commandId, name; optional businessNumber, taxNumber, contactPerson, phone, email, address, notes |
-| PUT suppliers/:id | Supplier fields plus version and active |
-| POST suppliers/:id/archive | commandId, version; no open purchase orders |
-| GET suppliers/:id/account | Currency, receivedValue, outstanding, lastReceiptAt, receiptCount and paginated entries |
-| GET catalog/items / catalog/warehouses / catalog/suppliers | Active branch pickers under purchase.read |
-| GET orders / orders/:id | Purchase snapshots, exact totals and per-item received/remaining quantities |
-| POST orders | commandId, supplierId, warehouseId, reference, notes, expectedDate; items [{itemId,quantity,unitCode,unitPrice,taxRate}] |
-| PUT orders/:id | Draft input plus version; only DRAFT |
-| POST orders/:id/order | commandId, version; confirms and freezes content |
-| POST orders/:id/cancel | commandId, version, reason; only DRAFT or unreceived ORDERED |
-| POST orders/:id/receive | commandId, version, reference, optional invoiceNumber/invoiceDate (together), dueDate, HTTPS documentReference, notes; items [{purchaseItemId,quantity}] |
-| GET receipts / receipts/:id | Immutable goods snapshots, receivedBy, source purchase and current unpaid amount |
-| POST payments | commandId, receiptId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason |
-| POST payments/:id/reverse | commandId, reason; full correction of original supplier payment record |
-| GET events / orders/:id/history | after string bigint cursor, limit <=100; history includes safe response snapshots |
+| Method/path                                                | Input or result                                                                                                                                          |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET suppliers                                              | Paginated supplier configuration                                                                                                                         |
+| POST suppliers                                             | commandId, name; optional businessNumber, taxNumber, contactPerson, phone, email, address, notes                                                         |
+| PUT suppliers/:id                                          | Supplier fields plus version and active                                                                                                                  |
+| POST suppliers/:id/archive                                 | commandId, version; no open purchase orders                                                                                                              |
+| GET suppliers/:id/account                                  | Currency, receivedValue, outstanding, lastReceiptAt, receiptCount and paginated entries                                                                  |
+| GET catalog/items / catalog/warehouses / catalog/suppliers | Active branch pickers under purchase.read                                                                                                                |
+| GET orders / orders/:id                                    | Purchase snapshots, exact totals and per-item received/remaining quantities                                                                              |
+| POST orders                                                | commandId, supplierId, warehouseId, reference, notes, expectedDate; items [{itemId,quantity,unitCode,unitPrice,taxRate}]                                 |
+| PUT orders/:id                                             | Draft input plus version; only DRAFT                                                                                                                     |
+| POST orders/:id/order                                      | commandId, version; confirms and freezes content                                                                                                         |
+| POST orders/:id/cancel                                     | commandId, version, reason; only DRAFT or unreceived ORDERED                                                                                             |
+| POST orders/:id/receive                                    | commandId, version, reference, optional invoiceNumber/invoiceDate (together), dueDate, HTTPS documentReference, notes; items [{purchaseItemId,quantity}] |
+| GET receipts / receipts/:id                                | Immutable goods snapshots, receivedBy, source purchase and current unpaid amount                                                                         |
+| POST payments                                              | commandId, receiptId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason                                                           |
+| POST payments/:id/reverse                                  | commandId, reason; full correction of original supplier payment record                                                                                   |
+| GET events / orders/:id/history                            | after string bigint cursor, limit <=100; history includes safe response snapshots                                                                        |
+
+## Reporting (Phase 11)
+
+Routes are under `/api/reports` and are GET only; every one requires `report.read`. Branch, organization and timezone come from the session's branch, and the range query is strict: `preset` is `today` (default), `yesterday`, `week` (Monday to today), `month` or `custom`; `custom` requires `from` and `to` as inclusive ISO dates in the branch calendar spanning at most 366 days, and presets take no dates. Optional filters are `warehouseId` (inventory), `supplierId` (purchasing), `companyId` (companies) and `page`/`limit` (<=100, inventory stock page). A `branchId` or `organizationId` query is rejected with 400. Every response echoes `range` with `fromDate`, `toDate`, `timezone` and the resolved UTC `from`/`to` instants. Money is decimal text and is never rounded through floating point.
+
+| Route                    | Result                                                                                                                                                                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET reports/overview     | Branch name, currency, timezone, the sales summary, stock position/low/negative counts, open shifts, company exposure and supplier outstanding                                                                                                                                          |
+| GET reports/sales        | Settled-order count, gross, discounts, sales after discount, tax, net ex-tax, average order value, collected, cancellations, refunds, net receipts, dine-in/takeaway split, tender mix by method and company-account totals                                                             |
+| GET reports/orders       | Daily and hourly series in the branch timezone, order status counts by creation date, type split, voided item count, table usage and top orders                                                                                                                                         |
+| GET reports/products     | Product rows from frozen line snapshots (quantity, lines, sales), top and low performers, category rollup and modifier usage counts                                                                                                                                                     |
+| GET reports/staff        | Waiter rows (orders, sales, average ticket, dine-in/takeaway) and cashier settlement rows                                                                                                                                                                                               |
+| GET reports/cash         | Tender mix, refund and cancellation totals, company-account settlement, and shifts overlapping the range with opening, cash in/out, cash payments, reversals, expected, counted and difference                                                                                          |
+| GET reports/inventory    | Position count, low and negative stock counts, a paginated stock page derived from StockMovement sums, movement counts by kind and per-position quantities by kind                                                                                                                      |
+| GET reports/purchasing   | Supplier rows (receipts, received value, ledger payments, outstanding, received in range), purchase-order counts by status and recent receipts                                                                                                                                          |
+| GET reports/companies    | Company rows (contract status, limit, charged, paid, balance, available, charged in range, overdue) with exposure totals and statements                                                                                                                                                 |
+| GET reports/:kind/export | `text/csv; charset=utf-8` attachment for `sales`, `orders`, `products`, `staff`, `cash`, `inventory`, `purchasing` or `companies`, same range query, exact values, RFC 4180 quoting, formula-prefix neutralization and a UTF-8 byte-order mark; an export above 50,000 rows returns 400 |
+
+Sales are recognized at settlement time; refunds and cancellations appear on the day recorded and are never netted into the original sale. Ledger-signed figures (`paid`, `payments`, cash out, reversals) keep the sign the operational endpoints return, so a report value equals the corresponding account or shift endpoint exactly.
 
 ## Company contracts (Phase 9)
 
 Routes are under `/api/companies`; branch, organization and actor come from the authenticated session. All writes use commandId UUIDs and replay on identical input. Money is decimal text. List endpoints accept page, limit <=100, search, companyId, contractId, optional status and includeArchived.
 
-| Method/path | Input or result |
-| --- | --- |
-| GET companies | company.read; paginated branch company directory |
-| POST companies | company.read + company.manage; commandId, name; optional businessNumber, taxNumber, address, phone, email, contactPerson |
-| PUT companies/:id | Company fields plus version and active |
-| POST companies/:id/archive | commandId, version; requires terminated contracts and a zero balance |
-| GET companies/:id/account | Currency, contract status, creditLimit, charged, paid, balance, available, orderCount and paginated ledger entries |
-| GET companies/:id/history | Per-company command history; a company in another branch returns 404 |
-| GET/POST companies/directory/contracts | Contract list and creation; PUT and POST .../:id/status manage editing and transitions |
-| GET/POST companies/directory/employees | Authorized employee list with derived consumption, creation, update and archive |
-| POST companies/directory/payments | commandId, companyId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason |
-| POST companies/directory/payments/:id/reverse | commandId, reason; full correction of one recorded account payment |
-| GET/POST companies/directory/statements | Immutable period statements; generation is idempotent per company and period |
-| GET companies/directory/chargeable | company.read + company.charge; restricted picker of companies with an active contract, their discount, limit, balance and authorized employees |
-| GET companies/directory/events | after string bigint cursor, limit <=100 |
+| Method/path                                   | Input or result                                                                                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET companies                                 | company.read; paginated branch company directory                                                                                               |
+| POST companies                                | company.read + company.manage; commandId, name; optional businessNumber, taxNumber, address, phone, email, contactPerson                       |
+| PUT companies/:id                             | Company fields plus version and active                                                                                                         |
+| POST companies/:id/archive                    | commandId, version; requires terminated contracts and a zero balance                                                                           |
+| GET companies/:id/account                     | Currency, contract status, creditLimit, charged, paid, balance, available, orderCount and paginated ledger entries                             |
+| GET companies/:id/history                     | Per-company command history; a company in another branch returns 404                                                                           |
+| GET/POST companies/directory/contracts        | Contract list and creation; PUT and POST .../:id/status manage editing and transitions                                                         |
+| GET/POST companies/directory/employees        | Authorized employee list with derived consumption, creation, update and archive                                                                |
+| POST companies/directory/payments             | commandId, companyId, positive amount, method BANK_TRANSFER/CASH/CARD/OTHER, reference, reason                                                 |
+| POST companies/directory/payments/:id/reverse | commandId, reason; full correction of one recorded account payment                                                                             |
+| GET/POST companies/directory/statements       | Immutable period statements; generation is idempotent per company and period                                                                   |
+| GET companies/directory/chargeable            | company.read + company.charge; restricted picker of companies with an active contract, their discount, limit, balance and authorized employees |
+| GET companies/directory/events                | after string bigint cursor, limit <=100                                                                                                        |
 
 A COMPANY_ACCOUNT tender extends the existing collect route: `{method:"COMPANY_ACCOUNT",amount:"10.00",companyId:"uuid",companyEmployeeId:"uuid"}`. It carries no tendered cash, no shift and no card reference, and requires company.charge in addition to payment.collect. It settles the order exactly like cash or card but writes no cash movement; instead it posts a CHARGE to the company ledger in the same transaction. Charging is rejected without an ACTIVE contract, for an employee of another company, or when the balance plus the amount would exceed the credit limit. Reversing a company payment takes neither a shift nor a reference and returns credit as a new account entry; it never rewrites history. Contract discounts are recorded commercial terms and do not retroactively alter immutable order line snapshots.
 
