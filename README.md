@@ -1,6 +1,6 @@
 # Restaurant Platform
 
-Phases 1-10 of a local-first restaurant POS platform: authentication, administration, branch-owned menu, layout, orders, kitchen tickets, payments and cash shifts. Dine-in/takeaway orders preserve item snapshots and decimal-safe totals. Kitchen submission routes those snapshots to station tickets, with audited preparation states and printer-ready contracts. Payments support immutable receipts, mixed tenders, item splits, partial collections, reversals and counted cash shifts. Inventory adds exact quantities, immutable stock movements, versioned recipes and atomic consumption at final sale settlement. Purchasing adds supplier records, purchase orders, goods receiving and receipt-backed supplier balances. Company contracts, reporting and fiscalization are not implemented yet.
+Phases 1-11 of a local-first restaurant POS platform: authentication, administration, branch-owned menu, layout, orders, kitchen tickets, payments and cash shifts. Dine-in/takeaway orders preserve item snapshots and decimal-safe totals. Kitchen submission routes those snapshots to station tickets, with audited preparation states and printer-ready contracts. Payments support immutable receipts, mixed tenders, item splits, partial collections, reversals and counted cash shifts. Inventory adds exact quantities, immutable stock movements, versioned recipes and atomic consumption at final sale settlement. Purchasing adds supplier records, purchase orders, goods receiving and receipt-backed supplier balances. Company contracts add B2B accounts, credit limits and statements. Phase 11 adds read-only reporting and the owner dashboard. Fiscalization is not implemented.
 
 ## Stack and applications
 
@@ -84,6 +84,8 @@ Lists currently cap at 200 records; the audit UI shows the latest 100 events. Or
 - [Phase 9 verification](docs/PHASE_9_VERIFICATION.md)
 - [Waiter PWA architecture decision](docs/adr/0010-waiter-pwa.md)
 - [Phase 10 verification](docs/PHASE_10_VERIFICATION.md)
+- [Reporting architecture decision](docs/adr/0011-reporting-owner-dashboard.md)
+- [Phase 11 verification](docs/PHASE_11_VERIFICATION.md)
 
 Open **Menu** for catalog configuration and product-to-kitchen-station routing. **Layout** provides configurable areas and tables. **Orders** creates dine-in/takeaway drafts with modifiers, discounts and history; open an order and choose **Send to kitchen**. Every active line must have an available route. Open **Kitchen**, or the dedicated **/kds** screen, to prepare, mark ready and complete station tickets. Submitted content is frozen; cancellation preserves ticket history. Request payment after opening an unsubmitted order or after all kitchen stations are ready. In **Payments**, open a registered POS cash shift, select a waiting bill and collect by amount or item quantity. Card entries acknowledge externally approved terminal receipts; this application does not process cards. Exact settlement marks the order PAID and frees its table. Refunds preserve the original order and settlement. No business examples are seeded. On upgrades, OWNER grants new permissions to existing roles in **Roles**. See [Phase 6 verification](docs/PHASE_6_VERIFICATION.md) and [payment decisions](docs/adr/0006-payments.md). See [Phase 7 verification](docs/PHASE_7_VERIFICATION.md) and [inventory decisions](docs/adr/0007-inventory.md). See [Phase 8 verification](docs/PHASE_8_VERIFICATION.md) and [purchasing decisions](docs/adr/0008-purchasing.md). Phase 9 requires separate authorization.
 
@@ -92,7 +94,6 @@ Open **Menu** for catalog configuration and product-to-kitchen-station routing. 
 Open **Inventory** to manage warehouses, ingredients/stock items, recipes, current stock and history. Configure a warehouse and items with their stock units, record opening quantities with **Adjust stock**, then define each product recipe. Search or filter stock by warehouse; low-stock cards provide direct **Adjust**, **Waste** and **Edit alert** actions. Quantities accept compatible kg/g or l/ml conversions without rounding; pcs tracks counts to six decimal places.
 
 A product without an active recipe does not consume inventory. The first payment freezes its recipe quantities; only final settlement deducts stock, once. Later recipe edits preserve that plan. Refunds do not automatically return ingredients. Negative stock stays visible so a sold meal can still be settled. Products can use a recipe directly for packaged goods as well as prepared ingredients. Modifier-specific ingredient rules are not implemented. Purchasing extends this ledger in Phase 8.
-
 
 ## Purchasing and goods receiving (Phase 8)
 
@@ -107,6 +108,12 @@ The home view lists your areas and tables with live status — free, occupied, o
 **Send to kitchen** routes the order through the existing stations. A sent order is locked, exactly as it is everywhere else: kitchen amendments are not available, so extra items mean a new order for that table. When the guest is ready, **request payment** moves the bill to waiting payment and hands it to the cashier; a waiter never collects money, and company account rules are unchanged. Discounts, cancellation and reassigning another waiter stay with supervisors.
 
 Installing caches only the app shell so it launches quickly. No order, menu or table data is stored on the device. This is not offline ordering: without the restaurant server the app says so instead of accepting work it cannot save. Installation needs HTTPS on a real LAN device; grant staff the WAITER role in **Roles**. See [waiter decisions](docs/adr/0010-waiter-pwa.md).
+
+## Reporting and owner dashboard (Phase 11)
+
+Open **Dashboard** to read the branch's figures for Today, Yesterday, This week, This month or a custom range in the branch's own calendar. The cards show settled sales, net sales excluding tax, average order, discounts, refunds, net receipts, dine-in and takeaway counts, the tender mix, open shifts, low and negative stock, company exposure and supplier outstanding; select a card to open its report. The Orders, Products, Staff, Cash, Inventory, Purchasing and Companies views drill into daily and hourly series, top and low sellers, waiter and cashier figures, shift summaries with expected versus counted cash, current stock and movements, supplier balances and company accounts with overdue statements. Selecting a day in the daily table narrows the range to that day. **Export CSV** downloads the current view's table with the exact values shown.
+
+Every figure is derived from the existing order, payment, cash, stock, supplier and company records at the moment you read it; nothing is stored, estimated or editable here, and product revenue uses the prices frozen at the time of sale. Sales count on the day they were settled; refunds appear on the day they were recorded as their own line. The dashboard shows the branch you signed into. Grant `report.read` to managers or accountants in **Roles**; owners receive it on upgrade. See [reporting decisions](docs/adr/0011-reporting-owner-dashboard.md).
 
 ## Company contracts and B2B accounts (Phase 9)
 

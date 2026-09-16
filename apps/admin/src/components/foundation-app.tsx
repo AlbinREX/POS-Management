@@ -21,6 +21,7 @@ import { OrdersWorkspace } from './orders-workspace';
 import { KitchenDisplay } from './kitchen-display';
 import { Brand, NavIcon } from './riza-ui';
 import { CompaniesWorkspace } from './companies-workspace';
+import { DashboardWorkspace } from './dashboard-workspace';
 import { WaiterApp } from './waiter-app';
 import { PurchasingWorkspace } from './purchasing-workspace';
 import { InventoryWorkspace } from './inventory-workspace';
@@ -40,7 +41,8 @@ type Tab =
   | 'Payments'
   | 'Inventory'
   | 'Purchasing'
-  | 'Companies';
+  | 'Companies'
+  | 'Dashboard';
 interface Role {
   id: string;
   name: string;
@@ -286,6 +288,7 @@ function Workspace({
   const can = (permission: PermissionKey) => user.permissions.includes(permission);
   const tabs: Tab[] = [
     'Workspace',
+    ...(can('report.read') ? ['Dashboard' as const] : []),
     ...(can('order.read') ? ['POS' as const] : []),
     ...(can('inventory.read') ? ['Inventory' as const] : []),
     ...(can('purchase.read') || can('supplier.read') ? ['Purchasing' as const] : []),
@@ -353,6 +356,8 @@ function Workspace({
                 Inventory: 'Ingredients, recipes and a complete stock history.',
                 Purchasing: 'Suppliers, purchase orders and goods receiving.',
                 Companies: 'Company accounts, contracts, employees and statements.',
+                Dashboard:
+                  'Sales, orders, products, staff, cash, stock, purchasing and company accounts.',
                 Team: 'Manage the people who can access this branch.',
                 Roles: 'Control what each role can do.',
                 Terminals: 'Register and manage restaurant devices.',
@@ -366,6 +371,7 @@ function Workspace({
                 {tabs
                   .filter((item) =>
                     [
+                      'Dashboard',
                       'POS',
                       'Orders',
                       'Layout',
@@ -390,6 +396,7 @@ function Workspace({
               <Overview user={user} />
             </>
           ) : null}
+          {tab === 'Dashboard' ? <DashboardWorkspace user={user} /> : null}
           {tab === 'Companies' ? <CompaniesWorkspace user={user} /> : null}
           {tab === 'Purchasing' ? <PurchasingWorkspace user={user} /> : null}
           {tab === 'Inventory' ? <InventoryWorkspace user={user} /> : null}

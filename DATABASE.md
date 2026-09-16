@@ -112,7 +112,6 @@ A recipe revision's ingredient rows can only be inserted with that new revision.
 
 First payment freezes the plan; partial collections do not deduct quantities. Final/zero settlement records consumption in the existing financial transaction. Rollback leaves neither payments nor stock movements committed. Historical PAID orders are not backfilled; previously partial bills freeze recipes on their next collection. See [ADR 0007](docs/adr/0007-inventory.md).
 
-
 ## Purchasing (Phase 8)
 
 Migration `202609140001_purchasing` adds Supplier, PurchaseOrder, PurchaseItem, GoodsReceipt, GoodsReceiptItem, SupplierEntry, PurchasingRevision and PurchasingEvent. All operational references include branch/organization composite keys, including receipt source lines, actor memberships and purchasing event references. StockMovement adds kind PURCHASE and optional unique receiptItemId; existing adjustment, waste and sale source constraints remain active. The PostgreSQL enum extension and new checks run within the migration transaction; new-value checks cast the enum to text so no uncommitted enum value is evaluated.
@@ -122,6 +121,10 @@ Supplier is versioned and soft-archivable. PurchaseOrder has a branch sequence n
 GoodsReceipt/Items are append-only. Each receipt snapshots delivered quantities using frozen order prices and references source items. Unique case-insensitive trimmed supplier references and nonempty invoice numbers prevent duplicate posting with different command IDs. Deferred checks require complete line totals, exactly matching stock additions, no cumulative overreceiving, an exact supplier charge and correct purchase status. Receipt-line rows can be inserted only with the new receipt transaction. Unique source links prevent double stock.
 
 SupplierEntry records signed CHARGE, PAYMENT and PAYMENT_REVERSAL amounts. One charge per receipt must equal its total; payments cannot exceed its unpaid amount; full correction reversals must match an original payment and cannot repeat. Balances are sums, not mutable columns. Runtime grants plus triggers prohibit update/delete/truncate of receipt, stock, supplier-entry and event history. All writes use Serializable transactions, branch serialization and idempotent command receipts; inventory failure rolls back the payable and receipt as well.
+
+## Reporting (Phase 11)
+
+Migration `202609160001_reporting` is data-only. It inserts the `report.read` permission and grants it to protected OWNER roles with a `role.permissions_migrated` audit row, and contains no DDL: no table, column, index, constraint or trigger changes, so the Prisma schema is unchanged and `prisma migrate diff` from the migration history to the schema is empty. Reports derive every figure at read time from existing rows: settlement-time order headers for sales, frozen `OrderItem` snapshots for product revenue, the signed `CashMovement`, `StockMovement`, `SupplierEntry` and `CompanyLedgerEntry` ledgers for balances, and immutable `CompanyStatement` due dates for overdue amounts. No aggregate, snapshot or second balance table exists to drift from the ledgers.
 
 ## Company contracts (Phase 9)
 

@@ -76,7 +76,6 @@ Build api/admin/migrate images, take a verified backup, then stop the old API be
 
 Configure warehouses, stock items, opening adjustments, low-stock thresholds and product recipes through Inventory before relying on consumption figures. An unset recipe intentionally has no consumption. Grant inventory permissions to existing staff through OWNER; seed never replaces customized grants. No new service or public-cloud dependency is required. Check stock/history access, forbidden cross-branch requests and payment settlement against an isolated test database before deployment. See [Phase 7 verification](docs/PHASE_7_VERIFICATION.md).
 
-
 ## Phase 8 upgrade
 
 Back up before applying `202609140001_purchasing`. Build matching api/admin/migrate images, stop the old API, run the migration service (including restricted runtime provisioning), start API/admin and reload Nginx. Preserve the PostgreSQL volume and existing secrets. No business examples or supplier balances are seeded. New StockMovement references are nullable for existing stock history; historical sales/payments are not rewritten.
@@ -84,6 +83,10 @@ Back up before applying `202609140001_purchasing`. Build matching api/admin/migr
 OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplier records and use the branch's existing Inventory warehouses/items. Purchase costs are net per selected unit; enter tax from actual supplier documents. Verify a staged partial receipt, command replay, remaining quantities and supplier balance before live receiving. Supplier payment entry is a recording action; bank/card execution and POS cash-shift movements remain separate. Posted receipt reversal/credit notes and closing an unfulfilled partially received order are not implemented.
 
 The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.
+
+## Phase 11 upgrade
+
+Back up as usual, rebuild the api, admin and migrate images and run Compose. Migration `202609160001_reporting` is data-only: it inserts the `report.read` permission and grants it to protected OWNER with an audit record, and creates or alters no table, column, index or trigger, so the schema, backup and restore procedures are unchanged and `prisma migrate diff` against the schema is empty. OWNER grants `report.read` to existing managers or accountants through Roles; nothing else is seeded. The dashboard is the **Dashboard** tab of the existing frontend behind the same Nginx route and CSP; CSV exports are served by the API as `text/csv` attachments through the same `/api` proxy. Verify after upgrade that an owner sees the Dashboard tab, that today's figures match the Payments and Companies screens, and that a CSV export downloads.
 
 ## Phase 10 upgrade
 

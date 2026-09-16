@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-10: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts and the waiter PWA. Settlement is the only API path to PAID.
+Status: Phases 1-11: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA and read-only reporting with the owner dashboard. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -15,7 +15,7 @@ apps/admin            Next.js foundation and menu administration, login
 apps/pos              Reserved for the touchscreen POS
 apps/kds              Reserved for kitchen display
 apps/waiter           Reserved for mobile PWA
-apps/owner-dashboard  Reserved for owner reporting
+apps/owner-dashboard  Reserved boundary; the owner dashboard is served by apps/admin (Phase 11)
 apps/api              NestJS REST application, later WebSocket adapters
 packages/database     Prisma schema, migrations, client, bootstrap seed
 packages/shared-types API contracts and permission vocabulary
@@ -100,10 +100,13 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 
 [ADR 0007](docs/adr/0007-inventory.md) defines exact-unit quantities, append-only stock history, immutable recipe versions and inventory plans frozen with bills. Final settlement consumes stock atomically with PAID. The existing local API and Riza frontend host inventory; no additional service or Internet dependency is introduced.
 
-
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 11 reporting and owner dashboard
+
+Reporting is a read-only module of the same local API under `/api/reports`, behind one new `report.read` permission, with the dashboard rendered as a tab of the existing Riza frontend. It adds no table and no business rule: sales, orders, products, staff, cash, stock, purchasing and company figures are derived on request from the immutable settlement, payment, cash-movement, stock-movement, ledger and statement rows in `RepeatableRead` snapshots, with exact decimal arithmetic and branch-local day boundaries resolved from `Branch.timezone`. Sales are recognized at settlement time, refunds appear separately on the day recorded, product revenue comes from frozen line snapshots rather than current prices, and balances are the same ledger sums the operational modules enforce. CSV export is the first non-JSON response in the API and serializes the identical figures. The only migration is data-only. See [ADR 0011](docs/adr/0011-reporting-owner-dashboard.md).
 
 ## Phase 10 waiter PWA
 
