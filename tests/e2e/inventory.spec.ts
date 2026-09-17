@@ -91,11 +91,10 @@ test('inventory operator configures stock, recovers a lost save, records waste a
   );
   await dialog.getByRole('button', { name: 'Save adjustment' }).click();
   await expect(retryInventoryCommand).toBeAttached();
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page
-    .getByRole('navigation', { name: 'Administration' })
-    .getByRole('button', { name: 'Inventory', exact: true })
-    .click();
+  await page.reload({ waitUntil: 'commit' });
+  const nav = page.getByRole('navigation', { name: 'Administration' });
+  await expect(nav).toBeVisible({ timeout: 15000 });
+  await nav.getByRole('button', { name: 'Inventory', exact: true }).click();
   await expect(views).toBeVisible();
   await expect(
     page.getByRole('status').filter({ hasText: 'Refreshing inventory. Changes are paused.' }),
