@@ -109,11 +109,10 @@ test('purchasing operator orders, receives with retry, checks stock and reconcil
   await expect(
     page.getByRole('button', { name: 'Retry purchasing command', exact: true }),
   ).toBeAttached();
-  await page.reload();
-  await page
-    .getByRole('navigation')
-    .getByRole('button', { name: 'Purchasing', exact: true })
-    .click();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const nav = page.getByRole('navigation', { name: 'Administration' });
+  await expect(nav).toBeVisible({ timeout: 15000 });
+  await nav.getByRole('button', { name: 'Purchasing', exact: true }).click();
   await page.getByRole('button', { name: 'Retry purchasing command', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Retry purchasing command', exact: true }),
