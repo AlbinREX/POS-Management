@@ -1,12 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent,
+} from 'react';
 import type {
   AreaMap,
   AreaRecord,
   LayoutChanges,
   LayoutPage,
   TableRecord,
+  TableShape,
   TableStatus,
 } from '@restaurant/shared-types';
 import { areaInputSchema, tableInputSchema } from '@restaurant/validation';
@@ -14,6 +23,23 @@ import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api, ApiFailure } from '../lib/api';
+import {
+  collides,
+  drawRect,
+  GRID,
+  HANDLE_CURSORS,
+  HANDLE_LABELS,
+  HANDLES,
+  isUniform,
+  MIN_SIDE,
+  moveRect,
+  normalizeRect,
+  resizeRect,
+  sameRect,
+  type Canvas,
+  type Handle,
+  type Rect,
+} from '../lib/floor-geometry';
 
 const statusLabels: Record<TableStatus, string> = {
   FREE: 'Free',
@@ -31,6 +57,13 @@ const colors: Record<TableStatus, string> = {
   ORDER_SENT: '#3d3157',
   WAITING_PAYMENT: '#503823',
 };
+const shapeLabels: Record<TableShape, string> = {
+  RECTANGLE: 'Rectangle',
+  SQUARE: 'Square',
+  CIRCLE: 'Circle',
+};
+/** Geometry may only change while a table is free or disabled, exactly as the API requires. */
+const isMovable = (status: TableStatus) => status === 'FREE' || status === 'DISABLED';
 const errorMessage = (e: unknown) =>
   e instanceof ApiFailure
     ? e.message
@@ -46,6 +79,45 @@ async function allAreas(archived: boolean) {
   }
 }
 type Operation = (request: () => Promise<unknown>, done?: () => void) => Promise<void>;
+
+/**
+ * The editor's working copy of one table.
+ *
+ * Geometry is edited visually and metadata in the panel, but both live here until Save,
+ * so a drag never writes to the server on its own and a half-configured new table is
+ * never persisted. `row` is absent for a table being drawn.
+ */
+type Draft = {
+  row?: TableRecord;
+  areaId: string;
+  name: string;
+  number: string;
+  capacity: string;
+  shape: TableShape;
+  rect: Rect;
+};
+const draftFrom = (row: TableRecord): Draft => ({
+  row,
+  areaId: row.areaId,
+  name: row.name,
+  number: String(row.number),
+  capacity: String(row.capacity),
+  shape: row.shape,
+  rect: {
+    positionX: row.positionX,
+    positionY: row.positionY,
+    width: row.width,
+    height: row.height,
+  },
+});
+const draftDirty = (draft: Draft) =>
+  !draft.row ||
+  !sameRect(draft.rect, draftFrom(draft.row).rect) ||
+  draft.areaId !== draft.row.areaId ||
+  draft.name !== draft.row.name ||
+  draft.number !== String(draft.row.number) ||
+  draft.capacity !== String(draft.row.capacity) ||
+  draft.shape !== draft.row.shape;
 
 export function RestaurantLayout({
   canManage,
@@ -66,9 +138,14 @@ export function RestaurantLayout({
   const [pending, setPending] = useState(false);
   const [selected, setSelected] = useState('');
   const [areaEditor, setAreaEditor] = useState<AreaRecord | 'new' | null>(null);
-  const [tableEditor, setTableEditor] = useState<TableRecord | 'new' | null>(null);
-  const [arrange, setArrange] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [drawing, setDrawing] = useState(false);
   const cursor = useRef('0');
+  // Polling refreshes the map every few seconds. An in-progress draft must survive that,
+  // so the draft is keyed by id and only reconciled when the underlying row is gone.
+  const draftRef = useRef<Draft | null>(null);
+  draftRef.current = draft;
+
   useEffect(() => {
     let current = true,
       healthy = false;
@@ -90,6 +167,17 @@ export function RestaurantLayout({
       if (!current) return;
       if (next) cursor.current = next.revision;
       setMap(next);
+      // Reconcile an open draft with what the server now reports. A table that vanished
+      // closes the panel; otherwise the draft keeps the operator's unsaved edits but
+      // adopts the current row, so a remote status change is reflected immediately
+      // rather than leaving the panel offering edits the server would refuse.
+      const open = draftRef.current;
+      if (open?.row && next) {
+        const current = next.tables.find((t) => t.id === open.row!.id);
+        if (!current) setDraft(null);
+        else if (current.version !== open.row.version)
+          setDraft({ ...open, row: current });
+      }
       setConnectionError('');
       setConnected(true);
       healthy = true;
@@ -140,8 +228,54 @@ export function RestaurantLayout({
     }
   };
   const busy = pending || !connected;
-  const table = map?.tables.find((t) => t.id === selected);
   const area = map?.area;
+  const editable = canManage && !!area && !area.deletedAt && !busy;
+  const table = map?.tables.find((t) => t.id === selected);
+  // Other tables the draft must not overlap, which is the same set the API compares against.
+  const obstacles = useMemo(
+    () => (map?.tables ?? []).filter((t) => t.id !== draft?.row?.id).map(rectOf),
+    [map, draft],
+  );
+
+  const select = useCallback(
+    (id: string) => {
+      setSelected(id);
+      setError('');
+      const row = map?.tables.find((t) => t.id === id);
+      setDraft((open) => {
+        // Selecting the table already open keeps its draft: re-deriving it here would
+        // wipe unsaved edits every time the operator grabs the table to drag it.
+        if (open?.row?.id === id) return open;
+        // Clicking elsewhere never discards unsaved work either.
+        if (open && draftDirty(open)) return open;
+        return row ? draftFrom(row) : null;
+      });
+    },
+    [map],
+  );
+  const beginDraw = () => {
+    setDrawing(true);
+    setAreaEditor(null);
+    setDraft(null);
+    setSelected('');
+    setError('');
+    setNotice('');
+  };
+  const cancelDraw = useCallback(() => setDrawing(false), []);
+  const drawn = (rect: Rect, shape: TableShape) => {
+    if (!area) return;
+    setDrawing(false);
+    setDraft({
+      areaId: area.id,
+      name: '',
+      number: '',
+      capacity: '4',
+      shape,
+      rect: normalizeRect(rect, area, shape),
+    });
+    setSelected('');
+  };
+
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
@@ -154,9 +288,9 @@ export function RestaurantLayout({
               setAreaId(e.target.value);
               setSelected('');
               setAreaEditor(null);
-              setTableEditor(null);
+              setDraft(null);
+              setDrawing(false);
               setError('');
-              setArrange(false);
             }}
           >
             <option value="" disabled>
@@ -174,7 +308,8 @@ export function RestaurantLayout({
           variant="outline"
           onClick={() => {
             setReload((v) => v + 1);
-            setTableEditor(null);
+            setDraft(null);
+            setDrawing(false);
             setAreaEditor(null);
             setError('');
           }}
@@ -186,7 +321,8 @@ export function RestaurantLayout({
             disabled={busy}
             onClick={() => {
               setAreaEditor('new');
-              setTableEditor(null);
+              setDraft(null);
+              setDrawing(false);
             }}
           >
             Add area
@@ -202,7 +338,8 @@ export function RestaurantLayout({
             setAreaId('');
             setSelected('');
             setAreaEditor(null);
-            setTableEditor(null);
+            setDraft(null);
+            setDrawing(false);
           }}
         />
         Show archived areas
@@ -243,23 +380,6 @@ export function RestaurantLayout({
           }}
         />
       ) : null}
-      {tableEditor && area ? (
-        <TableEditor
-          key={
-            tableEditor === 'new' ? 'new-' + area.id : tableEditor.id + '-' + tableEditor.version
-          }
-          row={tableEditor === 'new' ? undefined : tableEditor}
-          area={area}
-          areas={areas}
-          busy={busy}
-          operate={operate}
-          onClose={() => setTableEditor(null)}
-          onSaved={(id) => {
-            setTableEditor(null);
-            setSelected(id);
-          }}
-        />
-      ) : null}
       {area ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -277,27 +397,19 @@ export function RestaurantLayout({
                   disabled={busy}
                   onClick={() => {
                     setAreaEditor(area);
-                    setTableEditor(null);
+                    setDraft(null);
+                    setDrawing(false);
                   }}
                 >
                   Edit area
                 </Button>
                 <Button
+                  variant={drawing ? 'secondary' : 'default'}
+                  aria-pressed={drawing}
                   disabled={busy || !area.active}
-                  onClick={() => {
-                    setTableEditor('new');
-                    setAreaEditor(null);
-                  }}
+                  onClick={() => (drawing ? cancelDraw() : beginDraw())}
                 >
-                  Add table
-                </Button>
-                <Button
-                  variant={arrange ? 'secondary' : 'outline'}
-                  aria-pressed={arrange}
-                  disabled={busy}
-                  onClick={() => setArrange((v) => !v)}
-                >
-                  Arrange tables
+                  {drawing ? 'Cancel drawing' : 'Add table'}
                 </Button>
               </div>
             ) : null}
@@ -313,41 +425,46 @@ export function RestaurantLayout({
           <FloorMap
             map={map!}
             selected={selected}
-            onSelect={setSelected}
-            arrange={arrange && canManage && !busy && !area.deletedAt}
-            onMove={(row, positionX, positionY) =>
-              void operate(() =>
-                api(`layout/tables/${row.id}/geometry`, 'PATCH', {
-                  version: row.version,
-                  positionX,
-                  positionY,
-                  width: row.width,
-                  height: row.height,
-                  shape: row.shape,
-                }),
-              )
-            }
+            draft={draft}
+            drawing={drawing}
+            editable={editable}
+            obstacles={obstacles}
+            onSelect={select}
+            onDraw={drawn}
+            onCancelDraw={cancelDraw}
+            onGeometry={(rect) => setDraft((open) => (open ? { ...open, rect } : open))}
           />
-          {table ? (
-            <TableDetails
-              key={table.id + '-' + table.version}
-              row={table}
+          {draft ? (
+            <TableDraftPanel
+              key={draft.row ? draft.row.id + '-' + draft.row.version : 'new-table'}
+              draft={draft}
               area={area}
+              areas={areas}
+              busy={busy}
               canManage={canManage}
               canStatus={canStatus}
-              busy={busy}
+              obstacles={obstacles}
               operate={operate}
-              onEdit={() => {
-                setTableEditor(table);
-                setAreaEditor(null);
+              onChange={setDraft}
+              onClose={() => setDraft(null)}
+              onSaved={(id) => {
+                setDraft(null);
+                setSelected(id);
               }}
-              onArchived={() => setSelected('')}
+              onArchived={() => {
+                setDraft(null);
+                setSelected('');
+              }}
             />
+          ) : table ? (
+            <TableSummary row={table} onEdit={() => select(table.id)} canManage={canManage} />
           ) : (
             <p className="text-sm text-muted-foreground">
-              {map!.tables.length
-                ? 'Select a table on the map or in the list.'
-                : 'No tables in this area yet.'}
+              {drawing
+                ? 'Drag on the floor plan to place a new table. Press Esc to cancel.'
+                : map!.tables.length
+                  ? 'Select a table on the map or in the list.'
+                  : 'No tables in this area yet.'}
             </p>
           )}
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Tables in area">
@@ -356,7 +473,7 @@ export function RestaurantLayout({
                 <Button
                   variant={selected === t.id ? 'secondary' : 'outline'}
                   className="h-auto min-h-14 w-full justify-start whitespace-normal text-left"
-                  onClick={() => setSelected(t.id)}
+                  onClick={() => select(t.id)}
                 >
                   {t.number} · {t.name} · {t.capacity} seats · {statusLabels[t.status]}
                 </Button>
@@ -374,31 +491,71 @@ export function RestaurantLayout({
   );
 }
 
-type Drag = {
-  row: TableRecord;
-  pointerId: number;
-  startX: number;
-  startY: number;
-  x: number;
-  y: number;
-};
+const rectOf = (row: TableRecord): Rect => ({
+  positionX: row.positionX,
+  positionY: row.positionY,
+  width: row.width,
+  height: row.height,
+});
+
+/** An in-flight pointer gesture on the map. Only one can be active at a time. */
+type Gesture =
+  | { kind: 'draw'; pointerId: number; anchor: { x: number; y: number } }
+  | { kind: 'move'; pointerId: number; origin: Rect; from: { x: number; y: number } }
+  | {
+      kind: 'resize';
+      pointerId: number;
+      handle: Handle;
+      origin: Rect;
+      from: { x: number; y: number };
+    };
+
 function FloorMap({
   map,
   selected,
+  draft,
+  drawing,
+  editable,
+  obstacles,
   onSelect,
-  arrange,
-  onMove,
+  onDraw,
+  onCancelDraw,
+  onGeometry,
 }: {
   map: AreaMap;
   selected: string;
+  draft: Draft | null;
+  drawing: boolean;
+  editable: boolean;
+  obstacles: Rect[];
   onSelect: (id: string) => void;
-  arrange: boolean;
-  onMove: (row: TableRecord, x: number, y: number) => void;
+  onDraw: (rect: Rect, shape: TableShape) => void;
+  onCancelDraw: () => void;
+  onGeometry: (rect: Rect) => void;
 }) {
   const [zoom, setZoom] = useState(0.75);
-  const [drag, setDrag] = useState<Drag | null>(null);
-  const dragging = useRef<Drag | null>(null);
+  const [gesture, setGesture] = useState<Gesture | null>(null);
+  const [preview, setPreview] = useState<Rect | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+  const canvas: Canvas = map.area;
+  // The draft may be a table being drawn, so its shape drives drawing constraints too.
+  const shape = draft?.shape ?? 'RECTANGLE';
+  const active = gesture !== null;
+  const draftRect = draft?.rect ?? null;
+
+  // Esc cancels drawing and abandons an in-flight gesture without writing anything.
+  useEffect(() => {
+    if (!drawing && !active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setGesture(null);
+      setPreview(null);
+      onCancelDraw();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawing, active, onCancelDraw]);
+
   function point(e: PointerEvent<SVGElement>) {
     const element = svg.current!,
       p = element.createSVGPoint();
@@ -406,51 +563,72 @@ function FloorMap({
     p.y = e.clientY;
     return p.matrixTransform(element.getScreenCTM()!.inverse());
   }
-  function start(e: PointerEvent<SVGGElement>, row: TableRecord) {
-    onSelect(row.id);
-    if (!arrange || !['FREE', 'DISABLED'].includes(row.status) || e.button !== 0) return;
+  /** Capture on the svg itself so a fast drag that leaves the shape keeps tracking. */
+  function capture(e: PointerEvent<SVGElement>) {
+    svg.current?.setPointerCapture(e.pointerId);
+  }
+  function startDraw(e: PointerEvent<SVGSVGElement>) {
+    if (!drawing || !editable || e.button !== 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    capture(e);
     const p = point(e);
-    dragging.current = {
-      row,
+    setGesture({ kind: 'draw', pointerId: e.pointerId, anchor: { x: p.x, y: p.y } });
+    setPreview(drawRect({ x: p.x, y: p.y }, { x: p.x, y: p.y }, canvas, shape));
+  }
+  function startMove(e: PointerEvent<SVGGElement>, row: TableRecord) {
+    onSelect(row.id);
+    if (drawing || !editable || !isMovable(row.status) || e.button !== 0) return;
+    e.preventDefault();
+    capture(e);
+    const p = point(e);
+    setGesture({
+      kind: 'move',
       pointerId: e.pointerId,
-      startX: p.x,
-      startY: p.y,
-      x: row.positionX,
-      y: row.positionY,
-    };
-    setDrag(dragging.current);
+      // Move the geometry the operator currently sees. Using the saved row here would
+      // silently discard an unsaved resize the moment the table is dragged.
+      origin: draft?.row?.id === row.id && draftRect ? draftRect : rectOf(row),
+      from: { x: p.x, y: p.y },
+    });
+  }
+  function startResize(e: PointerEvent<SVGRectElement>, handle: Handle, origin: Rect) {
+    if (!editable || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    capture(e);
+    const p = point(e);
+    setGesture({ kind: 'resize', pointerId: e.pointerId, handle, origin, from: { x: p.x, y: p.y } });
   }
   function move(e: PointerEvent<SVGSVGElement>) {
-    const d = dragging.current;
-    if (!d || d.pointerId !== e.pointerId || !arrange) return;
+    if (!gesture || gesture.pointerId !== e.pointerId) return;
     const p = point(e);
-    const x = Math.max(
-      0,
-      Math.min(
-        map.area.canvasWidth - d.row.width,
-        Math.round((d.row.positionX + p.x - d.startX) / 10) * 10,
-      ),
-    );
-    const y = Math.max(
-      0,
-      Math.min(
-        map.area.canvasHeight - d.row.height,
-        Math.round((d.row.positionY + p.y - d.startY) / 10) * 10,
-      ),
-    );
-    dragging.current = { ...d, x, y };
-    setDrag(dragging.current);
+    if (gesture.kind === 'draw') {
+      setPreview(drawRect(gesture.anchor, { x: p.x, y: p.y }, canvas, shape));
+      return;
+    }
+    const next =
+      gesture.kind === 'move'
+        ? moveRect(gesture.origin, p.x - gesture.from.x, p.y - gesture.from.y, canvas)
+        : resizeRect(
+            gesture.origin,
+            gesture.handle,
+            p.x - gesture.from.x,
+            p.y - gesture.from.y,
+            canvas,
+            shape,
+          );
+    onGeometry(next);
   }
   function finish(e: PointerEvent<SVGSVGElement>, cancel = false) {
-    const d = dragging.current;
-    if (!d || d.pointerId !== e.pointerId) return;
-    dragging.current = null;
-    setDrag(null);
-    if (!cancel && arrange && (d.x !== d.row.positionX || d.y !== d.row.positionY))
-      onMove(d.row, d.x, d.y);
+    if (!gesture || gesture.pointerId !== e.pointerId) return;
+    const current = gesture;
+    const drawn = preview;
+    setGesture(null);
+    setPreview(null);
+    if (cancel || current.kind !== 'draw' || !drawn) return;
+    onDraw(drawn, shape);
   }
+
+  const invalid = draftRect ? collides(draftRect, obstacles) : false;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -472,9 +650,11 @@ function FloorMap({
           +
         </Button>
         <p className="text-sm text-muted-foreground">
-          {arrange
-            ? 'Drag free or disabled tables; release to save. Use Edit table for exact dimensions.'
-            : 'Select a table. Scroll the map to see more.'}
+          {drawing
+            ? 'Drag on the grid to draw a table · Esc cancels'
+            : draft
+              ? 'Drag the table to move it, or drag a handle to resize · Save to apply'
+              : 'Select a table. Scroll the map to see more.'}
         </p>
       </div>
       <div
@@ -486,38 +666,57 @@ function FloorMap({
           ref={svg}
           role="group"
           aria-label={'Floor plan for ' + map.area.name}
+          data-drawing={drawing ? 'true' : 'false'}
+          data-gesture={gesture?.kind ?? 'none'}
+          className="layout-map"
           viewBox={`0 0 ${map.area.canvasWidth} ${map.area.canvasHeight}`}
           style={{
             width: map.area.canvasWidth * zoom,
             height: map.area.canvasHeight * zoom,
             maxWidth: 'none',
-            touchAction: arrange ? 'none' : 'auto',
+            // Only take over touch panning while actually drawing or dragging, so the
+            // map keeps its normal scroll and zoom behaviour the rest of the time.
+            touchAction: drawing || active ? 'none' : 'auto',
           }}
+          onPointerDown={startDraw}
           onPointerMove={move}
           onPointerUp={(e) => finish(e)}
           onPointerCancel={(e) => finish(e, true)}
         >
           <defs>
-            <pattern id="layout-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#2b2d32" strokeWidth="1" />
+            <pattern
+              id="layout-grid"
+              width={GRID}
+              height={GRID}
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d={`M ${GRID} 0 L 0 0 0 ${GRID}`}
+                fill="none"
+                stroke="#2b2d32"
+                strokeWidth="1"
+              />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#layout-grid)" />
           {map.tables.map((row) => {
-            const x = drag?.row.id === row.id ? drag.x : row.positionX,
-              y = drag?.row.id === row.id ? drag.y : row.positionY;
-            const stroke = selected === row.id ? '#f4c451' : '#747984';
+            // The selected table follows the draft while it is being edited.
+            const live = draft?.row?.id === row.id && draftRect ? draftRect : rectOf(row);
+            const isSelected = selected === row.id || draft?.row?.id === row.id;
+            const dragging = gesture?.kind === 'move' && draft?.row?.id === row.id;
             return (
               <g
                 key={row.id}
                 role="button"
                 tabIndex={0}
                 aria-label={`Table ${row.number}: ${row.name}, ${statusLabels[row.status]}, ${row.capacity} seats`}
-                aria-pressed={selected === row.id}
-                transform={`translate(${x} ${y})`}
-                style={{ cursor: arrange ? 'grab' : 'pointer' }}
-                onPointerDown={(e) => start(e, row)}
-                onClick={() => onSelect(row.id)}
+                aria-pressed={isSelected}
+                transform={`translate(${live.positionX} ${live.positionY})`}
+                className="layout-table"
+                data-selected={isSelected ? 'true' : 'false'}
+                data-movable={editable && isMovable(row.status) && !drawing ? 'true' : 'false'}
+                data-dragging={dragging ? 'true' : 'false'}
+                onPointerDown={(e) => startMove(e, row)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -528,33 +727,18 @@ function FloorMap({
                 <title>
                   {row.name} · {statusLabels[row.status]} · {row.capacity} seats
                 </title>
-                {row.shape === 'CIRCLE' ? (
-                  <ellipse
-                    cx={row.width / 2}
-                    cy={row.height / 2}
-                    rx={row.width / 2 - 3}
-                    ry={row.height / 2 - 3}
-                    fill={colors[row.status]}
-                    stroke={stroke}
-                    strokeWidth={selected === row.id ? 4 : 2}
-                  />
-                ) : (
-                  <rect
-                    x="3"
-                    y="3"
-                    width={row.width - 6}
-                    height={row.height - 6}
-                    rx={row.shape === 'SQUARE' ? 4 : 10}
-                    fill={colors[row.status]}
-                    stroke={stroke}
-                    strokeWidth={selected === row.id ? 4 : 2}
-                  />
-                )}
+                <TableShapeNode
+                  shape={draft?.row?.id === row.id ? draft.shape : row.shape}
+                  rect={live}
+                  fill={colors[row.status]}
+                  selected={isSelected}
+                  invalid={isSelected && invalid}
+                />
                 <text
-                  x={row.width / 2}
-                  y={row.height / 2 - 4}
+                  x={live.width / 2}
+                  y={live.height / 2 - 4}
                   textAnchor="middle"
-                  fontSize={Math.min(20, row.width / 4)}
+                  fontSize={Math.min(20, live.width / 4)}
                   fontWeight="600"
                   fill="#fafaf8"
                   pointerEvents="none"
@@ -562,10 +746,10 @@ function FloorMap({
                   {row.number}
                 </text>
                 <text
-                  x={row.width / 2}
-                  y={row.height / 2 + 14}
+                  x={live.width / 2}
+                  y={live.height / 2 + 14}
                   textAnchor="middle"
-                  fontSize={Math.min(12, row.width / 8)}
+                  fontSize={Math.min(12, live.width / 8)}
                   fill="#d2d4da"
                   pointerEvents="none"
                 >
@@ -574,11 +758,513 @@ function FloorMap({
               </g>
             );
           })}
+          {/* A table being drawn has no server row yet, so it renders from the draft. */}
+          {draft && !draft.row && draftRect ? (
+            <g
+              transform={`translate(${draftRect.positionX} ${draftRect.positionY})`}
+              className="layout-table"
+              data-selected="true"
+              aria-label="New table placement"
+            >
+              <TableShapeNode
+                shape={draft.shape}
+                rect={draftRect}
+                fill={colors.FREE}
+                selected
+                invalid={invalid}
+              />
+              <text
+                x={draftRect.width / 2}
+                y={draftRect.height / 2 + 4}
+                textAnchor="middle"
+                fontSize={Math.min(14, draftRect.width / 6)}
+                fill="#fafaf8"
+                pointerEvents="none"
+              >
+                {draft.number || 'New'}
+              </text>
+            </g>
+          ) : null}
+          {/* Resize handles sit above every table so they stay grabbable. */}
+          {editable && draftRect && !drawing ? (
+            <ResizeHandles rect={draftRect} onStart={startResize} />
+          ) : null}
+          {preview ? (
+            <rect
+              className="layout-preview"
+              aria-hidden="true"
+              x={preview.positionX}
+              y={preview.positionY}
+              width={preview.width}
+              height={preview.height}
+              rx={isUniform(shape) ? preview.width / 2 : 10}
+            />
+          ) : null}
         </svg>
       </div>
+      {draftRect ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          Position {draftRect.positionX}, {draftRect.positionY} · Size {draftRect.width} ×{' '}
+          {draftRect.height}
+          {invalid ? ' · Overlaps another table' : ''}
+        </p>
+      ) : null}
     </div>
   );
 }
+
+function TableShapeNode({
+  shape,
+  rect,
+  fill,
+  selected,
+  invalid,
+}: {
+  shape: TableShape;
+  rect: Rect;
+  fill: string;
+  selected: boolean;
+  invalid: boolean;
+}) {
+  const stroke = invalid ? '#e5646b' : selected ? '#f4c451' : '#747984';
+  const strokeWidth = selected ? 3 : 2;
+  return shape === 'CIRCLE' ? (
+    <ellipse
+      cx={rect.width / 2}
+      cy={rect.height / 2}
+      rx={rect.width / 2 - 3}
+      ry={rect.height / 2 - 3}
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+    />
+  ) : (
+    <rect
+      x="3"
+      y="3"
+      width={rect.width - 6}
+      height={rect.height - 6}
+      rx={shape === 'SQUARE' ? 4 : 10}
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+    />
+  );
+}
+
+/** Corner and side handles, drawn in canvas units so they stay aligned at any zoom. */
+function ResizeHandles({
+  rect,
+  onStart,
+}: {
+  rect: Rect;
+  onStart: (e: PointerEvent<SVGRectElement>, handle: Handle, origin: Rect) => void;
+}) {
+  // The visible handle stays small so the map reads cleanly, while an invisible,
+  // larger grab area makes it comfortable to hit with a mouse at any zoom.
+  const size = 12;
+  const half = size / 2;
+  const grab = 28;
+  const grabHalf = grab / 2;
+  const at: Record<Handle, [number, number]> = {
+    nw: [rect.positionX, rect.positionY],
+    n: [rect.positionX + rect.width / 2, rect.positionY],
+    ne: [rect.positionX + rect.width, rect.positionY],
+    e: [rect.positionX + rect.width, rect.positionY + rect.height / 2],
+    se: [rect.positionX + rect.width, rect.positionY + rect.height],
+    s: [rect.positionX + rect.width / 2, rect.positionY + rect.height],
+    sw: [rect.positionX, rect.positionY + rect.height],
+    w: [rect.positionX, rect.positionY + rect.height / 2],
+  };
+  return (
+    <g aria-hidden="true">
+      {HANDLES.map((handle) => {
+        const [x, y] = at[handle];
+        return (
+          <g key={handle}>
+            <rect
+              className="layout-handle"
+              data-handle={handle}
+              x={x - half}
+              y={y - half}
+              width={size}
+              height={size}
+              rx={2}
+              pointerEvents="none"
+            />
+            <rect
+              className="layout-handle-grab"
+              data-handle={handle}
+              data-grab="true"
+              x={x - grabHalf}
+              y={y - grabHalf}
+              width={grab}
+              height={grab}
+              fill="transparent"
+              style={{ cursor: HANDLE_CURSORS[handle] }}
+              onPointerDown={(e) => onStart(e, handle, rect)}
+            >
+              <title>Resize {HANDLE_LABELS[handle]}</title>
+            </rect>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/**
+ * Details for a table that cannot currently be edited geometrically, such as one that is
+ * occupied. It keeps the panel honest rather than offering a Save that would be refused.
+ */
+function TableSummary({
+  row,
+  onEdit,
+  canManage,
+}: {
+  row: TableRecord;
+  onEdit: () => void;
+  canManage: boolean;
+}) {
+  return (
+    <section aria-label="Selected table" className="space-y-3 rounded-lg border bg-card p-5">
+      <h3 className="text-lg font-semibold">
+        {row.number} · {row.name}
+      </h3>
+      <p>
+        {statusLabels[row.status]} · {row.capacity} seats · {row.shape.toLowerCase()} · {row.width}{' '}
+        × {row.height} · Position {row.positionX}, {row.positionY}
+      </p>
+      {canManage ? (
+        <Button variant="outline" onClick={onEdit}>
+          Edit table
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * The details panel. Geometry arrives from the map, metadata is typed here, and Save
+ * persists both together through the existing table endpoints, so a drag alone never
+ * writes and the version check still guards every write.
+ */
+function TableDraftPanel({
+  draft,
+  area,
+  areas,
+  busy,
+  canManage,
+  canStatus,
+  obstacles,
+  operate,
+  onChange,
+  onClose,
+  onSaved,
+  onArchived,
+}: {
+  draft: Draft;
+  area: AreaRecord;
+  areas: AreaRecord[];
+  busy: boolean;
+  canManage: boolean;
+  canStatus: boolean;
+  obstacles: Rect[];
+  operate: Operation;
+  onChange: (draft: Draft) => void;
+  onClose: () => void;
+  onSaved: (id: string) => void;
+  onArchived: () => void;
+}) {
+  const [error, setError] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const row = draft.row;
+  const movable = !row || isMovable(row.status);
+  const dirty = draftDirty(draft);
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+    onChange({ ...draft, [key]: value });
+  // Changing shape can force a square, so geometry is renormalized with it.
+  const setShape = (shape: TableShape) =>
+    onChange({ ...draft, shape, rect: normalizeRect(draft.rect, area, shape) });
+  const statusChoices: Partial<Record<TableStatus, ('FREE' | 'RESERVED' | 'DISABLED')[]>> = {
+    FREE: ['RESERVED', 'DISABLED'],
+    RESERVED: ['FREE'],
+    DISABLED: ['FREE'],
+  };
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (collides(draft.rect, obstacles)) {
+      setError('This table overlaps another table. Move or resize it before saving.');
+      return;
+    }
+    const parsed = tableInputSchema.safeParse({
+      areaId: draft.areaId,
+      name: draft.name.trim(),
+      number: Number(draft.number),
+      capacity: Number(draft.capacity),
+      positionX: draft.rect.positionX,
+      positionY: draft.rect.positionY,
+      width: draft.rect.width,
+      height: draft.rect.height,
+      shape: draft.shape,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues.map((i) => i.message).join('; '));
+      return;
+    }
+    setError('');
+    void operate(async () => {
+      const saved = await api<TableRecord>(
+        'layout/tables' + (row ? '/' + row.id : ''),
+        row ? 'PUT' : 'POST',
+        row ? { version: row.version, data: parsed.data } : parsed.data,
+      );
+      onSaved(saved.id);
+    });
+  }
+
+  return (
+    <form
+      aria-label="Table details"
+      onSubmit={submit}
+      className="space-y-4 rounded-lg border bg-card p-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">{row ? 'Edit table' : 'New table'}</h2>
+        <p className="text-sm text-muted-foreground" role="status">
+          {row ? statusLabels[row.status] : 'Not saved yet'}
+          {dirty ? ' · Unsaved changes' : ''}
+        </p>
+      </div>
+      {error ? (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {row && !movable ? (
+        <p className="text-sm text-muted-foreground">
+          This table is in service. Free it before changing its position, size or details.
+        </p>
+      ) : null}
+      <fieldset disabled={busy || !canManage || !movable} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="layout-name">Table name</Label>
+            <Input
+              id="layout-name"
+              value={draft.name}
+              onChange={(e) => set('name', e.target.value)}
+              maxLength={100}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="layout-tableArea">Table area</Label>
+            <select
+              id="layout-tableArea"
+              value={draft.areaId}
+              onChange={(e) => set('areaId', e.target.value)}
+            >
+              {areas
+                .filter((a) => !a.deletedAt)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="layout-number">Table number (unique in branch)</Label>
+            <Input
+              id="layout-number"
+              type="number"
+              step={1}
+              value={draft.number}
+              onChange={(e) => set('number', e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="layout-capacity">Seats</Label>
+            <Input
+              id="layout-capacity"
+              type="number"
+              step={1}
+              value={draft.capacity}
+              onChange={(e) => set('capacity', e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="layout-shape">Shape</Label>
+            <select
+              id="layout-shape"
+              value={draft.shape}
+              onChange={(e) => setShape(e.target.value as TableShape)}
+            >
+              {(Object.keys(shapeLabels) as TableShape[]).map((shape) => (
+                <option key={shape} value={shape}>
+                  {shapeLabels[shape]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="layout-status">Status</Label>
+            <Input
+              id="layout-status"
+              value={row ? statusLabels[row.status] : statusLabels.FREE}
+              readOnly
+              disabled
+            />
+          </div>
+        </div>
+        <fieldset className="layout-geometry" aria-label="Table geometry">
+          <legend className="text-sm text-muted-foreground">Geometry (drawn on the map)</legend>
+          <GeometryField
+            label="Position X"
+            value={draft.rect.positionX}
+            onChange={(positionX) =>
+              onChange({
+                ...draft,
+                rect: normalizeRect({ ...draft.rect, positionX }, area, draft.shape),
+              })
+            }
+          />
+          <GeometryField
+            label="Position Y"
+            value={draft.rect.positionY}
+            onChange={(positionY) =>
+              onChange({
+                ...draft,
+                rect: normalizeRect({ ...draft.rect, positionY }, area, draft.shape),
+              })
+            }
+          />
+          <GeometryField
+            label="Table width"
+            value={draft.rect.width}
+            onChange={(width) =>
+              onChange({
+                ...draft,
+                rect: normalizeRect({ ...draft.rect, width }, area, draft.shape),
+              })
+            }
+          />
+          <GeometryField
+            label="Table height"
+            value={draft.rect.height}
+            onChange={(height) =>
+              onChange({
+                ...draft,
+                rect: normalizeRect({ ...draft.rect, height }, area, draft.shape),
+              })
+            }
+          />
+        </fieldset>
+        <p className="text-sm text-muted-foreground">
+          Drag the table to move it, or drag a handle to resize. Geometry snaps to a {GRID}-unit
+          grid, stays inside the area and keeps a minimum side of {MIN_SIDE}. Circles and squares
+          use equal sides. Nothing is saved until you press Save.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit">Save table</Button>
+          <Button type="button" variant="outline" onClick={() => (row ? onChange(draftFrom(row)) : onClose())}>
+            {row ? 'Reset' : 'Cancel'}
+          </Button>
+          {row ? (
+            <Button type="button" variant="outline" onClick={onClose}>
+              Close
+            </Button>
+          ) : null}
+        </div>
+      </fieldset>
+      {row ? (
+        <div className="flex flex-wrap gap-2 border-t pt-4">
+          {canStatus
+            ? statusChoices[row.status]?.map((status) => (
+                <Button
+                  key={status}
+                  type="button"
+                  variant="outline"
+                  disabled={busy || (!area.active && status !== 'DISABLED')}
+                  onClick={() =>
+                    void operate(() =>
+                      api('layout/tables/' + row.id + '/status', 'PATCH', {
+                        version: row.version,
+                        status,
+                      }),
+                    )
+                  }
+                >
+                  Mark {statusLabels[status].toLowerCase()}
+                </Button>
+              ))
+            : null}
+          {canManage ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busy || !movable}
+              onClick={() => setConfirm(true)}
+            >
+              Archive table
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {confirm && row ? (
+        <div className="space-y-2">
+          <p>Archive this table? Its number and change history will be retained.</p>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={busy}
+            onClick={() =>
+              void operate(
+                () => api('layout/tables/' + row.id + '/archive', 'POST', { version: row.version }),
+                onArchived,
+              )
+            }
+          >
+            Confirm table archive
+          </Button>
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
+/** A numeric geometry input that keeps the map and the panel in agreement. */
+function GeometryField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const id = 'layout-' + label.toLowerCase().replace(/\s+/g, '');
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type="number"
+        step={GRID}
+        value={value}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (Number.isFinite(next)) onChange(next);
+        }}
+      />
+    </div>
+  );
+}
+
 function Field({
   name,
   label,
@@ -745,205 +1431,5 @@ function AreaEditor({
         ) : null}
       </fieldset>
     </form>
-  );
-}
-function TableEditor({
-  row,
-  area,
-  areas,
-  busy,
-  operate,
-  onClose,
-  onSaved,
-}: {
-  row?: TableRecord;
-  area: AreaRecord;
-  areas: AreaRecord[];
-  busy: boolean;
-  operate: Operation;
-  onClose: () => void;
-  onSaved: (id: string) => void;
-}) {
-  const [error, setError] = useState('');
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const numeric = (key: string) => Number(form.get(key));
-    const parsed = tableInputSchema.safeParse({
-      name: form.get('name'),
-      areaId: form.get('areaId'),
-      number: numeric('number'),
-      capacity: numeric('capacity'),
-      positionX: numeric('positionX'),
-      positionY: numeric('positionY'),
-      width: numeric('width'),
-      height: numeric('height'),
-      shape: form.get('shape'),
-    });
-    if (!parsed.success) {
-      setError(parsed.error.issues.map((i) => i.message).join('; '));
-      return;
-    }
-    setError('');
-    void operate(async () => {
-      const saved = await api<TableRecord>(
-        'layout/tables' + (row ? '/' + row.id : ''),
-        row ? 'PUT' : 'POST',
-        row ? { version: row.version, data: parsed.data } : parsed.data,
-      );
-      onSaved(saved.id);
-    });
-  }
-  return (
-    <form
-      aria-label="Table editor"
-      onSubmit={submit}
-      className="space-y-4 rounded-lg border bg-card p-5"
-    >
-      <h2 className="text-lg font-semibold">{row ? 'Edit table' : 'New table'}</h2>
-      {error ? (
-        <p role="alert" className="text-destructive">
-          {error}
-        </p>
-      ) : null}
-      <fieldset disabled={busy} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="name" label="Table name" value={row?.name} maxLength={100} />
-          <div className="space-y-2">
-            <Label htmlFor="layout-tableArea">Table area</Label>
-            <select id="layout-tableArea" name="areaId" defaultValue={row?.areaId ?? area.id}>
-              {areas
-                .filter((a) => !a.deletedAt)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <Field
-            name="number"
-            label="Table number (unique in branch)"
-            value={row?.number}
-            type="number"
-          />
-          <Field name="capacity" label="Capacity" value={row?.capacity ?? 4} type="number" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="positionX" label="Position X" value={row?.positionX ?? 20} type="number" />
-          <Field name="positionY" label="Position Y" value={row?.positionY ?? 20} type="number" />
-          <Field name="width" label="Table width" value={row?.width ?? 120} type="number" />
-          <Field name="height" label="Table height" value={row?.height ?? 80} type="number" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="layout-shape">Shape</Label>
-          <select id="layout-shape" name="shape" defaultValue={row?.shape ?? 'RECTANGLE'}>
-            <option value="RECTANGLE">Rectangle</option>
-            <option value="SQUARE">Square</option>
-            <option value="CIRCLE">Circle</option>
-          </select>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Dimensions use floor-plan units. Circles and squares need matching width and height.
-          Tables must fit without overlapping.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit">Save table</Button>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </fieldset>
-    </form>
-  );
-}
-function TableDetails({
-  row,
-  area,
-  canManage,
-  canStatus,
-  busy,
-  operate,
-  onEdit,
-  onArchived,
-}: {
-  row: TableRecord;
-  area: AreaRecord;
-  canManage: boolean;
-  canStatus: boolean;
-  busy: boolean;
-  operate: Operation;
-  onEdit: () => void;
-  onArchived: () => void;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  const movable = ['FREE', 'DISABLED'].includes(row.status);
-  const choices: Partial<Record<TableStatus, ('FREE' | 'RESERVED' | 'DISABLED')[]>> = {
-    FREE: ['RESERVED', 'DISABLED'],
-    RESERVED: ['FREE'],
-    DISABLED: ['FREE'],
-  };
-  return (
-    <section aria-label="Selected table" className="space-y-3 rounded-lg border bg-card p-5">
-      <h3 className="text-lg font-semibold">
-        {row.number} · {row.name}
-      </h3>
-      <p>
-        {statusLabels[row.status]} · {row.capacity} seats · {row.shape.toLowerCase()} · {row.width}{' '}
-        × {row.height} · Position {row.positionX}, {row.positionY}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {canManage ? (
-          <Button variant="outline" disabled={busy || !movable} onClick={onEdit}>
-            Edit table
-          </Button>
-        ) : null}
-        {canStatus
-          ? choices[row.status]?.map((status) => (
-              <Button
-                key={status}
-                variant="outline"
-                disabled={busy || (!area.active && status !== 'DISABLED')}
-                onClick={() =>
-                  void operate(() =>
-                    api('layout/tables/' + row.id + '/status', 'PATCH', {
-                      version: row.version,
-                      status,
-                    }),
-                  )
-                }
-              >
-                Mark {statusLabels[status].toLowerCase()}
-              </Button>
-            ))
-          : null}
-        {canManage ? (
-          <Button
-            variant="destructive"
-            disabled={busy || !movable}
-            onClick={() => setConfirm(true)}
-          >
-            Archive table
-          </Button>
-        ) : null}
-      </div>
-      {confirm ? (
-        <div className="space-y-2">
-          <p>Archive this table? Its number and change history will be retained.</p>
-          <Button
-            variant="destructive"
-            disabled={busy}
-            onClick={() =>
-              void operate(
-                () => api('layout/tables/' + row.id + '/archive', 'POST', { version: row.version }),
-                onArchived,
-              )
-            }
-          >
-            Confirm table archive
-          </Button>
-        </div>
-      ) : null}
-    </section>
   );
 }
