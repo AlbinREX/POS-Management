@@ -36,17 +36,25 @@ test('configure areas and geometry, drag a table, receive a remote status change
   }
   await page.getByLabel('Area', { exact: true }).selectOption({ label: `${prefix} Indoor` });
   await page.getByRole('button', { name: 'Add table', exact: true }).click();
+  // Drawing places the table; the details panel then opens for its metadata.
+  const grid = page.getByRole('group', { name: new RegExp(`^Floor plan for ${prefix} Indoor$`) });
+  const gridBox = (await grid.boundingBox())!;
+  await page.mouse.move(gridBox.x + 40, gridBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(gridBox.x + 130, gridBox.y + 130, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByRole('form', { name: 'Table details' })).toBeVisible();
   await page.getByLabel('Table name', { exact: true }).fill(`${prefix} table`);
   const number = info.project.name === 'desktop' ? 301 : 302;
   await page.getByLabel('Table number (unique in branch)').fill(String(number));
-  await page.getByLabel('Table height').fill('120');
   await page.getByLabel('Shape', { exact: true }).selectOption('CIRCLE');
+  await page.getByLabel('Table height').fill('120');
   const createdResponse = page.waitForResponse(
     (r) => r.url().endsWith('/api/layout/tables') && r.request().method() === 'POST',
   );
   await page.getByRole('button', { name: 'Save table', exact: true }).click();
   const created = await (await createdResponse).json();
-  await expect(page.getByRole('form', { name: 'Table editor' })).toHaveCount(0);
+  await expect(page.getByRole('form', { name: 'Table details' })).toHaveCount(0);
   const mapTable = page.getByRole('button', { name: new RegExp(`^Table ${number}:`) });
   await expect(mapTable).toBeVisible();
   // Return an old area-list response after a concurrent area commit. The map
@@ -71,33 +79,32 @@ test('configure areas and geometry, drag a table, receive a remote status change
   await expect(page.getByLabel('Area', { exact: true })).toContainText(`${prefix} Garden`, {
     timeout: 12000,
   });
-  await page.getByRole('button', { name: 'Arrange tables', exact: true }).click();
+  await mapTable.click();
+  await expect(page.getByRole('form', { name: 'Table details' })).toBeVisible();
   await mapTable.scrollIntoViewIfNeeded();
   const box = await mapTable.boundingBox();
   expect(box).not.toBeNull();
-  const geometryResponse = page.waitForResponse(
-    (r) =>
-      r.url().endsWith(`/api/layout/tables/${created.id}/geometry`) &&
-      r.request().method() === 'PATCH',
-  );
+  // Dragging edits the draft only. No geometry request may leave until Save.
+  let geometryWrites = 0;
+  page.on('request', (r) => {
+    if (r.url().includes('/api/layout/tables/') && ['PATCH', 'PUT'].includes(r.method()))
+      geometryWrites += 1;
+  });
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.mouse.down();
   await page.mouse.move(box!.x + box!.width / 2 + 75, box!.y + box!.height / 2 + 75, { steps: 5 });
   await page.mouse.up();
-  const moved = await (await geometryResponse).json();
-  expect(moved.positionX).toBe(120);
-  expect(moved.positionY).toBe(120);
-  await expect(page.getByRole('region', { name: 'Selected table' })).toContainText(
-    'Position 120, 120',
-  );
-  await page.getByRole('button', { name: 'Arrange tables', exact: true }).click();
-  await page.getByRole('button', { name: 'Edit table', exact: true }).click();
+  // A 75px drag at 75% zoom is 100 canvas units, which lands on the 20-unit grid.
+  await expect(page.getByLabel('Position X')).toHaveValue('160');
+  await expect(page.getByLabel('Position Y')).toHaveValue('160');
+  expect(geometryWrites).toBe(0);
   await page.getByLabel('Table area').selectOption({ label: `${prefix} Terrace` });
   await page.getByLabel('Shape', { exact: true }).selectOption('RECTANGLE');
   await page.getByLabel('Table width').fill('160');
   await page.getByLabel('Table height').fill('80');
   await page.getByRole('button', { name: 'Save table', exact: true }).click();
-  await expect(page.getByRole('form', { name: 'Table editor' })).toHaveCount(0);
+  await expect(page.getByRole('form', { name: 'Table details' })).toHaveCount(0);
+  expect(geometryWrites).toBeGreaterThan(0);
   await expect(mapTable).toHaveCount(0);
   await page.getByLabel('Area', { exact: true }).selectOption({ label: `${prefix} Terrace` });
   await mapTable.click();
@@ -113,7 +120,7 @@ test('configure areas and geometry, drag a table, receive a remote status change
   });
   expect(remote.status()).toBe(200);
   await expect(mapTable).toHaveAccessibleName(new RegExp('Reserved'), { timeout: 12000 });
-  await expect(page.getByRole('button', { name: 'Edit table', exact: true })).toBeDisabled();
+  await expect(page.getByRole('form', { name: 'Table details' }).getByRole('textbox').first()).toBeDisabled();
   await page.screenshot({ path: `.local/${info.project.name}-layout.png`, fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -145,7 +152,7 @@ test('configure areas and geometry, drag a table, receive a remote status change
   }
   await page.getByRole('button', { name: 'Audit history', exact: true }).click();
   await expect(
-    page.getByRole('cell', { name: 'layout.table.geometry_changed', exact: true }).first(),
+    page.getByRole('cell', { name: 'layout.table.updated', exact: true }).first(),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   expect(errors).toEqual([]);

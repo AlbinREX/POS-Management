@@ -1415,3 +1415,57 @@ details > summary::marker {
   font-size: 0.88rem;
   color: var(--muted-foreground);
 }
+
+/* Floor-plan layout editor: draw, move and resize affordances. */
+.layout-map {
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: auto;
+}
+.layout-map[data-drawing='true'] {
+  cursor: crosshair;
+}
+.layout-map[data-gesture='move'] {
+  cursor: grabbing;
+}
+.layout-table {
+  cursor: pointer;
+}
+.layout-map[data-drawing='true'] .layout-table {
+  cursor: crosshair;
+}
+.layout-table[data-movable='true'] {
+  cursor: grab;
+}
+.layout-table[data-dragging='true'] {
+  cursor: grabbing;
+}
+.layout-table[data-selected='true'] {
+  filter: drop-shadow(0 0 4px #f4c45166);
+}
+.layout-handle {
+  fill: var(--card);
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.layout-handle:hover {
+  fill: var(--primary);
+}
+.layout-preview {
+  fill: #f4c4511f;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+.layout-geometry {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  .layout-geometry {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
