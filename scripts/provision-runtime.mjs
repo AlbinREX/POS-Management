@@ -52,6 +52,10 @@ export async function provisionRuntime(
     // The runtime role advances it (INSERT/UPDATE) but may never delete or truncate it,
     // and it holds no business data that could overwrite a local record.
     await client.query('REVOKE DELETE, TRUNCATE ON "SyncCheckpoint" FROM restaurant_app');
+    // Phase 14: fiscal handoff rows are operational delivery state, not business
+    // history. The runtime role advances them (INSERT/UPDATE) but may never delete or
+    // truncate them, so an undelivered sale cannot be made to disappear.
+    await client.query('REVOKE DELETE, TRUNCATE ON "FiscalHandoff" FROM restaurant_app');
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

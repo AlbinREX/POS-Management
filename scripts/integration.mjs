@@ -167,6 +167,10 @@ try {
   app = await createApp();
   const { runOpsIntegration } = await import('../tests/integration/ops.mjs');
   await runOpsIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runFiscalIntegration } = await import('../tests/integration/fiscal.mjs');
+  await runFiscalIntegration(app);
   if (process.argv.includes('--browser')) {
     // Fresh limiter state for independent browser acceptance tests.
     await app.close();

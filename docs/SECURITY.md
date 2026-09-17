@@ -1,3 +1,11 @@
+# Phase 14 fiscal handoff boundary
+
+FastFood Riza does not perform Kosovo fiscalization; EnterNet operates the fiscal device and F-LINK software. The integration surface is deliberately minimal: two permissions, `fiscal.read` for visibility and `fiscal.retry` for the operator action, neither of which grants business authority and neither implied by any business permission.
+
+Provider configuration comes from the environment only. No credential or endpoint is stored in the database, accepted from a request, exposed to the frontend, or written to a log or audit record. No fiscal identifier is accepted from a client: the retry schema is strict, and a provider reference is stored only as an adapter reports it. Delivery runs outside every business transaction, so a provider failure cannot revert a PAID order or alter any financial record. Handoff rows are branch-scoped by composite foreign key, and the runtime role may advance them but never delete or truncate them.
+
+Not claimed: ATK compliance, fiscal certification, fiscal signing, device attestation or any F-LINK transport security property, since that transport is not implemented.
+
 # Phase 13 production hardening
 
 Runtime images contain only compiled output and production dependencies. Source, tests, documentation and scripts are absent from the API and admin images, and the migration image is separate, carrying the Prisma CLI and the two scripts it runs. Four packages remain because upstream declares them as production dependencies: `playwright` and `@playwright/test` via `next`, and `prisma` and `typescript` via `@prisma/client`. Removing them by hand would risk breaking Next.js or Prisma at runtime, so they are documented rather than stripped.

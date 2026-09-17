@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-13: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA read-only reporting with the owner dashboard, and local-first hardening with an outbound delivery checkpoint. Settlement is the only API path to PAID.
+Status: Phases 1-14: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA read-only reporting with the owner dashboard, and local-first hardening with an outbound delivery checkpoint. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -60,7 +60,7 @@ Global authorization defaults to deny. Each non-public handler must declare requ
 - Financial actions, inventory consumption, audit events and eventual outbox events commit in one transaction. Idempotency keys and unique source constraints prevent duplicate effects.
 - Concurrent workflows use row locks or serializable transactions with bounded retries. Optimistic versions apply to mutable operational aggregates.
 - Future realtime delivery uses a transactional outbox, per-branch authorization and event sequence/replay. WebSocket messages are notifications; clients refetch authoritative state after reconnect. No WebSocket business states are invented in Phase 1.
-- Fiscal integration stays behind a provider interface. No fiscal number or Kosovo legal behavior is synthesized. Phase 14 requires official specifications and certified integration.
+- Fiscal integration stays behind a provider interface. No fiscal number or Kosovo legal behavior is synthesized. Phase 14 delivers that interface for EnterNet / F-LINK; the transport itself awaits their specification.
 
 ## Risks and mitigations
 
@@ -103,6 +103,10 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 14 EnterNet / F-LINK fiscal handoff
+
+FastFood Riza does not perform Kosovo fiscalization. EnterNet operates the fiscal device and F-LINK software and remains responsible for ATK rules, fiscal signing, certificates, fiscal numbering and device protocol. This phase adds only the integration boundary: a deterministic sale payload built from immutable settlement and order snapshots, a `FiscalProvider` abstraction, and a `FiscalHandoff` table tracking delivery state per settlement with an idempotent correlation key. Delivery is strictly downstream of settlement and runs outside any business transaction, so a provider failure can never revert a PAID order. The F-LINK transport is not implemented, because its protocol has not been supplied; the configured adapter never claims success, leaving undelivered sales visible. See [ADR 0014](docs/adr/0014-enternet-flink-integration.md).
 
 ## Phase 13 production, security and backup hardening
 
