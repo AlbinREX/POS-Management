@@ -533,6 +533,7 @@ model Organization {
 }
 
 model Branch {
+  syncCheckpoints    SyncCheckpoint[]
   companies          Company[]
   companyContracts   CompanyContract[]
   companyEmployees   CompanyEmployee[]
@@ -1672,4 +1673,29 @@ model CompaniesEvent {
   @@index([companyId, branchId, organizationId])
   @@index([contractId, branchId, organizationId])
   @@index([userId, branchId, organizationId])
+}
+
+// Phase 12 outbound delivery checkpoint.
+//
+// The seven per-module event logs are the durable outbox: each is written in the same
+// transaction as its business change. This table records only how far an optional cloud
+// consumer has confirmed delivery per branch and stream. It holds no business data, is
+// never a source of truth, and can be rebuilt by resetting a cursor: local records are
+// the authority and are never modified by delivery.
+model SyncCheckpoint {
+  id                String    @id @default(uuid()) @db.Uuid
+  branchId          String    @db.Uuid
+  organizationId    String    @db.Uuid
+  stream            String    @db.VarChar(40)
+  deliveredRevision BigInt    @default(0)
+  lastDeliveredAt   DateTime? @db.Timestamptz(3)
+  lastAttemptAt     DateTime? @db.Timestamptz(3)
+  lastError         String?   @db.VarChar(500)
+  failedAttempts    Int       @default(0)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+  branch            Branch    @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, organizationId, stream])
+  @@index([branchId, organizationId])
 }

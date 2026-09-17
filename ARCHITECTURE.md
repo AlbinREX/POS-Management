@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-11: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA and read-only reporting with the owner dashboard. Settlement is the only API path to PAID.
+Status: Phases 1-13: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA read-only reporting with the owner dashboard, and local-first hardening with an outbound delivery checkpoint. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -103,6 +103,14 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 13 production, security and backup hardening
+
+Runtime images carry only compiled output and production dependencies; source, tests and documentation are absent, and the migration image is separate. A production API fails fast on placeholder or weak configuration rather than serving. The backup script reports its own health to a status file, and a read-only `GET /api/ops/status` behind `ops.read` surfaces database reachability, backup age, Phase 12 delivery backlog and disk headroom, with the aggregate severity equal to the worst signal. No business module was redesigned and no Phase 1-12 guarantee was weakened. See [ADR 0013](docs/adr/0013-production-security-hardening.md).
+
+## Phase 12 local-first hardening and synchronization
+
+The seven per-module event logs written since Phase 3 are already a transactional outbox: each row commits with its business change. Phase 12 adds only `SyncCheckpoint`, a per-branch, per-stream record of how far an optional cloud consumer has confirmed delivery, plus a `sync.read` status endpoint and a compact header indicator. The delivery worker runs on its own timer outside every request and business transaction, is inert unless `SYNC_TARGET_URL` is configured, and is outbound only: nothing received from a cloud target is applied locally, so destructive cloud-to-local overwrite is impossible by construction. Delivered cursors move forward only, and a cursor ahead of local history reports an empty backlog rather than reprocessing. The client distinguishes local server connected, local server unavailable, internet unavailable and the delivery health as separate states. No command is queued offline: replay safety depends on server-side credit, stock, shift and drawer constraints that a partitioned device cannot evaluate. See [ADR 0012](docs/adr/0012-offline-local-first-sync.md).
 
 ## Phase 11 reporting and owner dashboard
 

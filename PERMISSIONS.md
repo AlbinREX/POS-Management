@@ -92,6 +92,14 @@ Fresh OWNER, ADMIN, MANAGER and STOREKEEPER receive all five keys. Existing cust
 
 Fresh OWNER/ADMIN/MANAGER receive all seven keys. Fresh STOREKEEPER receives supplier.read/manage and purchase.read/manage/receive, retaining Phase 7 inventory grants without supplier-payment or POS-payment authority. The migration adds and audits only protected OWNER grants; existing customized roles are preserved. Suppliers and receipt balances stay readable after archival. Cashier payment permissions do not imply supplier-account access. Direct receiving commands cannot choose the actor, branch, receipt totals or stock movement kind.
 
+## Phase 13 operations
+
+| Permission | Authority                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| ops.read   | Read-only operational status: database reachability, backup age and outcome, Phase 12 delivery backlog and filesystem headroom |
+
+Operational visibility is a distinct authority from operating. `ops.read` grants no business access, and no business permission implies it: an operations reader is refused orders, payments and reports. Fresh OWNER, ADMIN and MANAGER receive it; CASHIER, WAITER, KITCHEN and STOREKEEPER do not. Migration `202609180001_ops` grants and audits only protected OWNER. The endpoint exposes no credential, connection string, driver error or business record, writes nothing, and revoking the key takes effect on the next request.
+
 ## Phase 11 reporting
 
 | Permission  | Authority                                                                                                                                       |

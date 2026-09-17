@@ -1,5 +1,17 @@
 # Local deployment
 
+## Phase 13 production hardening
+
+Runtime images now contain only what they run. Production dependencies resolve in a separate stage with a fresh `npm ci --omit=dev`, and each runtime stage copies compiled output, the generated Prisma client and package manifests only. Source, tests, documentation and scripts are absent from the API and admin images; the migration image separately carries the Prisma CLI, the migration SQL and the two scripts it executes. Rebuild all three images on upgrade.
+
+A production API refuses to start on placeholder configuration. It requires a database password that is neither a placeholder nor shorter than 24 characters, a high-entropy JWT secret, and a non-loopback HTTPS origin. A half-configured server now fails immediately with a precise message instead of serving traffic. Development and test are unaffected.
+
+The API mounts `backups/` read-only so it can report backup age and outcome without being able to create, alter or delete an archive. Set `BACKUP_STATUS_FILE` only if the archives live elsewhere.
+
+`GET /api/ops/status`, behind the new `ops.read` permission, reports database reachability, backup age and outcome, the Phase 12 delivery backlog and filesystem headroom, with the aggregate severity equal to the worst individual signal. Grant `ops.read` to owners and administrators through Roles; migration `202609180001_ops` grants it to protected OWNER automatically.
+
+After upgrading, verify that the stack starts, that `GET /api/ops/status` returns `severity` with four checks for an owner and 403 for a cashier, and that a deliberate misconfiguration of `DATABASE_URL` in a scratch environment causes the API to exit rather than start.
+
 ## Phase 3 upgrade
 
 Back up the existing database. Build the updated images and start Compose; its migration/provisioning service applies `202609110002_layout` before the API starts. Runtime provisioning revokes mutation rights on LayoutEvent, so use `node scripts/migrate.mjs` for host-managed deployments as well. Existing protected owners receive layout.read, layout.manage and layout.status.manage with an audit event; other existing roles need explicit grants. Seed creates no areas or tables. Verify a map edit, status change, persisted audit/event and second-client refresh. No WebSocket proxy change is needed for this phase's authenticated change-feed polling.
@@ -83,6 +95,14 @@ Back up before applying `202609140001_purchasing`. Build matching api/admin/migr
 OWNER grants Phase 8 permissions to existing staff through Roles. Set up supplier records and use the branch's existing Inventory warehouses/items. Purchase costs are net per selected unit; enter tax from actual supplier documents. Verify a staged partial receipt, command replay, remaining quantities and supplier balance before live receiving. Supplier payment entry is a recording action; bank/card execution and POS cash-shift movements remain separate. Posted receipt reversal/credit notes and closing an unfulfilled partially received order are not implemented.
 
 The browser test harness now chooses an available loopback frontend port to avoid Windows Hyper-V port exclusions. APP_ORIGIN is passed to Playwright and its API fixtures. The installed Docker endpoint remains localhost:8080 and application configuration is unchanged.
+
+## Phase 12 upgrade
+
+Back up as usual, rebuild the api, admin and migrate images and run Compose. Migration `202609170001_sync` adds the `SyncCheckpoint` table and the `sync.read` permission; it alters no existing table, so restore procedures are unchanged, though the new table is included in archives like any other. Runtime provisioning must be rerun so the runtime role receives INSERT and UPDATE but not DELETE or TRUNCATE on the checkpoint, which `node scripts/migrate.mjs` and the Compose migrate service both do.
+
+Cloud delivery is disabled unless `SYNC_TARGET_URL` is set, which is the default. Leave it unset for a restaurant that does not replicate. With it set, the worker records an explicit transport-not-implemented failure, because no cloud endpoint is specified or certified for this system yet; that is reported as a failed sync rather than a healthy one. Delivery never blocks local operation either way.
+
+After upgrading, verify that the header shows the restaurant server as connected, that stopping the api container changes it to unavailable while the page stays loaded, and that `GET /api/sync/status` lists seven streams for an owner and is refused for a cashier.
 
 ## Phase 11 upgrade
 

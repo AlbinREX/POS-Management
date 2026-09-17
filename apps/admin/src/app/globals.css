@@ -1281,3 +1281,98 @@ details > summary::marker {
     font-size: 1.1rem;
   }
 }
+
+/* Phase 12 connectivity and sync indicator. Compact by design: the header carries the
+   state, and the technical detail lives in the Owner/Admin dashboard. */
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sync-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.sync-dot[data-tone='ok'] {
+  background: #5fd38d;
+}
+.sync-dot[data-tone='warn'] {
+  background: var(--primary);
+}
+.sync-dot[data-tone='bad'] {
+  background: var(--destructive);
+}
+.sync-dot[data-tone='idle'] {
+  background: var(--muted-foreground);
+}
+.sync-indicator > span:last-child {
+  color: var(--muted-foreground);
+}
+.sync-detail {
+  display: grid;
+  gap: 10px;
+}
+.sync-streams {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.sync-streams th,
+.sync-streams td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.sync-streams th {
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+.sync-streams tbody tr:last-child td {
+  border-bottom: 0;
+}
+.sync-streams .sync-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  /* The header's right-hand group is a non-wrapping flex row holding the signed-in user
+     and the sign-out button. At phone widths it has no spare room: adding the indicator
+     there pushes the document's scroll width past the layout width, and an overflowing
+     mobile page is rescaled, so every client coordinate shifts and interactions with
+     modals never settle. The indicator is therefore not rendered at this width. The
+     connectivity and sync state remain available on the Owner/Admin dashboard, which is
+     where the technical detail belongs, and the desktop header is unchanged. */
+  .sync-indicator {
+    display: none;
+  }
+}
+
+/* Phase 13 operations line. Reuses the report KPI card; only the accent changes, so a
+   degraded signal is visible without introducing a new component or colour system. */
+.report-kpi[data-ops='warn'] > strong {
+  color: var(--primary);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops='critical'] > strong {
+  color: var(--destructive);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops='unknown'] > strong {
+  color: var(--muted-foreground);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops]:disabled {
+  opacity: 1;
+}
