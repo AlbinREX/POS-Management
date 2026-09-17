@@ -1,3 +1,5 @@
+import { FiscalController } from './fiscal/fiscal.controller';
+import { FiscalService } from './fiscal/fiscal.service';
 import { OpsController } from './ops/ops.controller';
 import { OpsService } from './ops/ops.service';
 import { SyncController } from './sync/sync.controller';
@@ -32,6 +34,7 @@ import { LayoutController } from './layout/layout.controller';
 import { LayoutService } from './layout/layout.service';
 @Module({
   controllers: [
+    FiscalController,
     OpsController,
     SyncController,
     ReportingController,
@@ -48,6 +51,7 @@ import { LayoutService } from './layout/layout.service';
     LayoutController,
   ],
   providers: [
+    FiscalService,
     OpsService,
     SyncService,
     SyncWorker,

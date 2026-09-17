@@ -1,5 +1,13 @@
 # Local deployment
 
+## Phase 14 upgrade
+
+Back up, rebuild the api, admin and migrate images and run Compose. Migration `202609190001_fiscal` adds the `FiscalHandoff` table and the two fiscal permissions; it alters no existing table, so restore procedures are unchanged.
+
+Fiscal handoff is inert by default. `FISCAL_PROVIDER`, `FLINK_ENABLED`, `FLINK_ENDPOINT`, `FLINK_CONNECTION_MODE` and `FLINK_TIMEOUT_MS` are placeholders whose final names and semantics follow EnterNet's contract. Leave `FLINK_ENABLED=false`: the F-LINK transport is not implemented, and enabling it resolves to an adapter that honestly reports the missing specification rather than claiming delivery.
+
+FastFood Riza does not fiscalize. EnterNet operates the fiscal device and F-LINK software. After upgrading, verify that an owner sees the Fiscal tab in the Dashboard, that a settled sale exposes a payload at `GET /api/fiscal/orders/:id/payload`, and that a cashier is refused fiscal routes.
+
 ## Phase 13 production hardening
 
 Runtime images now contain only what they run. Production dependencies resolve in a separate stage with a fresh `npm ci --omit=dev`, and each runtime stage copies compiled output, the generated Prisma client and package manifests only. Source, tests, documentation and scripts are absent from the API and admin images; the migration image separately carries the Prisma CLI, the migration SQL and the two scripts it executes. Rebuild all three images on upgrade.

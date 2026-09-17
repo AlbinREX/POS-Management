@@ -4,6 +4,8 @@ import type {
   CashReport,
   CompaniesReport,
   DashboardOverview,
+  FiscalHandoffRecord,
+  FiscalStatusSummary,
   OpsStatus,
   InventoryReport,
   OrdersReport,
@@ -19,7 +21,15 @@ import { Input } from '@restaurant/ui/input';
 import { api, apiBlob, ApiFailure } from '../lib/api';
 
 type View =
-  'Overview' | 'Orders' | 'Products' | 'Staff' | 'Cash' | 'Inventory' | 'Purchasing' | 'Companies';
+  | 'Overview'
+  | 'Orders'
+  | 'Products'
+  | 'Staff'
+  | 'Cash'
+  | 'Inventory'
+  | 'Purchasing'
+  | 'Companies'
+  | 'Fiscal';
 interface Reports {
   Orders?: OrdersReport;
   Products?: ProductsReport;
@@ -39,6 +49,7 @@ const views: View[] = [
   'Inventory',
   'Purchasing',
   'Companies',
+  'Fiscal',
 ];
 const presets: { key: ReportPreset; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -144,6 +155,9 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
   const [page, setPage] = useState(1);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [ops, setOps] = useState<OpsStatus | null>(null);
+  const [fiscal, setFiscal] = useState<FiscalStatusSummary | null>(null);
+  const [handoffs, setHandoffs] = useState<FiscalHandoffRecord[]>([]);
+  const [retrying, setRetrying] = useState('');
   const [reports, setReports] = useState<Reports>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -161,9 +175,15 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
       // ops.read simply sees no operations line rather than an error.
       if (user.permissions.includes('ops.read'))
         setOps(await api<OpsStatus>('ops/status').catch(() => null));
-      if (view !== 'Overview') {
+      // Fiscal handoff state is operational, not a report, so it loads on its own.
+      if (view === 'Fiscal' && user.permissions.includes('fiscal.read')) {
+        setFiscal(await api<FiscalStatusSummary>('fiscal/status'));
+        setHandoffs(await api<FiscalHandoffRecord[]>('fiscal/handoffs'));
+      }
+      if (view !== 'Overview' && view !== 'Fiscal') {
         const extra = view === 'Inventory' ? `&page=${page}&limit=25` : '';
-        const result = await api<Reports[Exclude<View, 'Overview'>]>(
+        // Fiscal is operational state rather than a report, so it is excluded here.
+        const result = await api<Reports[Exclude<View, 'Overview' | 'Fiscal'>]>(
           `reports/${view.toLowerCase()}?${query}${extra}`,
         );
         setReports((r) => ({ ...r, [view]: result }));
@@ -840,7 +860,82 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
             />
           </>
         ) : null}
-        {view !== 'Overview' && !reports[view] && !loading && !error ? (
+        {view === 'Fiscal' ? (
+          <>
+            <h2>Fiscal handoff</h2>
+            <p className="fiscal-note">
+              FastFood Riza does not fiscalize. EnterNet operates the fiscal device and F-LINK
+              software; this view shows only whether a finalized sale has been handed off to them. A
+              failed handoff never changes a paid sale.
+            </p>
+            {fiscal?.transportPending ? (
+              <p className="purchase-notice">
+                No fiscal provider transport is configured. Sales remain recorded and unresolved
+                here until the EnterNet F-LINK integration specification is supplied.
+              </p>
+            ) : null}
+            <dl className="purchase-totals report-totals">
+              <div>
+                <dt>Provider</dt>
+                <dd>{fiscal?.provider ?? 'Not configured'}</dd>
+              </div>
+              <div>
+                <dt>Unresolved</dt>
+                <dd>{fiscal?.unresolved ?? 0}</dd>
+              </div>
+              {fiscal
+                ? Object.entries(fiscal.counts).map(([state, n]) => (
+                    <div key={state}>
+                      <dt>{label(state)}</dt>
+                      <dd>{n}</dd>
+                    </div>
+                  ))
+                : null}
+            </dl>
+            <Table
+              title="Fiscal handoffs"
+              columns={[
+                col('orderNumber', 'Order'),
+                col('state', 'State'),
+                col('provider', 'Provider'),
+                col('attempts', 'Attempts', true),
+                col('total', 'Total', true),
+                col('settledAt', 'Settled'),
+                col('providerReference', 'Provider reference'),
+                col('lastError', 'Last error'),
+              ]}
+              rows={handoffs.map((h) => ({ ...h, state: label(h.state) }))}
+              empty="No sales have been registered for fiscal handoff."
+            />
+            {user.permissions.includes('fiscal.retry') ? (
+              <div className="purchase-filters">
+                {handoffs
+                  .filter((h) => h.state !== 'CONFIRMED' && h.state !== 'SENT')
+                  .slice(0, 10)
+                  .map((h) => (
+                    <Button
+                      key={h.id}
+                      type="button"
+                      variant="outline"
+                      disabled={retrying === h.orderId}
+                      onClick={() => {
+                        setRetrying(h.orderId);
+                        void api(`fiscal/orders/${h.orderId}/retry`, 'POST', {})
+                          .catch(() => undefined)
+                          .finally(() => {
+                            setRetrying('');
+                            void load();
+                          });
+                      }}
+                    >
+                      Retry order {h.orderNumber}
+                    </Button>
+                  ))}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+        {view !== 'Overview' && view !== 'Fiscal' && !reports[view] && !loading && !error ? (
           <p className="purchase-empty">No report data.</p>
         ) : null}
       </section>

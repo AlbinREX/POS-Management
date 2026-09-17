@@ -534,6 +534,7 @@ model Organization {
 
 model Branch {
   syncCheckpoints    SyncCheckpoint[]
+  fiscalHandoffs     FiscalHandoff[]
   companies          Company[]
   companyContracts   CompanyContract[]
   companyEmployees   CompanyEmployee[]
@@ -807,6 +808,7 @@ model OrderBill {
 
 model OrderSettlement {
   stockMovements StockMovement[]
+  fiscalHandoff  FiscalHandoff?
 
   orderId        String           @id @db.Uuid
   branchId       String           @db.Uuid
@@ -1698,4 +1700,37 @@ model SyncCheckpoint {
 
   @@unique([branchId, organizationId, stream])
   @@index([branchId, organizationId])
+}
+
+// Phase 14 fiscal handoff delivery state.
+//
+// FastFood Riza does not perform fiscalization. EnterNet operates the fiscal device and
+// F-LINK software. This table records only whether a finalized sale has been handed off
+// to that provider, so an operator can see and recover an undelivered sale.
+//
+// It holds no fiscal document, no fiscal number and no tax-authority identifier. It is
+// keyed one-to-one to a settlement, which exists only for a PAID order, and it can never
+// alter that order: delivery state and financial truth are deliberately separate.
+model FiscalHandoff {
+  id                 String          @id @default(uuid()) @db.Uuid
+  orderId            String          @unique @db.Uuid
+  branchId           String          @db.Uuid
+  organizationId     String          @db.Uuid
+  correlationKey     String          @db.VarChar(120)
+  provider           String          @db.VarChar(60)
+  state              String          @db.VarChar(20)
+  attempts           Int             @default(0)
+  payloadFingerprint String?         @db.VarChar(32)
+  providerReference  String?         @db.VarChar(160)
+  lastError          String?         @db.VarChar(500)
+  lastAttemptAt      DateTime?       @db.Timestamptz(3)
+  confirmedAt        DateTime?       @db.Timestamptz(3)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3)
+  settlement         OrderSettlement @relation(fields: [orderId, branchId, organizationId], references: [orderId, branchId, organizationId], onDelete: Restrict)
+  branch             Branch          @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([orderId, branchId, organizationId])
+  @@unique([branchId, organizationId, correlationKey])
+  @@index([branchId, organizationId, state, createdAt, id])
 }

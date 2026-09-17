@@ -11,6 +11,7 @@ import type {
 import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { api, ApiFailure } from '../lib/api';
+import { FiscalStatus } from './fiscal-status';
 
 type Pending = { path: string; body: Record<string, unknown> };
 type Detail = { shift: CashShiftRecord; movements: CashMovementRecord[]; hasMore: boolean };
@@ -330,6 +331,7 @@ export function PaymentsWorkspace({
                   <p className="mt-3 text-sm">
                     Discount {summary.order.discount} · Tax included in total {summary.order.tax}
                   </p>
+                  <FiscalStatus user={user} orderId={summary.order.id} />
                 </div>
                 {summary.order.status === 'WAITING_PAYMENT' && can('payment.collect') ? (
                   summary.order.total === '0.00' ? (

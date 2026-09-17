@@ -122,6 +122,12 @@ GoodsReceipt/Items are append-only. Each receipt snapshots delivered quantities 
 
 SupplierEntry records signed CHARGE, PAYMENT and PAYMENT_REVERSAL amounts. One charge per receipt must equal its total; payments cannot exceed its unpaid amount; full correction reversals must match an original payment and cannot repeat. Balances are sums, not mutable columns. Runtime grants plus triggers prohibit update/delete/truncate of receipt, stock, supplier-entry and event history. All writes use Serializable transactions, branch serialization and idempotent command receipts; inventory failure rolls back the payable and receipt as well.
 
+## Fiscal handoff (Phase 14)
+
+Migration `202609190001_fiscal` adds one table, `FiscalHandoff`, and the `fiscal.read` and `fiscal.retry` permissions. The table records delivery state for one settlement: correlation key, provider, state, attempt count, payload fingerprint, provider-supplied reference, last error and timestamps. It stores no fiscal document, no fiscal number and no tax-authority identifier, because this system produces none.
+
+A unique index on `orderId`, a composite unique on branch, organization and correlation key, and a composite foreign key to `OrderSettlement` make a second handoff for the same sale impossible and preserve branch isolation. CHECK constraints restrict the state to the five known values, keep attempts non-negative, and require a confirmed row to carry its confirmation time. Runtime grants allow INSERT and UPDATE but revoke DELETE and TRUNCATE, so an undelivered sale cannot be made to disappear. No existing table is altered.
+
 ## Operational permission (Phase 13)
 
 Migration `202609180001_ops` is data-only. It registers the `ops.read` permission and grants it to protected OWNER roles with a `role.permissions_migrated` audit row, and contains no DDL, so the schema and every backup and restore procedure are unchanged. Operational status is derived at read time from database reachability, the backup status file, the Phase 12 checkpoints and filesystem headroom; nothing is stored.
