@@ -1358,3 +1358,21 @@ details > summary::marker {
     display: none;
   }
 }
+
+/* Phase 13 operations line. Reuses the report KPI card; only the accent changes, so a
+   degraded signal is visible without introducing a new component or colour system. */
+.report-kpi[data-ops='warn'] > strong {
+  color: var(--primary);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops='critical'] > strong {
+  color: var(--destructive);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops='unknown'] > strong {
+  color: var(--muted-foreground);
+  text-transform: capitalize;
+}
+.report-kpi[data-ops]:disabled {
+  opacity: 1;
+}

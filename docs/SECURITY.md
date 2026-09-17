@@ -1,3 +1,15 @@
+# Phase 13 production hardening
+
+Runtime images contain only compiled output and production dependencies. Source, tests, documentation and scripts are absent from the API and admin images, and the migration image is separate, carrying the Prisma CLI and the two scripts it runs. Four packages remain because upstream declares them as production dependencies: `playwright` and `@playwright/test` via `next`, and `prisma` and `typescript` via `@prisma/client`. Removing them by hand would risk breaking Next.js or Prisma at runtime, so they are documented rather than stripped.
+
+A production API fails at startup on placeholder or weak configuration: a placeholder or sub-24-character database password, a placeholder or low-entropy JWT secret, or a loopback production origin. Development and test are deliberately unaffected. The seed already refused placeholders at bootstrap; this closes the same gap at every API start.
+
+The backup script reports its own health to `backups/backup-status.json` on success and failure, deletes partial archives on failure and exits non-zero. `GET /api/ops/status`, behind the new `ops.read` permission, reports database reachability, backup age and outcome, Phase 12 delivery backlog and filesystem headroom, with the aggregate severity equal to the worst individual signal. The endpoint is read-only, writes nothing, mounts the backup directory read-only, and returns no credential, connection string, driver error or business record. `ops.read` grants no business authority and no business permission implies it.
+
+Reviewed and unchanged because they were already sound: append-only audit triggers, refresh-token rotation with family revocation on reuse, HttpOnly/SameSite=Strict/Secure cookies, exact Origin checks with CORS closed, runtime database grants that cannot migrate schema or mutate audit, financial or event history, rate limits on API/login/refresh/password, an internal backend network with no published database or API port, and a dependency scan reporting zero vulnerabilities.
+
+Not claimed: nonce-based CSP, multi-factor authentication, account lockout, off-host tamper-evident audit, backup encryption or offsite replication, container read-only roots and resource limits, penetration testing and fiscal certification.
+
 # Phase 1 security boundary
 
 Passwords use Argon2id (64 MiB, 3 iterations, parallelism 1). Initial passwords require 12–128 characters. Password changes verify the current secret, atomically compare the previous hash, revoke all user sessions and write a safe audit event. Admin password-recovery tooling and compulsory first-login password rotation remain future hardening work.

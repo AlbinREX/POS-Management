@@ -24,5 +24,42 @@ try {
         Remove-Item -LiteralPath $targetPath
         if (Test-Path -LiteralPath "$targetPath.sha256") { Remove-Item -LiteralPath "$targetPath.sha256" }
     }
+    # A machine-readable status file lets scheduled runs and the operations endpoint
+    # report backup age and the last outcome without parsing console text. It records no
+    # credential, connection string or archive content.
+    $status = [ordered]@{
+        lastAttemptAt = (Get-Date).ToUniversalTime().ToString('o')
+        lastSuccessAt = (Get-Date).ToUniversalTime().ToString('o')
+        archive       = $name
+        sizeBytes     = (Get-Item -LiteralPath (Join-Path $backupPath $name)).Length
+        sha256        = $hash
+        retentionDays = $RetentionDays
+        outcome       = 'success'
+        error         = $null
+    }
+    [IO.File]::WriteAllText((Join-Path $backupPath 'backup-status.json'), ($status | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding $false))
     Write-Output "Backup saved: $name. Perform a restore drill before relying on this archive."
+} catch {
+    # Record the failure for the operator and the status endpoint, then keep failing:
+    # a silent backup failure is the most dangerous outcome in this whole system.
+    $message = $_.Exception.Message
+    $failure = [ordered]@{
+        lastAttemptAt = (Get-Date).ToUniversalTime().ToString('o')
+        lastSuccessAt = $null
+        archive       = $null
+        outcome       = 'failed'
+        error         = $message
+    }
+    if (Test-Path -LiteralPath (Join-Path $backupPath 'backup-status.json')) {
+        try {
+            $previous = Get-Content -LiteralPath (Join-Path $backupPath 'backup-status.json') -Raw | ConvertFrom-Json
+            $failure.lastSuccessAt = $previous.lastSuccessAt
+            $failure.archive = $previous.archive
+        } catch { }
+    }
+    [IO.File]::WriteAllText((Join-Path $backupPath 'backup-status.json'), ($failure | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding $false))
+    # Partial archives are never left to be mistaken for a usable backup.
+    Get-ChildItem -LiteralPath $backupPath -File -Filter '*.partial' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    Write-Error "Backup FAILED: $message"
+    exit 1
 } finally { Pop-Location }

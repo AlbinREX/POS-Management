@@ -163,6 +163,10 @@ try {
   app = await createApp();
   const { runSyncIntegration } = await import('../tests/integration/sync.mjs');
   await runSyncIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runOpsIntegration } = await import('../tests/integration/ops.mjs');
+  await runOpsIntegration(app);
   if (process.argv.includes('--browser')) {
     // Fresh limiter state for independent browser acceptance tests.
     await app.close();

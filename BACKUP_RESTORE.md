@@ -15,6 +15,12 @@ Scheduling is an explicit deployment action; no host scheduled task is installed
 
 Archives contain personal identity data and password hashes. Restrict the `backups/` directory, encrypt the disk and off-device copies, and store secret/certificate recovery material separately. The scripts do not implement backup encryption or offsite upload.
 
+## Backup health reporting (Phase 13)
+
+Every run writes `backups/backup-status.json` on success and on failure. It records the attempt time, the last successful time, the archive name, its size and checksum, the retention window and any error text, and it contains no credential or connection string. A failed run deletes partial archives, preserves the previous success timestamp, writes the failure and exits non-zero so a scheduled task reports it rather than failing silently.
+
+The operations endpoint reads that file. A backup is reported critical when the last attempt failed even if a recent archive exists, because protection has stopped advancing, and also when no archive has ever succeeded. It warns after roughly a missed daily run and escalates after two. Silent absence of protection is the failure mode this is designed to make impossible.
+
 ## Restore into a new database
 
 Never overwrite the active restaurant database as the first recovery action. Verify the SHA-256 sidecar, then:
@@ -43,7 +49,6 @@ Measure recovery point and recovery time during a drill. A daily-only schedule c
 A full database archive includes units, recipe revisions, frozen consumption plans, movements, events and current configuration. Restore these together with orders/payments; restoring only balance-like views loses source history. Compare per-warehouse/item `SUM(StockMovement.quantity)`, movement counts, plan-line counts and settlement counts with the source cutoff. Check that each new settlement's plan lines have matching sale movements and that stock history remains immutable under the runtime role.
 
 Do not rerun paid orders to recreate stock after a restore: their existing movements are the history. Repeated command IDs must replay previous receipts without further deductions. A recovery correction must be an authorized, reasoned stock adjustment, never a direct replacement of historical quantities.
-
 
 ## Phase 8 purchasing recovery checks
 

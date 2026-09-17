@@ -122,6 +122,10 @@ GoodsReceipt/Items are append-only. Each receipt snapshots delivered quantities 
 
 SupplierEntry records signed CHARGE, PAYMENT and PAYMENT_REVERSAL amounts. One charge per receipt must equal its total; payments cannot exceed its unpaid amount; full correction reversals must match an original payment and cannot repeat. Balances are sums, not mutable columns. Runtime grants plus triggers prohibit update/delete/truncate of receipt, stock, supplier-entry and event history. All writes use Serializable transactions, branch serialization and idempotent command receipts; inventory failure rolls back the payable and receipt as well.
 
+## Operational permission (Phase 13)
+
+Migration `202609180001_ops` is data-only. It registers the `ops.read` permission and grants it to protected OWNER roles with a `role.permissions_migrated` audit row, and contains no DDL, so the schema and every backup and restore procedure are unchanged. Operational status is derived at read time from database reachability, the backup status file, the Phase 12 checkpoints and filesystem headroom; nothing is stored.
+
 ## Synchronization checkpoint (Phase 12)
 
 Migration `202609170001_sync` adds one table, `SyncCheckpoint`, and the `sync.read` permission. The table holds a per-branch, per-stream delivered cursor with the last attempt and delivery times, the last error and a failure count. It carries no business data and is never a source of truth: the seven per-module event logs remain the authority, and clearing a checkpoint loses only the knowledge of what had already been sent. CHECK constraints keep the cursor and failure count non-negative and restrict `stream` to the seven known logs, so a typo cannot create a checkpoint no worker advances. A composite foreign key and a unique constraint on branch, organization and stream preserve branch isolation. Runtime grants allow INSERT and UPDATE but revoke DELETE and TRUNCATE, so the runtime role advances delivery state without being able to erase it. No existing table, column, constraint or trigger is altered.

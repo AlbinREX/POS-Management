@@ -1,6 +1,6 @@
 # Restaurant platform architecture
 
-Status: Phases 1-12: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA read-only reporting with the owner dashboard, and local-first hardening with an outbound delivery checkpoint. Settlement is the only API path to PAID.
+Status: Phases 1-13: foundation, menu, layout, orders, kitchen preparation, payments and cash shifts, inventory, purchasing, company contracts, the waiter PWA read-only reporting with the owner dashboard, and local-first hardening with an outbound delivery checkpoint. Settlement is the only API path to PAID.
 
 ## Topology and ownership
 
@@ -103,6 +103,10 @@ Kitchen submission, station tickets and durable preparation events extend the sa
 ## Phase 8 purchasing
 
 Supplier, purchase-order and receiving modules extend the existing local API and frontend. Receipt stock and supplier charges are atomic and source-linked; see [ADR 0008](docs/adr/0008-purchasing.md). Existing sales/payment/stock ledgers remain authoritative.
+
+## Phase 13 production, security and backup hardening
+
+Runtime images carry only compiled output and production dependencies; source, tests and documentation are absent, and the migration image is separate. A production API fails fast on placeholder or weak configuration rather than serving. The backup script reports its own health to a status file, and a read-only `GET /api/ops/status` behind `ops.read` surfaces database reachability, backup age, Phase 12 delivery backlog and disk headroom, with the aggregate severity equal to the worst signal. No business module was redesigned and no Phase 1-12 guarantee was weakened. See [ADR 0013](docs/adr/0013-production-security-hardening.md).
 
 ## Phase 12 local-first hardening and synchronization
 

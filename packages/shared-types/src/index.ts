@@ -1,6 +1,7 @@
 export * from './companies';
 export * from './reporting';
 export * from './sync';
+export * from './ops';
 export * from './purchasing';
 export * from './inventory';
 export const PERMISSIONS = [
@@ -55,6 +56,7 @@ export const PERMISSIONS = [
   'kitchen.manage',
   'report.read',
   'sync.read',
+  'ops.read',
 ] as const;
 export type PermissionKey = (typeof PERMISSIONS)[number];
 export const ROLE_NAMES = [
@@ -121,6 +123,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
     'layout.status.manage',
     'report.read',
     'sync.read',
+    'ops.read',
   ],
   // Managers may operate manual table statuses but do not redesign the floor plan.
   MANAGER: [
@@ -169,6 +172,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, readonly PermissionKey[]
     'layout.status.manage',
     'report.read',
     'sync.read',
+    'ops.read',
   ],
   CASHIER: [
     'company.read',

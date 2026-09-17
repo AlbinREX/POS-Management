@@ -4,6 +4,7 @@ import type {
   CashReport,
   CompaniesReport,
   DashboardOverview,
+  OpsStatus,
   InventoryReport,
   OrdersReport,
   ProductsReport,
@@ -142,6 +143,7 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
   const [applied, setApplied] = useState({ from: today(), to: today() });
   const [page, setPage] = useState(1);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [ops, setOps] = useState<OpsStatus | null>(null);
   const [reports, setReports] = useState<Reports>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -155,6 +157,10 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
     setError('');
     try {
       setOverview(await api<DashboardOverview>(`reports/overview?${query}`));
+      // Operational status is owner/admin information and is optional: a reader without
+      // ops.read simply sees no operations line rather than an error.
+      if (user.permissions.includes('ops.read'))
+        setOps(await api<OpsStatus>('ops/status').catch(() => null));
       if (view !== 'Overview') {
         const extra = view === 'Inventory' ? `&page=${page}&limit=25` : '';
         const result = await api<Reports[Exclude<View, 'Overview'>]>(
@@ -167,7 +173,7 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
     } finally {
       setLoading(false);
     }
-  }, [query, view, page]);
+  }, [query, view, page, user.permissions]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -301,6 +307,24 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
       ) : null}
       {sales && overview ? (
         <div className="report-kpis">
+          {ops ? (
+            <button
+              type="button"
+              className="report-kpi"
+              data-ops={ops.severity}
+              aria-label={`Operations: ${ops.severity}`}
+              disabled
+            >
+              <span>Operations</span>
+              <strong>{ops.severity === 'ok' ? 'Healthy' : ops.severity}</strong>
+              <small>
+                {ops.checks
+                  .filter((c) => c.severity !== 'ok')
+                  .map((c) => c.summary)
+                  .join(' ') || 'Database, backup, sync and storage are healthy.'}
+              </small>
+            </button>
+          ) : null}
           {kpi(
             'Sales',
             money(sales.salesAfterDiscount),

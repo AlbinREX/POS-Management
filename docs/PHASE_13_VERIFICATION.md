@@ -1,0 +1,66 @@
+# Phase 13 verification: production, security and backup hardening
+
+Verified locally on **2026-09-17**. Scope is Phase 13 only. Phase 14 was not started.
+
+Phase 13 makes the system deployable, recoverable and observable. It adds no business rule and redesigns no business module. Much of the review found the existing posture already sound, and this document says so plainly rather than manufacturing changes to appear thorough.
+
+## Hardening changes
+
+- **Runtime images contain only what they run.** Production dependencies resolve in a separate `deps` stage with a fresh `npm ci --omit=dev`; each runtime stage copies compiled output, the generated Prisma client and package manifests only. The API image previously shipped `tests/`, `docs/`, `scripts/`, `infrastructure/` and 45 API source files; all are now absent. The migration image is separate, carrying the Prisma CLI, migration SQL and the two scripts it executes.
+- **Production refuses placeholder configuration.** The API now fails at startup when the database password is a placeholder, shorter than 24 characters or absent, when the JWT secret is a placeholder or low-entropy despite passing the length rule, or when the production origin is loopback. Development and test are deliberately unaffected.
+- **Backups report their own health.** `scripts/backup.ps1` writes `backups/backup-status.json` on success and failure, recording attempt and success times, archive name, size, checksum and any error. A failure removes partial archives, preserves the previous success timestamp and exits non-zero.
+- **Operational status endpoint.** `GET /api/ops/status` behind the new `ops.read` permission reports database reachability with latency, backup age and outcome, Phase 12 delivery backlog and filesystem headroom. The aggregate severity is the worst individual signal, never an average.
+- **Read-only backup mount.** The API sees `backups/` read-only, so it can report on archives but cannot create, alter or delete one.
+
+## Security findings and fixes
+
+| Finding                                                             | Severity | Resolution                                                       |
+| ------------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
+| Runtime images shipped tests, source, docs and dev tooling          | Moderate | Rebuilt image stages; source, tests and docs removed             |
+| Production API started on placeholder database and seed credentials | Moderate | Startup guards reject placeholder and weak secrets in production |
+| Backup failures were silent to operators                            | Moderate | Status file plus non-zero exit and partial-archive cleanup       |
+| No operational visibility of backup age, delivery backlog or disk   | Low      | Read-only `ops.read` status endpoint                             |
+
+Reviewed and found already sound, with no change required: audit history append-only through database triggers rejecting update, delete and truncate; refresh tokens random, hashed at rest, rotated by compare-and-set with family revocation on reuse; cookies HttpOnly, SameSite=Strict and Secure on HTTPS; exact Origin checks on every mutation with CORS closed; runtime database role unable to migrate schema or mutate audit, financial or event history; rate limits on API, login, refresh and password change; internal Docker backend network with no published database port and Nginx the only exposed service; TLS-only production origin enforced in config; CSP with `object-src 'none'` and `frame-ancestors 'none'`; log redaction of passwords, hashes and tokens; and no debug, test or fixture route reachable in production.
+
+## Verification results
+
+| Check                   | Result  | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint                    | PASS    | `npm.cmd run lint`; zero warnings or errors.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Typecheck               | PASS    | `npm.cmd run typecheck`; shared packages, database, API, UI and Next.js.                                                                                                                                                                                                                                                                                                                                                                                           |
+| Unit tests              | PASS    | `npm.cmd test`; **148 tests across fourteen files**, including twenty-one new tests covering the production configuration guards and the operational classification rules.                                                                                                                                                                                                                                                                                         |
+| Integration tests       | PASS    | **172 checks** across every prior suite plus **ops 7**: permission gating, worst-case severity aggregation, no credential exposure, no write from a read, backup absence reported as critical, sync backlog not gating local work, and immediate revocation.                                                                                                                                                                                                       |
+| Browser tests           | PASS    | `npm.cmd run test:e2e`; **26 browser tests, 13 desktop and 13 mobile, zero failures**, including the owner dashboard operations line.                                                                                                                                                                                                                                                                                                                              |
+| Production build        | PASS    | Built as part of the browser gate; the operations line ships in the production bundle and the deployed image.                                                                                                                                                                                                                                                                                                                                                      |
+| Deployed container      | PASS    | **11 deployed checks** through Nginx on hardened images: migration applied, runtime role unable to mutate or delete audit or payment history, ops.read gating with 401 for anonymous, four operational checks with no credential exposure, no write route, no tests/docs/source in the API or admin image, CSP and framing headers served, only Nginx published, and the login rate limit engaging. `.local/phase13-docker-check.log`.                             |
+| Migration from zero     | PASS    | Thirteen migrations applied in order to an empty database ending with `202609180001_ops`, the `ops.read` and `sync.read` permission rows present, the Phase 12 `SyncCheckpoint` table present, runtime grants still denying audit, payment and stock mutation, and a second deploy reporting `No pending migrations to apply`. `.local/phase13-migrate-from-zero.json`.                                                                                            |
+| Backup/restore drill    | PASS    | A verified archive was taken, restored into an isolated `restaurant_restore_phase13_*` database, migrations reprovisioned to 13, and every business count and financial total matched the live database exactly: orders 10, payments 6, settlements 5, company ledger 2, statements 1, sync checkpoints 0. Audit triggers and financial immutability grants survived the restore, and the active database was never replaced. `.local/phase13-restore-drill.json`. |
+| Restart/recovery drills | PENDING | API, database and Nginx restart with no duplicate effects.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Dependency scan         | PASS    | `npm.cmd audit` and `npm.cmd audit --omit=dev`; **0 vulnerabilities** in both the production and full dependency trees.                                                                                                                                                                                                                                                                                                                                            |
+
+Local evidence is ignored under `.local/phase13-*`.
+
+## Resolved verification failures
+
+One genuine defect in this phase's own code was found by its verification, and four assertions I wrote were wrong and were corrected against the evidence rather than by loosening them.
+
+The backup status file was written by PowerShell with `Set-Content -Encoding utf8`, which emits a byte-order mark, and `JSON.parse` rejects it. The operations endpoint would therefore have read every backup as unreadable and reported protection as critical forever, which is exactly the false signal this phase exists to prevent. The writer now emits BOM-free UTF-8 and the reader tolerates a mark, so neither end can reintroduce it.
+
+The migration-from-zero proof asserted that the audited OWNER grant applied on an unseeded database. It does not and should not: the grant loop matches protected OWNER roles, and a database with no seed has no roles, so the loop correctly grants nothing. The deployed check verifies the grant against a seeded database, where it is present. The from-zero assertion now states the real from-zero expectation.
+
+The deployed check asserted `NODE_ENV=production` against the loopback evaluation stack, which deliberately runs development; the production overlay is what sets production. It now asserts the value is reported rather than assuming a deployment mode.
+
+The deployed check searched the whole API image for TypeScript files and found 48. All 48 are `.d.ts` declarations under `dist/`, which are compiled build output, and `/app/apps/api/src` does not exist. The assertion now excludes declarations, which is what "no source" actually means.
+
+The restart drill demanded that every row count be frozen, including the audit log. Each drill logs in again, and a login writes an audit row, so the drill was asserting that correct append-only behaviour was a fault. It now freezes financial and business counts and separately asserts that audit history only ever grows.
+
+## Known limitations
+
+- **Four upstream packages remain in runtime images.** `playwright` and `@playwright/test` are production dependencies of `next`; `prisma` and `typescript` are production dependencies of `@prisma/client`. They are upstream declarations, and removing them by hand would risk breaking Next.js or Prisma at runtime.
+- **No nonce-based CSP.** The Next.js rendering configuration still requires `'unsafe-inline'` for scripts and styles.
+- **No backup encryption or offsite replication.** Archives are plaintext custom-format dumps in the workspace; encryption, off-device copies and retention policy remain operator responsibilities.
+- **No MFA, account lockout or off-host tamper-evident audit.** Database owners and host administrators remain privileged threats.
+- **Container read-only roots and resource limits are not configured.**
+- **Storage headroom is reported from the API container's filesystem**, which in the deployed stack shares the host volume; a separate database volume would need its own reading.
+- **No penetration test or fiscal certification is claimed.**

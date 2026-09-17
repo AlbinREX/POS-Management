@@ -35,6 +35,11 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
       TRUST_PROXY: '1'
       PORT: '4000'
+    volumes:
+      # Read-only so the API can report backup age and outcome without being able to
+      # alter, delete or create an archive. Backups are written only by the operator
+      # script through the database container.
+      - ../../backups:/backups:ro
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:

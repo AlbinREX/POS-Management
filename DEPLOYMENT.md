@@ -1,5 +1,17 @@
 # Local deployment
 
+## Phase 13 production hardening
+
+Runtime images now contain only what they run. Production dependencies resolve in a separate stage with a fresh `npm ci --omit=dev`, and each runtime stage copies compiled output, the generated Prisma client and package manifests only. Source, tests, documentation and scripts are absent from the API and admin images; the migration image separately carries the Prisma CLI, the migration SQL and the two scripts it executes. Rebuild all three images on upgrade.
+
+A production API refuses to start on placeholder configuration. It requires a database password that is neither a placeholder nor shorter than 24 characters, a high-entropy JWT secret, and a non-loopback HTTPS origin. A half-configured server now fails immediately with a precise message instead of serving traffic. Development and test are unaffected.
+
+The API mounts `backups/` read-only so it can report backup age and outcome without being able to create, alter or delete an archive. Set `BACKUP_STATUS_FILE` only if the archives live elsewhere.
+
+`GET /api/ops/status`, behind the new `ops.read` permission, reports database reachability, backup age and outcome, the Phase 12 delivery backlog and filesystem headroom, with the aggregate severity equal to the worst individual signal. Grant `ops.read` to owners and administrators through Roles; migration `202609180001_ops` grants it to protected OWNER automatically.
+
+After upgrading, verify that the stack starts, that `GET /api/ops/status` returns `severity` with four checks for an owner and 403 for a cashier, and that a deliberate misconfiguration of `DATABASE_URL` in a scratch environment causes the API to exit rather than start.
+
 ## Phase 3 upgrade
 
 Back up the existing database. Build the updated images and start Compose; its migration/provisioning service applies `202609110002_layout` before the API starts. Runtime provisioning revokes mutation rights on LayoutEvent, so use `node scripts/migrate.mjs` for host-managed deployments as well. Existing protected owners receive layout.read, layout.manage and layout.status.manage with an audit event; other existing roles need explicit grants. Seed creates no areas or tables. Verify a map edit, status change, persisted audit/event and second-client refresh. No WebSocket proxy change is needed for this phase's authenticated change-feed polling.
