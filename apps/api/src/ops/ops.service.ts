@@ -44,7 +44,7 @@ export class OpsService {
     try {
       // Tolerate a byte-order mark: some editors and shells prepend one, and a BOM
       // must never be the reason an operator is told their backups are missing.
-      const text = (await readFile(resolve(BACKUP_STATUS), 'utf8')).replace(/^﻿/, '');
+      const text = (await readFile(resolve(BACKUP_STATUS), 'utf8')).replace(/^\uFEFF/, '');
       const raw = JSON.parse(text) as Record<string, unknown>;
       return classifyBackup(
         {
