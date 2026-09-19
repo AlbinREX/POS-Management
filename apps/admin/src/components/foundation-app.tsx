@@ -27,6 +27,7 @@ import { WaiterApp } from './waiter-app';
 import { PurchasingWorkspace } from './purchasing-workspace';
 import { InventoryWorkspace } from './inventory-workspace';
 import { PaymentsWorkspace } from './payments-workspace';
+import { DevicesWorkspace } from './devices-workspace';
 
 type Tab =
   | 'Workspace'
@@ -43,6 +44,7 @@ type Tab =
   | 'Inventory'
   | 'Purchasing'
   | 'Companies'
+  | 'Devices'
   | 'Dashboard';
 interface Role {
   id: string;
@@ -302,6 +304,7 @@ function Workspace({
     ...(can('user.read') ? ['Team' as const] : []),
     ...(can('role.read') ? ['Roles' as const] : []),
     ...(can('terminal.read') ? ['Terminals' as const] : []),
+    ...(can('device.read') ? ['Devices' as const] : []),
     ...(can('audit.read') ? ['Audit history' as const] : []),
   ];
   return (
@@ -362,7 +365,8 @@ function Workspace({
                   'Sales, orders, products, staff, cash, stock, purchasing and company accounts.',
                 Team: 'Manage the people who can access this branch.',
                 Roles: 'Control what each role can do.',
-                Terminals: 'Register and manage restaurant devices.',
+                Terminals: 'Register and manage restaurant workstations.',
+                Devices: 'Printers and card readers, their status and station routing.',
                 'Audit history': 'A permanent record of sensitive changes in this branch.',
               }[tab]
             }
@@ -403,6 +407,7 @@ function Workspace({
           {tab === 'Purchasing' ? <PurchasingWorkspace user={user} /> : null}
           {tab === 'Inventory' ? <InventoryWorkspace user={user} /> : null}
           {tab === 'Menu' ? <MenuCatalog canManage={can('menu.manage')} /> : null}
+          {tab === 'Devices' ? <DevicesWorkspace user={user} /> : null}
           {tab === 'POS' ? (
             <OrdersWorkspace
               user={user}

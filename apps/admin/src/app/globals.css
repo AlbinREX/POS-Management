@@ -1469,3 +1469,119 @@ details > summary::marker {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Settings -> Devices: hardware status, routing and unprinted documents. */
+.device-hint {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+.device-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.device-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+.device-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.device-identity strong {
+  font-size: 15px;
+}
+.device-name {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.device-address {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+.device-status {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.device-status[data-tone='ok'] {
+  color: #5fd38d;
+  border-color: #5fd38d55;
+}
+.device-status[data-tone='bad'] {
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+}
+.device-status[data-tone='warn'] {
+  color: var(--primary);
+  border-color: #f4c45155;
+}
+.device-error {
+  font-size: 12px;
+  color: var(--destructive);
+  overflow-wrap: anywhere;
+}
+.device-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.device-empty {
+  grid-column: 1 / -1;
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--muted-foreground);
+}
+.device-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  max-width: 520px;
+}
+.device-station-list,
+.device-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.device-station,
+.device-job {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.device-station > span:first-child,
+.device-job > span:first-child {
+  flex: 1;
+  min-width: 140px;
+}
+.device-job-state {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}

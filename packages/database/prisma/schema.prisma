@@ -370,6 +370,7 @@ model Category {
 }
 
 model KitchenStation {
+  stationPrinter StationPrinter?
   tickets        KitchenTicket[]
   id             String                  @id @default(uuid()) @db.Uuid
   organizationId String                  @db.Uuid
@@ -535,6 +536,10 @@ model Organization {
 model Branch {
   syncCheckpoints    SyncCheckpoint[]
   fiscalHandoffs     FiscalHandoff[]
+  devices            Device[]
+  stationPrinters    StationPrinter[]
+  printJobs          PrintJob[]
+  nfcCredentials     UserNfcCredential[]
   companies          Company[]
   companyContracts   CompanyContract[]
   companyEmployees   CompanyEmployee[]
@@ -602,6 +607,8 @@ model User {
 }
 
 model BranchMembership {
+  nfcCredentials    UserNfcCredential[] @relation("NfcCredentialMember")
+  enrolledNfcCards  UserNfcCredential[] @relation("NfcCredentialEnroller")
   companyEntries    CompanyLedgerEntry[]
   companyStatements CompanyStatement[]
   companiesEvents   CompaniesEvent[]
@@ -688,6 +695,7 @@ model UserBranchRole {
 }
 
 model Terminal {
+  devices        Device[]
   cashShifts     CashShift[]
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @db.Uuid
@@ -1733,4 +1741,125 @@ model FiscalHandoff {
   @@unique([orderId, branchId, organizationId])
   @@unique([branchId, organizationId, correlationKey])
   @@index([branchId, organizationId, state, createdAt, id])
+}
+
+// Phase 15 device management.
+//
+// FastFood Riza runs on a single Windows PC. A Device is a piece of hardware attached to
+// that machine or reachable on the restaurant LAN; a Terminal remains the workstation a
+// person signs in at, so the two are related but distinct. Every address a device is
+// reached at lives here, owned by the server: no request may supply a COM port or an IP.
+model Device {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organizationId     String       @db.Uuid
+  branchId           String       @db.Uuid
+  terminalId         String?      @db.Uuid
+  kind               String       @db.VarChar(20)
+  name               String       @db.VarChar(100)
+  connection         String       @db.VarChar(20)
+  port               String?      @db.VarChar(20)
+  baudRate           Int?
+  host               String?      @db.VarChar(120)
+  tcpPort            Int?
+  windowsPrinterName String?      @db.VarChar(160)
+  enabled            Boolean      @default(true)
+  version            Int          @default(1)
+  lastSeenAt         DateTime?    @db.Timestamptz(3)
+  lastTestAt         DateTime?    @db.Timestamptz(3)
+  lastError          String?      @db.VarChar(500)
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz(3)
+  deletedAt          DateTime?    @db.Timestamptz(3)
+  branch             Branch       @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  terminal           Terminal?    @relation(fields: [terminalId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  stations           StationPrinter[]
+  printJobs          PrintJob[]
+
+  @@unique([id, branchId, organizationId])
+  @@unique([branchId, name])
+  @@index([branchId, organizationId, kind, enabled, deletedAt])
+}
+
+// Which printer a kitchen station prints to.
+//
+// One row per station, so a station has at most one printer. Several stations may point
+// at the same device on purpose: a small kitchen often runs one printer for every line.
+// A station with no row is unrouted, and its tickets fail visibly rather than being sent
+// to some default device.
+model StationPrinter {
+  stationId      String         @id @db.Uuid
+  organizationId String         @db.Uuid
+  branchId       String         @db.Uuid
+  deviceId       String         @db.Uuid
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  station        KitchenStation @relation(fields: [stationId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  device         Device         @relation(fields: [deviceId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  branch         Branch         @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([stationId, branchId, organizationId])
+  @@index([deviceId, branchId, organizationId])
+}
+
+// Delivery of one document to one device.
+//
+// `documentId` is the document's identity and its idempotency key. For a kitchen ticket
+// it is the existing print contract's documentId, which is stable across ticket version
+// bumps but distinct for a cancellation, so a reprint is never a duplicate and a
+// cancellation is always its own document. The unique index enforces that.
+//
+// Print delivery is strictly downstream of business truth. A failed job never alters an
+// order, a kitchen submission, a ticket or a payment: the sale and the kitchen ticket
+// remain valid while the paper does not exist yet.
+model PrintJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  branchId       String    @db.Uuid
+  documentId     String    @db.VarChar(120)
+  kind           String    @db.VarChar(20)
+  deviceId       String?   @db.Uuid
+  ticketId       String?   @db.Uuid
+  orderId        String?   @db.Uuid
+  state          String    @db.VarChar(20)
+  attempts       Int       @default(0)
+  payload        Json
+  lastError      String?   @db.VarChar(500)
+  lastAttemptAt  DateTime? @db.Timestamptz(3)
+  confirmedAt    DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+  device         Device?   @relation(fields: [deviceId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  branch         Branch    @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([branchId, organizationId, documentId])
+  @@index([branchId, organizationId, state, createdAt, id])
+  @@index([deviceId, branchId, organizationId])
+}
+
+// An NFC card bound to a member of staff.
+//
+// Only a hash of the card credential is stored, with the same argon2id parameters used
+// for passwords, so the database never holds a value that could be written onto a blank
+// card. `managerPinHash` backs the second factor for manager overrides: a cloned UID on
+// its own cannot authorise a sensitive action.
+model UserNfcCredential {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  branchId       String           @db.Uuid
+  userId         String           @db.Uuid
+  credentialHash String
+  label          String           @db.VarChar(60)
+  managerPinHash String?
+  enrolledBy     String           @db.Uuid
+  lastUsedAt     DateTime?        @db.Timestamptz(3)
+  revokedAt      DateTime?        @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+  member         BranchMembership @relation("NfcCredentialMember", fields: [userId, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  enroller       BranchMembership @relation("NfcCredentialEnroller", fields: [enrolledBy, branchId, organizationId], references: [userId, branchId, organizationId], onDelete: Restrict)
+  branch         Branch           @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@index([branchId, organizationId, revokedAt])
+  @@index([userId, branchId, organizationId])
+  @@index([enrolledBy, branchId, organizationId])
 }

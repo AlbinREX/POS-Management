@@ -56,6 +56,14 @@ export async function provisionRuntime(
     // history. The runtime role advances them (INSERT/UPDATE) but may never delete or
     // truncate them, so an undelivered sale cannot be made to disappear.
     await client.query('REVOKE DELETE, TRUNCATE ON "FiscalHandoff" FROM restaurant_app');
+    // Phase 15: print delivery is operational state. The runtime role advances a job
+    // (INSERT/UPDATE) but may never delete or truncate one, so an undelivered ticket or
+    // receipt cannot be made to disappear from the record.
+    await client.query('REVOKE DELETE, TRUNCATE ON "PrintJob" FROM restaurant_app');
+    // Staff card credentials are security material. They are revoked by setting
+    // revokedAt, never by deletion, so an enrolment and its withdrawal both stay
+    // auditable and a card cannot be quietly unlinked.
+    await client.query('REVOKE DELETE, TRUNCATE ON "UserNfcCredential" FROM restaurant_app');
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
