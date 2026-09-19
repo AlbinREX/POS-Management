@@ -456,10 +456,10 @@ export function PaymentsWorkspace({
                                 aria-label="Item payment method"
                                 className={selectClass}
                                 value={method}
-                                onChange={(e) => setMethod(e.target.value)}
+                                onChange={(e) => setMethod(e.target.value === 'CARD' ? 'CARD' : 'CASH')}
                               >
-                                <option>CASH</option>
-                                <option>CARD</option>
+                                <option value="CASH">CASH</option>
+                                <option value="CARD">CARD</option>
                               </select>
                             </label>
                             <p className="text-sm">
