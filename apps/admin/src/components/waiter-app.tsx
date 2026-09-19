@@ -10,6 +10,8 @@ import type {
 } from '@restaurant/shared-types';
 import { Button } from '@restaurant/ui/button';
 import { api, ApiFailure } from '../lib/api';
+import { useI18n, serverMessage } from '../lib/i18n';
+import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
 import { NavIcon } from './riza-ui';
 import { OrdersWorkspace } from './orders-workspace';
 
@@ -56,6 +58,8 @@ export function openOrderForTable(orders: OrderRecord[], tableId: string) {
 }
 
 export function WaiterApp({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
+  const valueLabel = (value: string) => SALES_VALUE_KEYS[value] ? t(SALES_VALUE_KEYS[value]) : value;
   const can = (key: SessionUser['permissions'][number]) => user.permissions.includes(key);
   const layoutAccess = can('layout.read');
   const [view, setView] = useState<View>(layoutAccess ? 'Tables' : 'Orders');
@@ -138,14 +142,14 @@ export function WaiterApp({ user }: { user: SessionUser }) {
 
   return (
     <div className="waiter-shell">
-      {error ? <p className="waiter-notice">{error}</p> : null}
-      {notice ? <p className="waiter-notice">{notice}</p> : null}
+      {error ? <p className="waiter-notice">{serverMessage(error, locale)}</p> : null}
+      {notice ? <p className="waiter-notice">{serverMessage(notice, locale)}</p> : null}
       {view === 'Tables' ? (
-        <section aria-label="Restaurant tables" className="waiter-areas">
+        <section aria-label={t('sales.restaurantTables')} className="waiter-areas">
           <div className="waiter-header">
-            <h2>Tables</h2>
+            <h2>{t('sales.tables')}</h2>
             <Button type="button" variant="outline" onClick={() => void reload()}>
-              Refresh
+              {t('sales.refresh')}
             </Button>
           </div>
           {areas.length ? (
@@ -168,7 +172,7 @@ export function WaiterApp({ user }: { user: SessionUser }) {
                             data-busy={live ? 'true' : 'false'}
                             style={{ background: colors[table.status] }}
                             disabled={table.status === 'DISABLED'}
-                            aria-label={`Table ${table.name}, ${statusLabels[table.status]}`}
+                            aria-label={t('sales.tableStatus', { name: table.name, status: locale === 'en' ? statusLabels[table.status] : valueLabel(table.status) })}
                             onClick={() => {
                               if (live) openOrder(live.id);
                               else {
@@ -181,31 +185,31 @@ export function WaiterApp({ user }: { user: SessionUser }) {
                             }}
                           >
                             <strong>{table.name}</strong>
-                            <span>{statusLabels[table.status]}</span>
+                            <span>{locale === 'en' ? statusLabels[table.status] : valueLabel(table.status)}</span>
                             <span>
                               {live
-                                ? `Order ${live.orderNumber} · ${live.total}`
-                                : `Seats ${table.capacity}`}
+                                ? t('sales.liveOrder', { number: live.orderNumber, total: live.total })
+                                : t('sales.seats', { count: table.capacity })}
                             </span>
                           </button>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="waiter-notice">No tables in this area.</p>
+                    <p className="waiter-notice">{t('sales.noTablesInThisArea')}</p>
                   )}
                 </div>
               );
             })
           ) : (
             <p className="waiter-notice">
-              {stale ? 'Loading the floor plan…' : 'No areas are configured for this branch.'}
+              {stale ? t('sales.loadingFloor') : t('sales.noAreas')}
             </p>
           )}
         </section>
       ) : null}
       {view === 'Orders' || view === 'Takeaway' ? (
-        <section aria-label={view === 'Takeaway' ? 'Takeaway ordering' : 'Table ordering'}>
+        <section aria-label={view === 'Takeaway' ? t('sales.takeawayOrdering') : t('sales.tableOrdering')}>
           <OrdersWorkspace
             key={view}
             user={user}
@@ -217,10 +221,10 @@ export function WaiterApp({ user }: { user: SessionUser }) {
           />
         </section>
       ) : null}
-      <nav aria-label="Waiter views" className="waiter-tabs">
+      <nav aria-label={t('sales.waiterViews')} className="waiter-tabs">
         {views.map((item) => (
           <button
-            key={item}
+            key={item === 'Tables' ? t('sales.tables') : item === 'Orders' ? t('sales.waiterOrders') : t('sales.waiterTakeaway')}
             type="button"
             aria-current={view === item}
             onClick={() => {
@@ -228,7 +232,7 @@ export function WaiterApp({ user }: { user: SessionUser }) {
               setView(item);
             }}
           >
-            <NavIcon name={item === 'Tables' ? 'Layout' : item === 'Orders' ? 'Orders' : 'POS'} />
+            <NavIcon name={item === 'Tables' ? 'Layout' : item === 'Orders' ? t('sales.waiterOrders') : 'POS'} />
             {item}
           </button>
         ))}

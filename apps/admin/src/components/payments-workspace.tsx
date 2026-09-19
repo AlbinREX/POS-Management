@@ -11,6 +11,8 @@ import type {
 import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { api, ApiFailure } from '../lib/api';
+import { useI18n, formatDateTime, serverMessage } from '../lib/i18n';
+import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
 import { FiscalStatus } from './fiscal-status';
 
 type Pending = { path: string; body: Record<string, unknown> };
@@ -33,6 +35,8 @@ export function PaymentsWorkspace({
   initialOrderId?: string;
   initialMethod?: string;
 }) {
+  const { t, locale } = useI18n();
+  const valueLabel = (value: string) => SALES_VALUE_KEYS[value] ? t(SALES_VALUE_KEYS[value]) : value;
   const can = (key: SessionUser['permissions'][number]) => user.permissions.includes(key);
   const read = can('payment.read') && can('order.read'),
     cashRead = can('cash.shift.read');
@@ -60,7 +64,7 @@ export function PaymentsWorkspace({
     [busy, setBusy] = useState(false),
     [stale, setStale] = useState(true),
     [error, setError] = useState(''),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState<string | { amount: string; method: string; change: string | null }[]>('');
   const [history, setHistory] = useState<History>({ events: [], cursor: '0', hasMore: false });
   const busyRef = useRef(false),
     generation = useRef(0);
@@ -157,15 +161,7 @@ export function PaymentsWorkspace({
       setUnits({});
       setCash('');
       setCard('');
-      setNotice(
-        result.payments
-          ? result.payments
-              .map(
-                (p) => `${p.method} ${p.amount}${p.change !== null ? ` · Change ${p.change}` : ''}`,
-              )
-              .join(' / ')
-          : 'Recorded successfully.',
-      );
+      setNotice(result.payments ?? 'Recorded successfully.');
     } catch (e) {
       if (e instanceof ApiFailure && e.status < 500) {
         sessionStorage.removeItem(storageKey);
@@ -231,37 +227,36 @@ export function PaymentsWorkspace({
     <div className="space-y-6">
       {error ? (
         <p role="alert" className="rounded-md border border-destructive p-3">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {notice ? (
         <p role="status" className="rounded-md border p-3 font-semibold">
-          {notice}
+          {typeof notice === 'string' ? serverMessage(notice, locale) : notice.map((payment) => `${valueLabel(payment.method)} ${payment.amount}${payment.change !== null ? ` · ${t('sales.change', { amount: payment.change })}` : ''}`).join(' / ')}
         </p>
       ) : null}
       {stale ? (
-        <p role="status">Refreshing local server data. Financial actions are paused.</p>
+        <p role="status">{t('sales.refreshingLocalServerDataFinancialActionsArePaused')}</p>
       ) : null}
       {pending ? (
         <div className="space-y-2 rounded-md border border-amber-500 p-4">
           <p>
-            A payment or shift response is uncertain. Retry this saved command before starting
-            another action. Do not charge the card again.
+            {t('sales.aPaymentOrShiftResponseIsUncertainRetryThisSavedCommandBeforeStartingAnotherActionDoNotCha')}
           </p>
           <Button disabled={busy || !pending.path} onClick={() => void execute(pending)}>
-            Retry saved payment command
+            {t('sales.retrySavedPaymentCommand')}
           </Button>
         </div>
       ) : null}
       <Button variant="outline" disabled={busy} onClick={() => void reload()}>
-        Refresh payments
+        {t('sales.refreshPayments')}
       </Button>
       {read ? (
         <div className="grid min-w-0 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="space-y-3">
-            <h2 className="text-xl font-semibold">Bills</h2>
+            <h2 className="text-xl font-semibold">{t('sales.bills')}</h2>
             <select
-              aria-label="Bill status"
+              aria-label={t('sales.billStatus')}
               className={selectClass}
               value={status}
               onChange={(e) => {
@@ -269,9 +264,9 @@ export function PaymentsWorkspace({
                 setPage(1);
               }}
             >
-              <option value="WAITING_PAYMENT">Waiting for payment</option>
-              <option value="PAID">Paid / refunds</option>
-              <option value="CANCELLED">Cancelled orders</option>
+              <option value="WAITING_PAYMENT">{t('sales.waitingForPayment')}</option>
+              <option value="PAID">{t('sales.paidRefunds')}</option>
+              <option value="CANCELLED">{t('sales.cancelledOrders')}</option>
             </select>
             {orders.map((o) => (
               <button
@@ -280,21 +275,21 @@ export function PaymentsWorkspace({
                 onClick={() => chooseOrder(o.id)}
               >
                 <strong>
-                  #{o.orderNumber} · {o.tableName ?? 'Takeaway'}
+                  #{o.orderNumber} · {o.tableName ?? t('sales.takeaway')}
                 </strong>
                 <span className="block">
-                  {o.total} {o.currency} · {o.status}
+                  {o.total} {o.currency} · {valueLabel(o.status)}
                 </span>
-                <span className="block text-sm">{o.waiterName ?? 'No waiter assigned'}</span>
+                <span className="block text-sm">{o.waiterName ?? t('sales.noWaiter')}</span>
               </button>
             ))}
-            {!orders.length ? <p>No bills in this view.</p> : null}
+            {!orders.length ? <p>{t('sales.noBillsInThisView')}</p> : null}
             <div className="flex gap-2">
               <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                Previous bills
+                {t('sales.previousBills')}
               </Button>
               <Button variant="outline" disabled={!more} onClick={() => setPage(page + 1)}>
-                Next bills
+                {t('sales.nextBills')}
               </Button>
             </div>
           </aside>
@@ -303,33 +298,33 @@ export function PaymentsWorkspace({
               <>
                 <div className="rounded-md border bg-card p-5">
                   <h2 className="text-2xl font-bold">
-                    Bill #{summary.order.orderNumber} · {summary.order.tableName ?? 'Takeaway'}
+                    {t('sales.bill')}{summary.order.orderNumber} · {summary.order.tableName ?? t('sales.takeaway')}
                   </h2>
                   <p>
-                    {summary.order.waiterName ?? 'No waiter assigned'} · {summary.order.status}
+                    {summary.order.waiterName ?? t('sales.noWaiter')} · {valueLabel(summary.order.status)}
                   </p>
                   <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
-                      Total
+                      {t('sales.total')}
                       <strong className="block text-2xl">
                         {summary.order.total} {summary.order.currency}
                       </strong>
                     </div>
                     <div>
-                      Due
+                      {t('sales.due')}
                       <strong data-testid="payment-due" className="block text-2xl text-primary">
                         {summary.due}
                       </strong>
                     </div>
                     <div>
-                      Refunded<strong className="block text-2xl">{summary.refunded}</strong>
+                      {t('sales.refunded')}<strong className="block text-2xl">{summary.refunded}</strong>
                     </div>
                     <div>
-                      Net receipts<strong className="block text-2xl">{summary.netReceipts}</strong>
+                      {t('sales.netReceipts')}<strong className="block text-2xl">{summary.netReceipts}</strong>
                     </div>
                   </div>
                   <p className="mt-3 text-sm">
-                    Discount {summary.order.discount} · Tax included in total {summary.order.tax}
+                    {t('sales.discount')} {summary.order.discount} {t('sales.taxIncludedInTotal')} {summary.order.tax}
                   </p>
                   <FiscalStatus user={user} orderId={summary.order.id} />
                 </div>
@@ -343,42 +338,42 @@ export function PaymentsWorkspace({
                         })
                       }
                     >
-                      Settle zero-total bill
+                      {t('sales.settleZeroTotalBill')}
                     </Button>
                   ) : (
                     <form onSubmit={collect} className="space-y-4 rounded-md border bg-card p-5">
-                      <h3 className="text-xl font-semibold">Collect payment</h3>
+                      <h3 className="text-xl font-semibold">{t('sales.collectPayment')}</h3>
                       {initialOrderId === summary.order.id ? (
                         <p className="text-sm text-primary">
-                          From POS ·{' '}
+                          {t('sales.fromPos')}{' '}
                           {initialMethod === 'SPLIT'
-                            ? 'Split payment'
+                            ? t('sales.splitPayment')
                             : initialMethod === 'CARD'
-                              ? 'Card payment'
-                              : 'Cash payment'}
-                          . Review the amounts before confirming.
+                              ? t('sales.cardPayment')
+                              : t('sales.cashPayment')}
+                          {t('sales.reviewTheAmountsBeforeConfirming')}
                         </p>
                       ) : null}
                       <fieldset disabled={disabled} className="space-y-4">
                         <label className="block">
-                          Split mode
+                          {t('sales.splitMode')}
                           <select
-                            aria-label="Split mode"
+                            aria-label={t('sales.splitMode')}
                             className={selectClass}
                             value={billMode}
                             disabled={!!summary.mode}
                             onChange={(e) => setMode(e.target.value as 'AMOUNT' | 'ITEMS')}
                           >
-                            <option value="AMOUNT">Amounts / mixed cash and card</option>
-                            <option value="ITEMS">By item quantities</option>
+                            <option value="AMOUNT">{t('sales.amountsMixedCashAndCard')}</option>
+                            <option value="ITEMS">{t('sales.byItemQuantities')}</option>
                           </select>
                         </label>
                         {billMode === 'AMOUNT' ? (
                           <div className="grid gap-4 sm:grid-cols-2">
                             <label>
-                              Cash amount
+                              {t('sales.cashAmount')}
                               <Input
-                                aria-label="Cash amount"
+                                aria-label={t('sales.cashAmount')}
                                 inputMode="decimal"
                                 pattern="(0|[1-9][0-9]*)\.[0-9]{2}"
                                 placeholder="0.00"
@@ -387,9 +382,9 @@ export function PaymentsWorkspace({
                               />
                             </label>
                             <label>
-                              Card amount
+                              {t('sales.cardAmount')}
                               <Input
-                                aria-label="Card amount"
+                                aria-label={t('sales.cardAmount')}
                                 inputMode="decimal"
                                 pattern="(0|[1-9][0-9]*)\.[0-9]{2}"
                                 placeholder="0.00"
@@ -405,7 +400,7 @@ export function PaymentsWorkspace({
                                 setCard('');
                               }}
                             >
-                              Remaining balance in cash
+                              {t('sales.remainingBalanceInCash')}
                             </Button>
                             <Button
                               type="button"
@@ -415,7 +410,7 @@ export function PaymentsWorkspace({
                                 setCash('');
                               }}
                             >
-                              Remaining balance by card
+                              {t('sales.remainingBalanceByCard')}
                             </Button>
                           </div>
                         ) : (
@@ -433,12 +428,12 @@ export function PaymentsWorkspace({
                                       {i.productName}
                                       <small className="block">
                                         {i.modifiers.map((m) => m.name).join(', ')} ·{' '}
-                                        {available?.remaining} remaining ·{' '}
+                                        {available?.remaining} {t('sales.remaining')}{' '}
                                         {available?.remainingAmount} {summary.order.currency}
                                       </small>
                                     </span>
                                     <Input
-                                      aria-label={`Pay quantity ${i.productName}`}
+                                      aria-label={t('sales.payQuantity', { name: i.productName })}
                                       type="number"
                                       min={0}
                                       max={available?.remaining ?? 0}
@@ -451,53 +446,51 @@ export function PaymentsWorkspace({
                                 );
                               })}
                             <label>
-                              Payment method
+                              {t('sales.paymentMethod')}
                               <select
-                                aria-label="Item payment method"
+                                aria-label={t('sales.itemPaymentMethod')}
                                 className={selectClass}
                                 value={method}
                                 onChange={(e) => setMethod(e.target.value === 'CARD' ? 'CARD' : 'CASH')}
                               >
-                                <option value="CASH">CASH</option>
-                                <option value="CARD">CARD</option>
+                                <option value="CASH">{t('sales.cash')}</option>
+                                <option value="CARD">{t('sales.card')}</option>
                               </select>
                             </label>
                             <p className="text-sm">
-                              The server calculates the selected units from the saved discounted
-                              line totals, including any remainder cents.
+                              {t('sales.theServerCalculatesTheSelectedUnitsFromTheSavedDiscountedLineTotalsIncludingAnyRemainderCe')}
                             </p>
                           </>
                         )}
                         {cashUsed ? (
                           <label className="block">
-                            Cash tendered
+                            {t('sales.cashTendered')}
                             <Input
                               name="tendered"
-                              aria-label="Cash tendered"
+                              aria-label={t('sales.cashTendered')}
                               inputMode="decimal"
                               pattern="(0|[1-9][0-9]*)\.[0-9]{2}"
                               required
                             />
                             <small>
                               {currentShift
-                                ? `Drawer: ${currentShift.terminalName}`
-                                : 'Open your cash shift first.'}
+                                ? t('sales.drawer', { name: currentShift.terminalName })
+                                : t('sales.openShiftFirst')}
                             </small>
                           </label>
                         ) : null}
                         {cardUsed ? (
                           <label className="block">
-                            Approved terminal receipt reference
+                            {t('sales.approvedTerminalReceiptReference')}
                             <Input
                               name="reference"
-                              aria-label="Approved terminal receipt reference"
+                              aria-label={t('sales.approvedTerminalReceiptReference')}
                               required
                               maxLength={120}
                               autoComplete="off"
                             />
                             <small>
-                              Record only after the external terminal confirms approval. Never enter
-                              card numbers or security codes.
+                              {t('sales.recordOnlyAfterTheExternalTerminalConfirmsApprovalNeverEnterCardNumbersOrSecurityCodes')}
                             </small>
                           </label>
                         ) : null}
@@ -506,13 +499,13 @@ export function PaymentsWorkspace({
                           className="min-h-14 w-full text-lg"
                           disabled={cashUsed && !currentShift}
                         >
-                          Record payment
+                          {t('sales.recordPayment')}
                         </Button>
                       </fieldset>
                     </form>
                   )
                 ) : null}
-                <h3 className="text-xl font-semibold">Payment history</h3>
+                <h3 className="text-xl font-semibold">{t('sales.paymentHistory')}</h3>
                 {summary.payments.map((p) => {
                   const remaining = format(
                     cents(p.amount) - p.reversals.reduce((n, r) => n + cents(r.amount), 0n),
@@ -524,20 +517,20 @@ export function PaymentsWorkspace({
                   return (
                     <article key={p.id} className="space-y-3 rounded-md border bg-card p-4">
                       <p className="font-semibold">
-                        {p.method} {p.amount} {summary.order.currency}{' '}
-                        {p.change !== null ? `· Change ${p.change}` : ''}
+                        {valueLabel(p.method)} {p.amount} {summary.order.currency}{' '}
+                        {p.change !== null ? `· ${t('sales.change', { amount: p.change })}` : ''}
                       </p>
                       <p className="break-all text-sm">
-                        {p.id} · {new Date(p.createdAt).toLocaleString()}{' '}
+                        {p.id} · {formatDateTime(p.createdAt, locale)}{' '}
                         {p.transactionReference ? `· ${p.transactionReference}` : ''}
                       </p>
                       {p.allocations.length ? (
-                        <p>{p.allocations.length} item units allocated</p>
+                        <p>{p.allocations.length} {t('sales.itemUnitsAllocated')}</p>
                       ) : null}
                       {p.reversals.map((r) => (
                         <p key={r.id} className="rounded bg-muted p-2">
-                          {r.kind} {r.amount} · {r.reason} ·{' '}
-                          {new Date(r.createdAt).toLocaleString()}
+                          {valueLabel(r.kind)} {r.amount} · {r.reason} ·{' '}
+                          {formatDateTime(r.createdAt, locale)}
                         </p>
                       ))}
                       {permitted &&
@@ -560,48 +553,48 @@ export function PaymentsWorkspace({
                           <fieldset disabled={disabled} className="grid gap-3 sm:grid-cols-2">
                             {kind === 'REFUND' ? (
                               <label>
-                                Refund amount
+                                {t('sales.refundAmount')}
                                 <Input
                                   name="amount"
-                                  aria-label="Refund amount"
+                                  aria-label={t('sales.refundAmount')}
                                   defaultValue={remaining}
                                   required
                                   inputMode="decimal"
                                 />
                               </label>
                             ) : (
-                              <p>Cancel the full unsettled payment: {p.amount}</p>
+                              <p>{t('sales.cancelTheFullUnsettledPayment')} {p.amount}</p>
                             )}
                             <label>
-                              Reason
+                              {t('sales.reason')}
                               <Input
                                 name="reason"
-                                aria-label="Reversal reason"
+                                aria-label={t('sales.reversalReason')}
                                 required
                                 maxLength={500}
                               />
                             </label>
                             {p.method === 'CARD' ? (
                               <label>
-                                Confirmed card reversal reference
+                                {t('sales.confirmedCardReversalReference')}
                                 <Input
                                   name="reference"
-                                  aria-label="Confirmed card reversal reference"
+                                  aria-label={t('sales.confirmedCardReversalReference')}
                                   required
                                   autoComplete="off"
                                 />
                               </label>
                             ) : (
                               <p>
-                                Cash returned from{' '}
-                                {currentShift?.terminalName ?? 'your open drawer (required)'}
+                                {t('sales.cashReturnedFrom')}{' '}
+                                {currentShift?.terminalName ?? t('sales.requiredDrawer')}
                               </p>
                             )}
                             <Button
                               variant="outline"
                               disabled={p.method === 'CASH' && !currentShift}
                             >
-                              {kind === 'REFUND' ? 'Record refund' : 'Cancel payment'}
+                              {kind === 'REFUND' ? t('sales.recordRefund') : t('sales.cancelPayment')}
                             </Button>
                           </fieldset>
                         </form>
@@ -609,14 +602,14 @@ export function PaymentsWorkspace({
                     </article>
                   );
                 })}
-                {!summary.payments.length ? <p>No payments recorded.</p> : null}
+                {!summary.payments.length ? <p>{t('sales.noPaymentsRecorded')}</p> : null}
                 <details>
                   <summary className="min-h-12 cursor-pointer font-semibold">
-                    Payment audit events
+                    {t('sales.paymentAuditEvents')}
                   </summary>
                   {history.events.map((e) => (
                     <p key={e.id}>
-                      {e.action} · {new Date(e.createdAt).toLocaleString()} · {e.revision}
+                      {valueLabel(e.action)} · {formatDateTime(e.createdAt, locale)} · {e.revision}
                     </p>
                   ))}
                   {history.hasMore ? (
@@ -634,24 +627,24 @@ export function PaymentsWorkspace({
                           .catch((e: Error) => setError(e.message));
                       }}
                     >
-                      More payment events
+                      {t('sales.morePaymentEvents')}
                     </Button>
                   ) : null}
                 </details>
               </>
             ) : (
-              <p>Select a bill to collect payment or inspect its history.</p>
+              <p>{t('sales.selectABillToCollectPaymentOrInspectItsHistory')}</p>
             )}
           </section>
         </div>
       ) : null}
       {cashRead ? (
         <section className="space-y-4 border-t pt-6">
-          <h2 className="text-2xl font-bold">Cash register shifts</h2>
+          <h2 className="text-2xl font-bold">{t('sales.cashRegisterShifts')}</h2>
           <p>
             {currentShift
-              ? `Your open drawer: ${currentShift.terminalName} · Expected ${currentShift.expectedAmount} ${currentShift.currency}`
-              : 'You have no open cash shift.'}
+              ? t('sales.yourOpenDrawer', { name: currentShift.terminalName, amount: currentShift.expectedAmount, currency: currentShift.currency })
+              : t('sales.noOpenShift')}
           </p>
           {!currentShift && can('cash.shift.manage') ? (
             <form
@@ -666,15 +659,15 @@ export function PaymentsWorkspace({
               }}
             >
               <label>
-                POS terminal
+                {t('sales.posTerminal')}
                 <select
-                  aria-label="POS terminal"
+                  aria-label={t('sales.posTerminal')}
                   name="terminal"
                   className={selectClass}
                   required
                   disabled={disabled}
                 >
-                  <option value="">Choose registered POS</option>
+                  <option value="">{t('sales.chooseRegisteredPos')}</option>
                   {terminals.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -683,9 +676,9 @@ export function PaymentsWorkspace({
                 </select>
               </label>
               <label>
-                Opening cash
+                {t('sales.openingCash')}
                 <Input
-                  aria-label="Opening cash"
+                  aria-label={t('sales.openingCash')}
                   name="opening"
                   defaultValue="0.00"
                   inputMode="decimal"
@@ -693,7 +686,7 @@ export function PaymentsWorkspace({
                   disabled={disabled}
                 />
               </label>
-              <Button disabled={disabled}>Open cash shift</Button>
+              <Button disabled={disabled}>{t('sales.openCashShift')}</Button>
             </form>
           ) : null}
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -708,9 +701,9 @@ export function PaymentsWorkspace({
                   setShiftDetail(null);
                 }}
               >
-                {s.terminalName} · {s.cashierName} · {s.status}
+                {s.terminalName} · {s.cashierName} · {valueLabel(s.status)}
                 <br />
-                {new Date(s.openedAt).toLocaleString()}
+                {formatDateTime(s.openedAt, locale)}
               </Button>
             ))}
           </div>
@@ -720,25 +713,25 @@ export function PaymentsWorkspace({
               disabled={shiftPage === 1}
               onClick={() => setShiftPage(shiftPage - 1)}
             >
-              Previous shifts
+              {t('sales.previousShifts')}
             </Button>
             <Button
               variant="outline"
               disabled={!shiftMore}
               onClick={() => setShiftPage(shiftPage + 1)}
             >
-              Next shifts
+              {t('sales.nextShifts')}
             </Button>
           </div>
           {shiftDetail ? (
             <div className="space-y-4 rounded-md border p-4">
               <h3 className="text-xl font-semibold">
-                {shiftDetail.shift.terminalName} · {shiftDetail.shift.status}
+                {shiftDetail.shift.terminalName} · {valueLabel(shiftDetail.shift.status)}
               </h3>
               <p>
-                Opening {shiftDetail.shift.openingAmount} · Expected{' '}
-                {shiftDetail.shift.expectedAmount} · Counted{' '}
-                {shiftDetail.shift.closingAmount ?? '—'} · Difference{' '}
+                {t('sales.opening')} {shiftDetail.shift.openingAmount} {t('sales.expected')}{' '}
+                {shiftDetail.shift.expectedAmount} {t('sales.counted')}{' '}
+                {shiftDetail.shift.closingAmount ?? '—'} {t('sales.difference')}{' '}
                 {shiftDetail.shift.difference ?? '—'}
               </p>
               {shiftDetail.shift.closingReason ? <p>{shiftDetail.shift.closingReason}</p> : null}
@@ -759,34 +752,34 @@ export function PaymentsWorkspace({
                       }}
                     >
                       <fieldset disabled={disabled} className="space-y-3">
-                        <legend className="font-semibold">Cash movement</legend>
+                        <legend className="font-semibold">{t('sales.cashMovement')}</legend>
                         <select
                           name="action"
-                          aria-label="Cash movement type"
+                          aria-label={t('sales.cashMovementType')}
                           className={selectClass}
                         >
-                          <option value="cash_in">Cash in</option>
-                          <option value="cash_out">Cash out</option>
+                          <option value="cash_in">{t('sales.cashIn')}</option>
+                          <option value="cash_out">{t('sales.cashOut')}</option>
                         </select>
                         <label className="block">
-                          Movement amount
+                          {t('sales.movementAmount')}
                           <Input
                             name="amount"
-                            aria-label="Movement amount"
+                            aria-label={t('sales.movementAmount')}
                             required
                             inputMode="decimal"
                           />
                         </label>
                         <label className="block">
-                          Movement reason
+                          {t('sales.movementReason')}
                           <Input
                             name="reason"
-                            aria-label="Movement reason"
+                            aria-label={t('sales.movementReason')}
                             required
                             maxLength={500}
                           />
                         </label>
-                        <Button>Record cash movement</Button>
+                        <Button>{t('sales.recordCashMovement')}</Button>
                       </fieldset>
                     </form>
                   ) : null}
@@ -804,29 +797,29 @@ export function PaymentsWorkspace({
                     }}
                   >
                     <fieldset disabled={disabled} className="space-y-3">
-                      <legend className="font-semibold">Close cash shift</legend>
+                      <legend className="font-semibold">{t('sales.closeCashShift')}</legend>
                       <label className="block">
-                        Counted cash
+                        {t('sales.countedCash')}
                         <Input
                           name="closing"
-                          aria-label="Counted cash"
+                          aria-label={t('sales.countedCash')}
                           required
                           inputMode="decimal"
                         />
                       </label>
                       <label className="block">
-                        Difference explanation
-                        <Input name="reason" aria-label="Difference explanation" maxLength={500} />
+                        {t('sales.differenceExplanation')}
+                        <Input name="reason" aria-label={t('sales.differenceExplanation')} maxLength={500} />
                       </label>
-                      <Button>Close cash shift</Button>
+                      <Button>{t('sales.closeCashShift')}</Button>
                     </fieldset>
                   </form>
                 </div>
               ) : null}
-              <h4 className="font-semibold">Cash movement history</h4>
+              <h4 className="font-semibold">{t('sales.cashMovementHistory')}</h4>
               {shiftDetail.movements.map((m) => (
                 <p key={m.id} className="border-t py-2">
-                  {m.kind} · {m.amount} · {m.reason} · {new Date(m.createdAt).toLocaleString()}
+                  {valueLabel(m.kind)} · {m.amount} · {serverMessage(m.reason, locale)} · {formatDateTime(m.createdAt, locale)}
                 </p>
               ))}
               <div className="flex gap-2">
@@ -835,14 +828,14 @@ export function PaymentsWorkspace({
                   disabled={movementPage === 1}
                   onClick={() => setMovementPage(movementPage - 1)}
                 >
-                  Previous movements
+                  {t('sales.previousMovements')}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={!shiftDetail.hasMore}
                   onClick={() => setMovementPage(movementPage + 1)}
                 >
-                  Next movements
+                  {t('sales.nextMovements')}
                 </Button>
               </div>
             </div>

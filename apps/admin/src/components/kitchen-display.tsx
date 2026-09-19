@@ -9,21 +9,25 @@ import type {
 import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { api, ApiFailure } from '../lib/api';
+import { useI18n, formatDateTime, serverMessage } from '../lib/i18n';
+import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
 const next: Partial<Record<KitchenStatus, KitchenStatus>> = {
   NEW: 'PREPARING',
   PREPARING: 'READY',
   READY: 'COMPLETED',
 };
-const label: Partial<Record<KitchenStatus, string>> = {
-  NEW: 'Start preparing',
-  PREPARING: 'Mark ready',
-  READY: 'Complete ticket',
+const label: Partial<Record<KitchenStatus, 'sales.startPreparing' | 'sales.markReady' | 'sales.completeTicket'>> = {
+  NEW: 'sales.startPreparing',
+  PREPARING: 'sales.markReady',
+  READY: 'sales.completeTicket',
 };
 type Receipt = {
   ticketId: string;
   body: { commandId: string; version: number; status: KitchenStatus };
 };
 export function KitchenDisplay({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
+  const valueLabel = (value: string) => SALES_VALUE_KEYS[value] ? t(SALES_VALUE_KEYS[value]) : value;
   const [tickets, setTickets] = useState<KitchenTicketRecord[]>([]),
     [stations, setStations] = useState<{ id: string; name: string; active: boolean }[]>([]);
   const [station, setStation] = useState(''),
@@ -126,9 +130,9 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
     <div className="space-y-5 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-end gap-4">
         <label className="min-w-0 max-w-full">
-          Kitchen station
+          {t('sales.kitchenStation')}
           <select
-            aria-label="Kitchen station"
+            aria-label={t('sales.kitchenStation')}
             className="block min-h-12 w-full min-w-0 max-w-full rounded-md border bg-background p-3"
             value={station}
             onChange={(e) => {
@@ -137,19 +141,19 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
               setStale(true);
             }}
           >
-            <option value="">All stations</option>
+            <option value="">{t('sales.allStations')}</option>
             {stations.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
-                {s.active ? '' : ' (inactive routing)'}
+                {s.active ? '' : t('sales.inactiveRouting')}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Ticket view
+          {t('sales.ticketView')}
           <select
-            aria-label="Ticket view"
+            aria-label={t('sales.ticketView')}
             className="block min-h-12 rounded-md border bg-background p-3"
             value={view}
             onChange={(e) => {
@@ -158,12 +162,12 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
               setStale(true);
             }}
           >
-            <option value="active">Active tickets</option>
-            <option value="history">All ticket history</option>
+            <option value="active">{t('sales.activeTickets')}</option>
+            <option value="history">{t('sales.allTicketHistory')}</option>
           </select>
         </label>
         <label className="w-40">
-          Delay warning (minutes)
+          {t('sales.delayWarningMinutes')}
           <Input
             type="number"
             min={1}
@@ -182,33 +186,33 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
             void reload();
           }}
         >
-          Refresh kitchen
+          {t('sales.refreshKitchen')}
         </Button>
       </div>
       <p role="status">
         {stale
-          ? 'Kitchen disconnected or refreshing · Updates paused'
-          : 'Connected · Kitchen refreshed every 5 seconds'}
+          ? t('sales.kitchenDisconnected')
+          : t('sales.kitchenConnected')}
       </p>
       {error ? (
         <p role="alert" className="rounded-md border border-destructive p-3 text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {pending ? (
         <div className="rounded-md border border-amber-600 p-4">
-          <p>A ticket update needs confirmation before another change.</p>
+          <p>{t('sales.aTicketUpdateNeedsConfirmationBeforeAnotherChange')}</p>
           <Button
             disabled={busy || !canManage}
             className="mt-3 min-h-12"
             onClick={() => void execute(pending)}
           >
-            Retry kitchen command
+            {t('sales.retryKitchenCommand')}
           </Button>
         </div>
       ) : null}
       {!tickets.length ? (
-        <p className="rounded-lg border p-8 text-lg">No tickets in this view.</p>
+        <p className="rounded-lg border p-8 text-lg">{t('sales.noTicketsInThisView')}</p>
       ) : null}
       <div className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {tickets.map((ticket) => {
@@ -222,7 +226,7 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
           const delayed = !end && ticket.status !== 'READY' && minutes >= delay;
           return (
             <article
-              aria-label={`Ticket ${ticket.content.orderNumber} ${ticket.content.stationName}`}
+              aria-label={t('sales.ticketName', { number: ticket.content.orderNumber, station: ticket.content.stationName })}
               key={ticket.id}
               className={`space-y-4 rounded-xl border-2 p-5 ${ticket.cancelledAt ? 'border-slate-600 bg-slate-900' : delayed ? 'border-red-400 bg-red-950/30' : ticket.status === 'READY' ? 'border-emerald-400 bg-emerald-950/30' : 'border-amber-500/50 bg-card'}`}
             >
@@ -236,13 +240,13 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
                 <p className="text-lg">
                   {ticket.content.tableName
                     ? `${ticket.content.areaName} / ${ticket.content.tableName}`
-                    : 'Takeaway'}
+                    : t('sales.waiterTakeaway')}
                 </p>
-                <p>Waiter: {ticket.content.waiterName ?? 'Unassigned'}</p>
+                <p>{t('sales.waiter')} {ticket.content.waiterName ?? t('sales.unassigned')}</p>
                 <p className="mt-2 text-xl font-bold">
-                  {ticket.cancelledAt ? 'CANCELLED' : ticket.status}
+                  {valueLabel(ticket.cancelledAt ? 'CANCELLED' : ticket.status)}
                 </p>
-                {delayed ? <p className="font-bold text-red-300">Delayed preparation</p> : null}
+                {delayed ? <p className="font-bold text-red-300">{t('sales.delayedPreparation')}</p> : null}
               </header>
               {ticket.content.notes ? (
                 <p className="rounded-md border p-2 font-semibold">{ticket.content.notes}</p>
@@ -259,14 +263,14 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
                       </p>
                     ))}
                     {item.notes ? (
-                      <p className="text-lg font-semibold">Note: {item.notes}</p>
+                      <p className="text-lg font-semibold">{t('sales.note')} {item.notes}</p>
                     ) : null}
                   </li>
                 ))}
               </ul>
               {ticket.cancellationReason ? (
                 <p className="font-semibold text-red-300">
-                  Cancellation: {ticket.cancellationReason}
+                  {t('sales.cancellation')} {ticket.cancellationReason}
                 </p>
               ) : null}
               {next[ticket.status] && !ticket.cancelledAt && canManage ? (
@@ -284,7 +288,7 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
                     })
                   }
                 >
-                  {label[ticket.status]}
+                  {label[ticket.status] ? t(label[ticket.status]!) : null}
                 </Button>
               ) : null}
               <Button
@@ -301,7 +305,7 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
                   }
                 }}
               >
-                Ticket history
+                {t('sales.ticketHistory')}
               </Button>
             </article>
           );
@@ -316,9 +320,9 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
             setStale(true);
           }}
         >
-          Previous tickets
+          {t('sales.previousTickets')}
         </Button>
-        <span>Page {page}</span>
+        <span>{t('sales.page')} {page}</span>
         <Button
           variant="outline"
           disabled={!more || busy}
@@ -327,21 +331,21 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
             setStale(true);
           }}
         >
-          Next tickets
+          {t('sales.nextTickets')}
         </Button>
       </div>
       {history.length ? (
-        <section aria-label="Kitchen history" className="rounded-md border p-4">
+        <section aria-label={t('sales.kitchenHistory')} className="rounded-md border p-4">
           <div className="flex justify-between">
-            <h2 className="font-semibold">Ticket history (first 100 events)</h2>
+            <h2 className="font-semibold">{t('sales.ticketHistoryFirst100Events')}</h2>
             <Button variant="ghost" onClick={() => setHistory([])}>
-              Close history
+              {t('sales.closeHistory')}
             </Button>
           </div>
           <ol>
             {history.map((h) => (
               <li key={h.id}>
-                {h.action} · {new Date(h.createdAt).toLocaleString()}
+                {valueLabel(h.action)} · {formatDateTime(h.createdAt, locale)}
               </li>
             ))}
           </ol>
