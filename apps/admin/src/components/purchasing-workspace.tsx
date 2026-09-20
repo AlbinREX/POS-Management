@@ -23,14 +23,14 @@ import {
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Orders' | 'Suppliers' | 'Receipts' | 'Account';
-const label = (v: string, t?: Translate) => {
+const label = (v: string, t: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ORDERED: 'operations.ordered', PARTIALLY_RECEIVED: 'operations.statusPartiallyReceived', RECEIVED: 'operations.received', CANCELLED: 'operations.statusCancelled',
     RECEIPT: 'operations.entryReceipt', CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal',
     CASH: 'operations.cash', CARD: 'operations.card', BANK_TRANSFER: 'operations.bankTransfer', OTHER: 'operations.other',
     created: 'operations.actionCreated', updated: 'operations.actionUpdated', confirmed: 'operations.actionConfirmed', received: 'operations.received', cancelled: 'operations.statusCancelled',
   } as const;
-  return v in keys && t ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
 };
 async function all<T>(path: string) {
   const rows: T[] = [];
@@ -406,7 +406,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 ] as PurchaseStatus[]
               ).map((s) => (
                 <option key={s} value={s}>
-                  {label(s)}
+                  {label(s, t)}
                 </option>
               ))}
             </select>
@@ -434,7 +434,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 <span
                   className={`stock-badge ${['DRAFT', 'PARTIALLY_RECEIVED'].includes(o.status) ? 'stock-low' : ''}`}
                 >
-                  {label(o.status)}
+                  {label(o.status, t)}
                 </span>
               </div>
               <div>
@@ -586,10 +586,10 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               {account.items.map((e) => (
                 <article key={e.id} className="purchase-entry">
                   <div>
-                    <span className="stock-badge">{label(e.kind)}</span>
+                    <span className="stock-badge">{label(e.kind, t)}</span>
                     <h3 className="mt-2 font-semibold">{e.receiptReference}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {e.reference} {e.method ? label(e.method) : ''}
+                      {e.reference} {e.method ? label(e.method, t) : ''}
                     </p>
                     <p className="text-sm">{e.reason}</p>
                     <small className="text-muted-foreground">
@@ -650,7 +650,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {selectedOrder.warehouseName} ·{' '}
-                <span data-testid="purchase-detail-status">{label(selectedOrder.status)}</span>
+                <span data-testid="purchase-detail-status">{label(selectedOrder.status, t)}</span>
               </p>
             </div>
             <Button
@@ -744,7 +744,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               {history.events.map((e) => (
                 <details key={e.id} className="rounded-lg border p-3 text-sm">
                   <summary>
-                    {label(e.action.replace('purchase.', ''))} ·{' '}
+                    {label(e.action.replace('purchase.', ''), t)} ·{' '}
                     {formatDateTime(e.createdAt, locale)}
                   </summary>
                   <PurchaseHistorySummary value={e.response} />
@@ -874,7 +874,7 @@ function PurchaseHistorySummary({ value }: { value: unknown }) {
       ) : null}
       {r.amount ? (
         <p>
-          {t('operations.amount')} {r.amount} {r.method ? label(r.method) : ''}
+          {t('operations.amount')} {r.amount} {r.method ? label(r.method, t) : ''}
         </p>
       ) : null}
       {r.notes ? <p>{r.notes}</p> : null}

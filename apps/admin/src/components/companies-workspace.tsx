@@ -15,13 +15,13 @@ import { api, ApiFailure } from '../lib/api';
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Companies' | 'Contracts' | 'Employees' | 'Account' | 'Statements';
-const label = (v: string, t?: Translate) => {
+const label = (v: string, t: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ACTIVE: 'operations.active', EXPIRED: 'operations.statusExpired', SUSPENDED: 'operations.statusSuspended', TERMINATED: 'operations.statusTerminated',
     MONTHLY: 'operations.monthly', BIWEEKLY: 'operations.biweekly', WEEKLY: 'operations.weekly',
     CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal', CREDIT: 'operations.entryCredit',
   } as const;
-  return v in keys && t ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
 };
 const form = (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
@@ -294,10 +294,10 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                   {contracts.map((c) => (
                     <li key={c.id}>
                       <strong>{c.contractNumber}</strong>
-                      <span className="stock-badge">{label(c.status)}</span>
+                      <span className="stock-badge">{label(c.status, t)}</span>
                       <span>
                         {t('operations.limit')} {c.creditLimit} {c.currency} · {c.discountPercentage}{t('operations.net')}{' '}
-                        {c.paymentTermsDays} {t('operations.days')} {label(c.billingCycle)}
+                        {c.paymentTermsDays} {t('operations.days')} {label(c.billingCycle, t)}
                       </span>
                       <span>
                         {c.startDate} → {c.endDate ?? t('operations.openEnded')}
@@ -414,7 +414,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                     </div>
                   </dl>
                   <p>
-                    {t('operations.charged')} {account.charged} {t('operations.paid')} {account.paid} · {account.orderCount} {t('operations.ordersContract')} {account.contractStatus ? label(account.contractStatus) : 'none'}
+                    {t('operations.charged')} {account.charged} {t('operations.paid')} {account.paid} · {account.orderCount} {t('operations.ordersContract')} {account.contractStatus ? label(account.contractStatus, t) : 'none'}
                   </p>
                   {recordPayment && account.balance !== '0.00' ? (
                     <Button type="button" disabled={locked} onClick={() => setEditor('payment')}>
@@ -425,7 +425,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                     <ul className="company-list">
                       {account.items.map((entry) => (
                         <li key={entry.id} className="purchase-entry">
-                          <strong>{label(entry.kind)}</strong>
+                          <strong>{label(entry.kind, t)}</strong>
                           <span>{entry.amount}</span>
                           <span>
                             {entry.orderNumber ? t('operations.orderNumber', { number: entry.orderNumber }) : entry.reference}

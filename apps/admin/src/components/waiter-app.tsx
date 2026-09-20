@@ -224,7 +224,7 @@ export function WaiterApp({ user }: { user: SessionUser }) {
       <nav aria-label={t('sales.waiterViews')} className="waiter-tabs">
         {views.map((item) => (
           <button
-            key={item === 'Tables' ? t('sales.tables') : item === 'Orders' ? t('sales.waiterOrders') : t('sales.waiterTakeaway')}
+            key={item}
             type="button"
             aria-current={view === item}
             onClick={() => {
@@ -232,8 +232,8 @@ export function WaiterApp({ user }: { user: SessionUser }) {
               setView(item);
             }}
           >
-            <NavIcon name={item === 'Tables' ? 'Layout' : item === 'Orders' ? t('sales.waiterOrders') : 'POS'} />
-            {item}
+            <NavIcon name={item === 'Tables' ? 'Layout' : item === 'Orders' ? 'Orders' : 'POS'} />
+            {item === 'Tables' ? t('sales.tables') : item === 'Orders' ? t('sales.waiterOrders') : t('sales.waiterTakeaway')}
           </button>
         ))}
       </nav>
