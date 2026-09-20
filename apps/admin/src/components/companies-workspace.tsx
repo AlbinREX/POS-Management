@@ -15,13 +15,13 @@ import { api, ApiFailure } from '../lib/api';
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Companies' | 'Contracts' | 'Employees' | 'Account' | 'Statements';
-const label = (v: string, t: Translate) => {
+const label = (v: string, t?: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ACTIVE: 'operations.active', EXPIRED: 'operations.statusExpired', SUSPENDED: 'operations.statusSuspended', TERMINATED: 'operations.statusTerminated',
     MONTHLY: 'operations.monthly', BIWEEKLY: 'operations.biweekly', WEEKLY: 'operations.weekly',
     CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal', CREDIT: 'operations.entryCredit',
   } as const;
-  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+  return v in keys && t ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
 };
 const form = (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();

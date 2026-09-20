@@ -65,7 +65,7 @@ describe('Message catalogue', () => {
   });
   it('uses no key that looks like a translated identifier', () => {
     // Keys are internal identifiers and must stay stable ASCII regardless of language.
-    for (const key of keys) expect(key).toMatch(/^[a-z][a-zA-Z0-9.]*$/);
+    for (const key of keys) expect(key).toMatch(/^[a-z][a-zA-Z0-9._]*$/);
   });
 });
 

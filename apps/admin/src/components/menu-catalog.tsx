@@ -355,7 +355,9 @@ function CatalogEditor({
     const parsed = menuInputSchema.safeParse(data);
     if (!parsed.success) {
       setError(
-        parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '),
+        parsed.error.issues
+          .map((issue: { path: PropertyKey[]; message: string }) => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; '),
       );
       return;
     }

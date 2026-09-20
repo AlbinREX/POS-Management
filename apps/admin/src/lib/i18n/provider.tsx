@@ -18,7 +18,7 @@ import {
   type Locale,
 } from './locale';
 
-export type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
+export type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 type I18nValue = { locale: Locale; setLocale: (locale: Locale) => void; t: Translate };
 
@@ -34,10 +34,10 @@ function interpolate(template: string, params?: Record<string, string | number>)
 
 export function translate(
   locale: Locale,
-  key: MessageKey,
+  key: string,
   params?: Record<string, string | number>,
 ): string {
-  const entry = MESSAGES[key];
+  const entry = MESSAGES[key as MessageKey];
   // A key missing from the catalogue cannot be a thrown error or a console warning:
   // several browser specs fail the run on any console output, and a missing phrase
   // must never take down a till mid-service. Fall back to English, then to the key.

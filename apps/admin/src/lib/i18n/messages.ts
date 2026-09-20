@@ -1,3 +1,8 @@
+import { CATALOG_MESSAGES } from './catalog-messages';
+import { OPERATIONS_MESSAGES } from './operations-messages';
+import { REPORT_MESSAGES } from './report-messages';
+import { SALES_MESSAGES } from './sales-messages';
+
 /**
  * The single translation catalogue for the whole application.
  *
@@ -14,7 +19,7 @@
  */
 export type Message = { sq: string; en: string };
 
-export const MESSAGES = {
+const CORE_MESSAGES = {
   // --- Brand and shell ---------------------------------------------------------
   'brand.workspace': { sq: 'HAPËSIRA E RESTORANTIT', en: 'RESTAURANT WORKSPACE' },
   'brand.tagline': { sq: 'Ushqimi i mirë i bashkon njerëzit.', en: 'Good food brings people together.' },
@@ -173,5 +178,13 @@ export const MESSAGES = {
   'audit.colAction': { sq: "Veprimi", en: "Action" },
   'audit.colRecord': { sq: "Regjistrimi", en: "Record" },
 } as const;
+
+export const MESSAGES = {
+  ...CORE_MESSAGES,
+  ...CATALOG_MESSAGES,
+  ...SALES_MESSAGES,
+  ...OPERATIONS_MESSAGES,
+  ...REPORT_MESSAGES,
+} as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof MESSAGES;

@@ -1022,7 +1022,7 @@ function TableDraftPanel({
       shape: draft.shape,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues.map((i) => i.message).join('; '));
+      setError(parsed.error.issues.map((i: { message: string }) => i.message).join('; '));
       return;
     }
     setError('');
@@ -1339,7 +1339,7 @@ function AreaEditor({
       active: form.has('active'),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues.map((i) => i.message).join('; '));
+      setError(parsed.error.issues.map((i: { message: string }) => i.message).join('; '));
       return;
     }
     setError('');

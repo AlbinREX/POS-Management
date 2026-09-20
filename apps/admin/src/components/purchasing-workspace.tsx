@@ -23,14 +23,14 @@ import {
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Orders' | 'Suppliers' | 'Receipts' | 'Account';
-const label = (v: string, t: Translate) => {
+const label = (v: string, t?: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ORDERED: 'operations.ordered', PARTIALLY_RECEIVED: 'operations.statusPartiallyReceived', RECEIVED: 'operations.received', CANCELLED: 'operations.statusCancelled',
     RECEIPT: 'operations.entryReceipt', CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal',
     CASH: 'operations.cash', CARD: 'operations.card', BANK_TRANSFER: 'operations.bankTransfer', OTHER: 'operations.other',
     created: 'operations.actionCreated', updated: 'operations.actionUpdated', confirmed: 'operations.actionConfirmed', received: 'operations.received', cancelled: 'operations.statusCancelled',
   } as const;
-  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+  return v in keys && t ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
 };
 async function all<T>(path: string) {
   const rows: T[] = [];

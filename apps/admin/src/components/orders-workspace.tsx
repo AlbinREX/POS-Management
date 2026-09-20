@@ -258,7 +258,7 @@ export function OrdersWorkspace({
               .map((g) => (
                 <fieldset className="rounded-md border p-3" key={g.id}>
                   <legend>
-                    {t('sales.chooseRange', { name: g.name, min: g.minSelections, max: g.maxSelections })}
+                    {t('sales.chooseRange', { name: g.name, min: g.minSelections ?? 0, max: g.maxSelections ?? 0 })}
                   </legend>
                   {modifiers
                     .filter((m) => m.groupId === g.id)
