@@ -316,25 +316,50 @@ details > summary::marker {
   min-width: 0;
   background: #202226;
   border: 1px solid var(--border);
-  border-radius: 17px;
-  padding: 8px;
+  border-radius: 18px;
+  padding: 10px;
   box-shadow: 0 6px 18px #0002;
+  /* A column with the copy allowed to grow keeps the price and stepper on the same
+     baseline in every card, however long a product name or description runs. */
+  display: flex;
+  flex-direction: column;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+.product-card:hover {
+  border-color: #3a3d44;
+  transform: translateY(-2px);
 }
 .product-card:focus-within {
   border-color: var(--primary);
 }
+@media (prefers-reduced-motion: reduce) {
+  .product-card {
+    transition: none;
+  }
+  .product-card:hover {
+    transform: none;
+  }
+}
 .product-select {
   width: 100%;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   text-align: left;
 }
 .product-select:disabled {
   opacity: 1;
 }
 .product-image {
-  height: 155px;
+  /* A reserved 4:3 box matches the bundled assets, so lazily-loaded images settle
+     into space the browser has already allocated instead of shifting the grid. */
+  aspect-ratio: 4 / 3;
+  height: auto;
+  width: 100%;
   overflow: hidden;
-  border-radius: 11px;
+  border-radius: 12px;
   background: #292b2f;
 }
 .product-image img {
@@ -363,7 +388,8 @@ details > summary::marker {
   color: #aaa08a;
 }
 .product-copy {
-  padding: 13px 7px 3px;
+  padding: 14px 8px 4px;
+  flex: 1;
 }
 .product-copy h3 {
   font-size: 16px;
@@ -391,9 +417,11 @@ details > summary::marker {
   flex-wrap: wrap;
 }
 .product-footer > strong {
-  font-size: 19px;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--primary);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 .product-footer small {
   font-size: 10px;
@@ -609,10 +637,7 @@ details > summary::marker {
   .pos-grid {
     grid-template-columns: minmax(0, 1fr) 400px;
   }
-  .product-image {
-    height: 205px;
   }
-}
 @media (max-width: 1390px) {
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -647,10 +672,7 @@ details > summary::marker {
   .product-grid {
     gap: 10px;
   }
-  .product-image {
-    height: 120px;
-  }
-  .catalog-heading h2 {
+    .catalog-heading h2 {
     font-size: 21px;
   }
   .catalog-count {
@@ -680,10 +702,7 @@ details > summary::marker {
   .riza-nav button[aria-current='page'] {
     box-shadow: inset 0 -2px var(--primary);
   }
-  .product-image {
-    height: 145px;
   }
-}
 @media (max-width: 680px) {
   .pos-workspace {
     padding-bottom: 64px;
@@ -730,10 +749,7 @@ details > summary::marker {
   .riza-brand strong {
     font-size: 19px;
   }
-  .product-image {
-    height: 140px;
-  }
-  .pos-cart {
+    .pos-cart {
     margin-top: 12px;
   }
 }
@@ -786,9 +802,6 @@ details > summary::marker {
 .product-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.product-image {
-  height: 135px;
-}
 .product-footer {
   margin-block: 8px;
 }
@@ -807,19 +820,11 @@ details > summary::marker {
 .pos-cart [aria-label='Order history'] {
   order: 6;
 }
-@media (min-width: 1600px) {
-  .product-image {
-    height: 190px;
-  }
-}
 @media (max-width: 1100px) {
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .product-image {
-    height: 120px;
   }
-}
 @media (max-width: 680px) {
   .pos-workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -829,10 +834,7 @@ details > summary::marker {
     grid-row: 2;
     padding: 0;
   }
-  .product-image {
-    height: 120px;
   }
-}
 .inventory-banner {
   display: flex;
   flex-wrap: wrap;
@@ -1468,4 +1470,27 @@ details > summary::marker {
   .layout-geometry {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+/* Language switcher: a compact two-option control that reads as one unit. */
+.language-switcher {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  padding: 2px;
+}
+.language-switcher button {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.language-switcher button[aria-pressed='true'] {
+  background: #f4c45114;
+  color: var(--primary);
 }

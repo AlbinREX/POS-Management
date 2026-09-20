@@ -12,6 +12,8 @@ import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { OptionalDetails, ProductImage } from './riza-ui';
 import { api, ApiFailure } from '../lib/api';
+import { useI18n, formatDateTime, serverMessage } from '../lib/i18n';
+import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
 
 const selectClass = 'min-h-12 w-full rounded-md border bg-background px-3';
 type Pending = { path: string; body: Record<string, unknown> };
@@ -37,6 +39,8 @@ export function OrdersWorkspace({
   initialOrderId?: string;
   onPayment?: (id: string, method: string) => void;
 }) {
+  const { t, locale } = useI18n();
+  const valueLabel = (value: string) => SALES_VALUE_KEYS[value] ? t(SALES_VALUE_KEYS[value]) : value;
   const pos = view === 'pos';
   const [categories, setCategories] = useState<MenuRecord[]>([]);
   const [category, setCategory] = useState('');
@@ -198,7 +202,7 @@ export function OrdersWorkspace({
   const addItemForm =
     editable && manage && catalogAccess ? (
       <form
-        aria-label="Add order item"
+        aria-label={t('sales.addOrderItem')}
         className="space-y-3 rounded-md border p-4"
         onSubmit={(e) => {
           e.preventDefault();
@@ -213,27 +217,27 @@ export function OrdersWorkspace({
           if (pos) setCustomizing(false);
         }}
       >
-        <h3 className="font-semibold">Add product</h3>
+        <h3 className="font-semibold">{t('sales.addProduct')}</h3>
         <fieldset disabled={locked} className="space-y-3">
           <label className="block">
-            Search products
+            {t('sales.searchProducts')}
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-12"
-              placeholder="Name or SKU"
+              placeholder={t('sales.nameOrSku')}
             />
           </label>
           <label className="block">
-            Product
+            {t('sales.product')}
             <select
               className={selectClass}
               value={productId}
-              aria-label="Product"
+              aria-label={t('sales.product')}
               required
               onChange={(e) => setProductId(e.target.value)}
             >
-              <option value="">Choose a product</option>
+              <option value="">{t('sales.chooseAProduct')}</option>
               {products
                 .filter(
                   (p) =>
@@ -254,7 +258,7 @@ export function OrdersWorkspace({
               .map((g) => (
                 <fieldset className="rounded-md border p-3" key={g.id}>
                   <legend>
-                    {g.name} · choose {g.minSelections}–{g.maxSelections}
+                    {t('sales.chooseRange', { name: g.name, min: g.minSelections, max: g.maxSelections })}
                   </legend>
                   {modifiers
                     .filter((m) => m.groupId === g.id)
@@ -273,7 +277,7 @@ export function OrdersWorkspace({
               ))}
           </div>
           <label className="block">
-            New item quantity
+            {t('sales.newItemQuantity')}
             <Input
               name="quantity"
               type="number"
@@ -285,11 +289,11 @@ export function OrdersWorkspace({
             />
           </label>
           <label className="block">
-            New item notes
+            {t('sales.newItemNotes')}
             <Input name="notes" maxLength={2000} className="min-h-12" />
           </label>
           <Button type="submit" className="min-h-12 w-full" disabled={!product}>
-            Add to order
+            {t('sales.addToOrder')}
           </Button>
         </fieldset>
       </form>
@@ -298,21 +302,21 @@ export function OrdersWorkspace({
     <aside className="space-y-4">
       {manage ? (
         <form
-          aria-label="New order"
+          aria-label={t('sales.newOrder')}
           onSubmit={submitCreate}
           className="space-y-3 rounded-lg border p-4"
         >
-          <h2 className="text-lg font-semibold">New order</h2>
+          <h2 className="text-lg font-semibold">{t('sales.newOrder')}</h2>
           <fieldset disabled={locked} className="space-y-3">
             {pos ? (
-              <div role="group" aria-label="Order type" className="service-selector">
+              <div role="group" aria-label={t('sales.orderType')} className="service-selector">
                 {layoutAccess ? (
                   <button
                     type="button"
                     aria-pressed={type === 'DINE_IN'}
                     onClick={() => setType('DINE_IN')}
                   >
-                    Dine-in
+                    {t('sales.dineIn')}
                   </button>
                 ) : null}
                 <button
@@ -320,31 +324,31 @@ export function OrdersWorkspace({
                   aria-pressed={type === 'TAKEAWAY'}
                   onClick={() => setType('TAKEAWAY')}
                 >
-                  Takeaway
+                  {t('sales.takeaway')}
                 </button>
-                <button type="button" disabled title="Delivery is not available">
-                  Delivery
+                <button type="button" disabled title={t('sales.deliveryIsNotAvailable')}>
+                  {t('sales.delivery')}
                 </button>
               </div>
             ) : (
               <label className="block space-y-1">
-                <span>Order type</span>
+                <span>{t('sales.orderType')}</span>
                 <select
-                  aria-label="Order type"
+                  aria-label={t('sales.orderType')}
                   className={selectClass}
                   value={type}
                   onChange={(e) => setType(e.target.value)}
                 >
-                  <option value="TAKEAWAY">Takeaway</option>
-                  {layoutAccess ? <option value="DINE_IN">Dine-in</option> : null}
+                  <option value="TAKEAWAY">{t('sales.takeaway')}</option>
+                  {layoutAccess ? <option value="DINE_IN">{t('sales.dineIn')}</option> : null}
                 </select>
               </label>
             )}
             {type === 'DINE_IN' ? (
               <label className="block space-y-1">
-                <span>Free table</span>
-                <select aria-label="Free table" required name="tableId" className={selectClass}>
-                  <option value="">Choose a table</option>
+                <span>{t('sales.freeTable')}</span>
+                <select aria-label={t('sales.freeTable')} required name="tableId" className={selectClass}>
+                  <option value="">{t('sales.chooseATable')}</option>
                   {tables.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.number} · {t.name}
@@ -355,9 +359,9 @@ export function OrdersWorkspace({
             ) : null}
             {assign ? (
               <label className="block space-y-1">
-                <span>Assigned waiter</span>
+                <span>{t('sales.assignedWaiter')}</span>
                 <select
-                  aria-label="Assigned waiter"
+                  aria-label={t('sales.assignedWaiter')}
                   name="waiterId"
                   className={selectClass}
                   defaultValue={user.id}
@@ -370,22 +374,22 @@ export function OrdersWorkspace({
                 </select>
               </label>
             ) : (
-              <p className="text-sm">Assigned to {user.name}</p>
+              <p className="text-sm">{t('sales.assignedTo')} {user.name}</p>
             )}
             <label className="block space-y-1">
-              <span>Order notes</span>
+              <span>{t('sales.orderNotes')}</span>
               <Input name="notes" maxLength={2000} className="min-h-12" />
             </label>
             <Button className="min-h-12 w-full" type="submit">
-              Create draft
+              {t('sales.createDraft')}
             </Button>
           </fieldset>
         </form>
       ) : null}
-      <section aria-label="Order list" className="space-y-2">
-        <h2 className="text-lg font-semibold">Recent orders</h2>
+      <section aria-label={t('sales.orderList')} className="space-y-2">
+        <h2 className="text-lg font-semibold">{t('sales.recentOrders')}</h2>
         {orders.length === 0 ? (
-          <p>No orders yet.</p>
+          <p>{t('sales.noOrdersYet')}</p>
         ) : (
           orders.map((o) => (
             <button
@@ -400,10 +404,10 @@ export function OrdersWorkspace({
               }}
             >
               <span className="font-semibold">
-                #{o.orderNumber} · {o.tableName ?? 'Takeaway'}
+                #{o.orderNumber} · {o.tableName ?? t('sales.takeaway')}
               </span>
               <span className="block text-sm">
-                {o.status.replaceAll('_', ' ')} · {o.total} {o.currency}
+                {locale === 'en' ? o.status.replaceAll('_', ' ') : valueLabel(o.status)} · {o.total} {o.currency}
               </span>
             </button>
           ))
@@ -414,7 +418,7 @@ export function OrdersWorkspace({
             disabled={page === 1 || busy}
             onClick={() => setPage((p) => p - 1)}
           >
-            Previous orders
+            {t('sales.previousOrders')}
           </Button>
           <span>{page}</span>
           <Button
@@ -422,7 +426,7 @@ export function OrdersWorkspace({
             disabled={!hasMore || busy}
             onClick={() => setPage((p) => p + 1)}
           >
-            Next orders
+            {t('sales.nextOrders')}
           </Button>
         </div>
       </section>
@@ -438,7 +442,7 @@ export function OrdersWorkspace({
         }
       >
         <p className="text-sm text-muted-foreground">
-          {user.branchName} · Operator: {user.name} · Local updates every 5 seconds
+          {t('sales.operatorRefresh', { branch: user.branchName, name: user.name })}
         </p>
         <Button
           variant="outline"
@@ -448,32 +452,31 @@ export function OrdersWorkspace({
             void reload();
           }}
         >
-          Refresh orders
+          {t('sales.refreshOrders')}
         </Button>
       </div>
       {error ? (
         <p role="alert" className="rounded-md border border-destructive p-3 text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
-      {notice ? <p role="status">{notice}</p> : null}
-      {stale ? <p role="status">Refreshing local data. Editing is paused.</p> : null}
+      {notice ? <p role="status">{serverMessage(notice, locale)}</p> : null}
+      {stale ? <p role="status">{t('sales.refreshingLocalDataEditingIsPaused')}</p> : null}
       {pending ? (
         <div className="rounded-md border border-amber-500 p-4">
           <p>
-            A command needs confirmation from the local server. Retry it before making another
-            change.
+            {t('sales.aCommandNeedsConfirmationFromTheLocalServerRetryItBeforeMakingAnotherChange')}
           </p>
           <Button className="mt-3 min-h-12" disabled={busy} onClick={() => void execute(pending)}>
-            Retry pending command
+            {t('sales.retryPendingCommand')}
           </Button>
         </div>
       ) : null}
       {pos ? (
         <details className="riza-order-switch" open={!order}>
           <summary>
-            Start or switch order{' '}
-            <span>{order ? `Current: #${order.orderNumber}` : 'Create your first draft'}</span>
+            {t('sales.startOrSwitchOrder')}{' '}
+            <span>{order ? t('sales.currentNumber', { number: order.orderNumber }) : t('sales.firstDraft')}</span>
           </summary>
           {orderNavigation}
         </details>
@@ -481,16 +484,16 @@ export function OrdersWorkspace({
       {pos && customizing && addItemForm ? (
         <dialog
           className="riza-dialog"
-          aria-label="Customize product"
+          aria-label={t('sales.customizeProduct')}
           ref={(node) => {
             if (node && !node.open) node.showModal();
           }}
           onClose={() => setCustomizing(false)}
         >
           <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="text-xl font-semibold">Make it yours</h2>
+            <h2 className="text-xl font-semibold">{t('sales.makeItYours')}</h2>
             <Button variant="outline" onClick={() => setCustomizing(false)}>
-              Close
+              {t('sales.close')}
             </Button>
           </div>
           {addItemForm}
@@ -502,31 +505,31 @@ export function OrdersWorkspace({
         }
       >
         {pos ? (
-          <section className="pos-catalog" aria-label="Product catalog">
+          <section className="pos-catalog" aria-label={t('sales.productCatalog')}>
             <div className="catalog-heading">
               <div>
-                <p className="eyebrow">MADE TO ORDER</p>
-                <h2>What's on the menu?</h2>
+                <p className="eyebrow">{t('sales.madeToOrder')}</p>
+                <h2>{t('sales.whatSOnTheMenu')}</h2>
               </div>
-              <span className="catalog-count">{products.length} products</span>
+              <span className="catalog-count">{products.length} {t('sales.products')}</span>
             </div>
             {catalogAccess ? (
               <>
                 <label className="catalog-search">
-                  <span>Search the menu</span>
+                  <span>{t('sales.searchTheMenu')}</span>
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by name or SKU…"
+                    placeholder={t('sales.searchByNameOrSku')}
                   />
                 </label>
-                <div className="category-strip" role="group" aria-label="Product categories">
+                <div className="category-strip" role="group" aria-label={t('sales.productCategories')}>
                   <Button
                     variant={category === '' ? 'default' : 'outline'}
                     aria-pressed={category === ''}
                     onClick={() => setCategory('')}
                   >
-                    All items
+                    {t('sales.allItems')}
                   </Button>
                   {categories.map((c) => (
                     <Button
@@ -548,7 +551,7 @@ export function OrdersWorkspace({
                           p.sku?.toLowerCase().includes(search.toLowerCase())),
                     )
                     .map((p) => (
-                      <article className="product-card" key={p.id} aria-label={`Product ${p.name}`}>
+                      <article className="product-card" key={p.id} aria-label={t('sales.productName', { name: p.name })}>
                         <button
                           className="product-select"
                           disabled={locked || !editable}
@@ -556,12 +559,12 @@ export function OrdersWorkspace({
                             setProductId(p.id);
                             setCustomizing(true);
                           }}
-                          aria-label={`Customize ${p.name}`}
+                          aria-label={t('sales.customizeName', { name: p.name })}
                         >
                           <ProductImage name={p.name} src={p.imageUrl} />
                           <div className="product-copy">
                             <h3>{p.name}</h3>
-                            <p>{p.description || 'Prepared to order. Customize it your way.'}</p>
+                            <p>{p.description || t('sales.preparedToOrder')}</p>
                           </div>
                         </button>
                         <div className="product-footer">
@@ -570,10 +573,10 @@ export function OrdersWorkspace({
                           </strong>
                           <div
                             className="quantity-stepper"
-                            aria-label={`Draft quantity for ${p.name}`}
+                            aria-label={t('sales.draftQuantity', { name: p.name })}
                           >
                             <button
-                              aria-label={`Decrease ${p.name}`}
+                              aria-label={t('sales.decrease', { name: p.name })}
                               disabled={locked || !editable || (quantities[p.id] ?? 1) <= 1}
                               onClick={() =>
                                 setQuantities((q) => ({
@@ -586,7 +589,7 @@ export function OrdersWorkspace({
                             </button>
                             <output>{quantities[p.id] ?? 1}</output>
                             <button
-                              aria-label={`Increase ${p.name}`}
+                              aria-label={t('sales.increase', { name: p.name })}
                               disabled={locked || !editable || (quantities[p.id] ?? 1) >= 999}
                               onClick={() =>
                                 setQuantities((q) => ({
@@ -608,7 +611,7 @@ export function OrdersWorkspace({
                             setCustomizing(true);
                           }}
                         >
-                          Customize & add
+                          {t('sales.customizeAdd')}
                         </Button>
                       </article>
                     ))}
@@ -618,10 +621,9 @@ export function OrdersWorkspace({
                     <span className="riza-mark" aria-hidden="true">
                       R
                     </span>
-                    <h3>Your menu starts here</h3>
+                    <h3>{t('sales.yourMenuStartsHere')}</h3>
                     <p>
-                      No active products are available. Products configured in Menu will appear
-                      here.
+                      {t('sales.noActiveProductsAreAvailableProductsConfiguredInMenuWillAppearHere')}
                     </p>
                   </div>
                 ) : !products.some(
@@ -630,17 +632,17 @@ export function OrdersWorkspace({
                       (p.name.toLowerCase().includes(search.toLowerCase()) ||
                         p.sku?.toLowerCase().includes(search.toLowerCase())),
                   ) ? (
-                  <p className="riza-empty">No products match this search.</p>
+                  <p className="riza-empty">{t('sales.noProductsMatchThisSearch')}</p>
                 ) : null}
               </>
             ) : (
-              <p className="riza-empty">Menu access is not granted to this account.</p>
+              <p className="riza-empty">{t('sales.menuAccessIsNotGrantedToThisAccount')}</p>
             )}
             {!editable ? (
-              <p className="catalog-hint">Create or select an editable draft to add products.</p>
+              <p className="catalog-hint">{t('sales.createOrSelectAnEditableDraftToAddProducts')}</p>
             ) : (
               <p className="catalog-hint">
-                Choose a quantity, then customize your item before adding it.
+                {t('sales.chooseAQuantityThenCustomizeYourItemBeforeAddingIt')}
               </p>
             )}
           </section>
@@ -649,7 +651,7 @@ export function OrdersWorkspace({
         )}
         {order && order.id === selected ? (
           <section
-            aria-label="Current order"
+            aria-label={t('sales.currentOrder')}
             id={pos ? 'pos-current-order' : undefined}
             className={
               pos
@@ -658,36 +660,36 @@ export function OrdersWorkspace({
             }
           >
             <div>
-              <p className="eyebrow">CURRENT ORDER</p>
-              <h2 className="text-2xl font-semibold">Order #{order.orderNumber}</h2>
+              <p className="eyebrow">{t('sales.currentOrderLabel')}</p>
+              <h2 className="text-2xl font-semibold">{t('sales.orderNumber', { number: order.orderNumber })}</h2>
               <p>
-                {order.tableName ? `${order.areaName} / ${order.tableName}` : 'Takeaway'} ·{' '}
-                {order.waiterName ?? 'Unassigned waiter'}
+                {order.tableName ? `${order.areaName} / ${order.tableName}` : t('sales.waiterTakeaway')} ·{' '}
+                {order.waiterName ?? t('sales.unassignedWaiter')}
               </p>
-              <p className="order-status mt-2 font-medium">{order.status.replaceAll('_', ' ')}</p>
+              <p className="order-status mt-2 font-medium">{locale === 'en' ? order.status.replaceAll('_', ' ') : valueLabel(order.status)}</p>
               {order.notes ? <p>{order.notes}</p> : null}
             </div>
             <div className="order-totals grid grid-cols-2 gap-3 rounded-md bg-muted p-4">
               <p>
-                Subtotal (gross)
+                {t('sales.subtotalGross')}
                 <strong className="block">
                   {order.subtotal} {order.currency}
                 </strong>
               </p>
               <p>
-                Discount
+                {t('sales.discount')}
                 <strong className="block">
                   {order.discount} {order.currency}
                 </strong>
               </p>
               <p>
-                Included tax
+                {t('sales.includedTax')}
                 <strong className="block">
                   {order.tax} {order.currency}
                 </strong>
               </p>
               <p className="text-lg">
-                Total
+                {t('sales.total')}
                 <strong className="block text-2xl" data-testid="order-total">
                   {order.total} {order.currency}
                 </strong>
@@ -695,12 +697,12 @@ export function OrdersWorkspace({
             </div>
             <div className="cart-items space-y-3">
               {order.items.length === 0 ? (
-                <p>Add the first item to this draft.</p>
+                <p>{t('sales.addTheFirstItemToThisDraft')}</p>
               ) : (
                 order.items.map((item) => (
                   <article
                     key={item.id}
-                    aria-label={item.productName + (item.voidedAt ? ' voided' : '')}
+                    aria-label={item.productName + (item.voidedAt ? t('sales.voidedSuffix') : '')}
                     className={`space-y-2 rounded-md border p-3 ${item.voidedAt ? 'bg-muted text-muted-foreground' : ''}`}
                   >
                     <div className="flex justify-between gap-3">
@@ -712,8 +714,8 @@ export function OrdersWorkspace({
                       </strong>
                     </div>
                     <p className="text-sm">
-                      {pos ? 'Unit price' : 'Snapshot price'} {item.unitPrice} · {item.taxRate}%{' '}
-                      {item.taxMode.toLowerCase()} tax
+                      {pos ? t('sales.unitPrice') : t('sales.snapshotPrice')} {item.unitPrice} · {item.taxRate}%{' '}
+                      {locale === 'en' ? item.taxMode.toLowerCase() : valueLabel(item.taxMode)} {t('sales.tax')}
                     </p>
                     {item.modifiers.map((m) => (
                       <p className="text-sm" key={m.modifierId}>
@@ -722,9 +724,9 @@ export function OrdersWorkspace({
                     ))}
                     {item.notes ? <p>{item.notes}</p> : null}
                     {item.voidedAt ? (
-                      <p>Voided: {item.voidReason}</p>
+                      <p>{t('sales.voided')} {item.voidReason}</p>
                     ) : editable && manage ? (
-                      <OptionalDetails compact={pos} title="Edit item">
+                      <OptionalDetails compact={pos} title={t('sales.editItem')}>
                         <form
                           className="flex flex-wrap items-end gap-2"
                           onSubmit={(e) => {
@@ -739,10 +741,10 @@ export function OrdersWorkspace({
                           }}
                         >
                           <label className="w-24">
-                            Quantity
+                            {t('sales.quantity')}
                             <Input
                               key={`${item.id}:${item.quantity}`}
-                              aria-label={`Quantity for ${item.productName}`}
+                              aria-label={t('sales.quantityFor', { name: item.productName })}
                               name="quantity"
                               type="number"
                               min={1}
@@ -754,7 +756,7 @@ export function OrdersWorkspace({
                             />
                           </label>
                           <label className="min-w-0 flex-1">
-                            Item notes
+                            {t('sales.itemNotes')}
                             <Input
                               key={`${item.id}:${item.notes}`}
                               name="notes"
@@ -770,7 +772,7 @@ export function OrdersWorkspace({
                             className="min-h-12"
                             disabled={locked}
                           >
-                            Update item
+                            {t('sales.updateItem')}
                           </Button>
                         </form>
                         <form
@@ -786,8 +788,8 @@ export function OrdersWorkspace({
                         >
                           <Input
                             name="reason"
-                            aria-label={`Removal reason for ${item.productName}`}
-                            placeholder="Removal reason"
+                            aria-label={t('sales.removalReasonFor', { name: item.productName })}
+                            placeholder={t('sales.removalReason')}
                             required
                             maxLength={500}
                             className="min-h-12"
@@ -799,7 +801,7 @@ export function OrdersWorkspace({
                             className="min-h-12"
                             disabled={locked}
                           >
-                            Remove item
+                            {t('sales.removeItem')}
                           </Button>
                         </form>
                       </OptionalDetails>
@@ -809,11 +811,11 @@ export function OrdersWorkspace({
               )}
             </div>
             {!pos ? addItemForm : null}
-            <OptionalDetails compact={pos} title="Order options">
+            <OptionalDetails compact={pos} title={t('sales.orderOptions')}>
               {editable && manage && can('order.discount') ? (
-                <OptionalDetails compact={false} title="Discount">
+                <OptionalDetails compact={false} title={t('sales.discount')}>
                   <form
-                    aria-label="Order discount"
+                    aria-label={t('sales.orderDiscount')}
                     className="space-y-2"
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -826,7 +828,7 @@ export function OrdersWorkspace({
                     }}
                   >
                     <label className="block">
-                      Discount amount ({order.currency}, gross)
+                      {t('sales.discountAmount')}{order.currency}{t('sales.gross')}
                       <Input
                         key={order.discount}
                         name="amount"
@@ -840,21 +842,21 @@ export function OrdersWorkspace({
                     </label>
                     <Input
                       name="reason"
-                      aria-label="Discount reason"
-                      placeholder="Discount reason"
+                      aria-label={t('sales.discountReason')}
+                      placeholder={t('sales.discountReason')}
                       required
                       maxLength={500}
                       className="min-h-12"
                       disabled={locked}
                     />
                     <Button type="submit" variant="outline" className="min-h-12" disabled={locked}>
-                      Apply discount
+                      {t('sales.applyDiscount')}
                     </Button>
                   </form>
                 </OptionalDetails>
               ) : null}
               {editable && manage && assign ? (
-                <OptionalDetails compact={false} title="Assign waiter">
+                <OptionalDetails compact={false} title={t('sales.assignWaiter')}>
                   <form
                     className="flex flex-wrap gap-2"
                     onSubmit={(e) => {
@@ -866,16 +868,16 @@ export function OrdersWorkspace({
                     }}
                   >
                     <label className="flex-1">
-                      Change waiter
+                      {t('sales.changeWaiter')}
                       <select
                         key={order.waiterId}
-                        aria-label="Change waiter"
+                        aria-label={t('sales.changeWaiter')}
                         name="waiterId"
                         className={selectClass}
                         defaultValue={order.waiterId ?? ''}
                         disabled={locked}
                       >
-                        <option value="">Unassigned</option>
+                        <option value="">{t('sales.unassigned')}</option>
                         {waiters.map((w) => (
                           <option key={w.id} value={w.id}>
                             {w.name}
@@ -884,18 +886,18 @@ export function OrdersWorkspace({
                       </select>
                     </label>
                     <Button type="submit" variant="outline" disabled={locked}>
-                      Assign waiter
+                      {t('sales.assignWaiter')}
                     </Button>
                   </form>
                 </OptionalDetails>
               ) : null}
             </OptionalDetails>
             {pos ? (
-              <div className="service-selector" aria-label="Order service type">
-                <span aria-current={order.type === 'DINE_IN' ? 'true' : undefined}>Dine-in</span>
-                <span aria-current={order.type === 'TAKEAWAY' ? 'true' : undefined}>Takeaway</span>
-                <button disabled title="Delivery is not available">
-                  Delivery
+              <div className="service-selector" aria-label={t('sales.orderServiceType')}>
+                <span aria-current={order.type === 'DINE_IN' ? 'true' : undefined}>{t('sales.dineIn')}</span>
+                <span aria-current={order.type === 'TAKEAWAY' ? 'true' : undefined}>{t('sales.takeaway')}</span>
+                <button disabled title={t('sales.deliveryIsNotAvailable')}>
+                  {t('sales.delivery')}
                 </button>
               </div>
             ) : null}
@@ -903,18 +905,18 @@ export function OrdersWorkspace({
               <div className="payment-shortcuts">
                 <p className="text-sm text-muted-foreground">
                   {order.status === 'WAITING_PAYMENT'
-                    ? 'Continue to payment collection'
-                    : 'Request payment before collecting'}
+                    ? t('sales.continuePayment')
+                    : t('sales.requestBeforeCollect')}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
-                  {['CASH', 'CARD', 'SPLIT'].map((method) => (
+                  {[t('sales.cash'), t('sales.card'), 'SPLIT'].map((method) => (
                     <Button
                       key={method}
                       variant="outline"
                       disabled={locked || order.status !== 'WAITING_PAYMENT'}
                       onClick={() => onPayment?.(order.id, method)}
                     >
-                      {method === 'SPLIT' ? 'Split' : method === 'CASH' ? 'Cash' : 'Card'}
+                      {method === 'SPLIT' ? t('sales.split') : method === 'CASH' ? t('sales.cashLabel') : t('sales.cardLabel')}
                     </Button>
                   ))}
                 </div>
@@ -927,7 +929,7 @@ export function OrdersWorkspace({
                   disabled={locked}
                   onClick={() => command({ action: 'status', status: 'OPEN' })}
                 >
-                  {pos ? 'Place Order' : 'Open order'}
+                  {pos ? t('sales.placeOrder') : t('sales.openOrder')}
                 </Button>
               ) : null}
               {manage && order.status === 'OPEN' && can('order.submit_kitchen') ? (
@@ -941,7 +943,7 @@ export function OrdersWorkspace({
                     })
                   }
                 >
-                  Send to kitchen
+                  {t('sales.sendToKitchen')}
                 </Button>
               ) : null}
               {manage && ['OPEN', 'READY'].includes(order.status) ? (
@@ -950,7 +952,7 @@ export function OrdersWorkspace({
                   disabled={locked}
                   onClick={() => command({ action: 'status', status: 'WAITING_PAYMENT' })}
                 >
-                  Request payment
+                  {t('sales.requestPayment')}
                 </Button>
               ) : null}
               {manage &&
@@ -962,7 +964,7 @@ export function OrdersWorkspace({
                   disabled={locked}
                   onClick={() => command({ action: 'status', status: 'OPEN' })}
                 >
-                  Reopen order
+                  {t('sales.reopenOrder')}
                 </Button>
               ) : null}
               <Button
@@ -978,7 +980,7 @@ export function OrdersWorkspace({
                   }
                 }}
               >
-                View order history
+                {t('sales.viewOrderHistory')}
               </Button>
             </div>
             {manage &&
@@ -986,7 +988,7 @@ export function OrdersWorkspace({
             ['DRAFT', 'OPEN', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'WAITING_PAYMENT'].includes(
               order.status,
             ) ? (
-              <OptionalDetails compact={pos} title="Cancel order">
+              <OptionalDetails compact={pos} title={t('sales.cancelOrder')}>
                 <form
                   className="flex flex-wrap gap-2"
                   onSubmit={(e) => {
@@ -999,8 +1001,8 @@ export function OrdersWorkspace({
                 >
                   <Input
                     name="reason"
-                    aria-label="Cancellation reason"
-                    placeholder="Cancellation reason"
+                    aria-label={t('sales.cancellationReason')}
+                    placeholder={t('sales.cancellationReason')}
                     required
                     maxLength={500}
                     className="min-h-12 flex-1"
@@ -1012,17 +1014,17 @@ export function OrdersWorkspace({
                     className="min-h-12"
                     disabled={locked}
                   >
-                    Cancel order
+                    {t('sales.cancelOrder')}
                   </Button>
                 </form>
               </OptionalDetails>
             ) : null}
-            {order.cancellationReason ? <p>Cancellation: {order.cancellationReason}</p> : null}
+            {order.cancellationReason ? <p>{t('sales.cancellation')} {order.cancellationReason}</p> : null}
             {history.length ? (
-              <ol aria-label="Order history" className="space-y-2 border-t pt-3">
+              <ol aria-label={t('sales.orderHistory')} className="space-y-2 border-t pt-3">
                 {history.map((h) => (
                   <li key={h.id} className="text-sm">
-                    v{h.orderVersion} · {h.action} · {new Date(h.createdAt).toLocaleString()}
+                    v{h.orderVersion} · {valueLabel(h.action)} · {formatDateTime(h.createdAt, locale)}
                   </li>
                 ))}
               </ol>
@@ -1030,14 +1032,14 @@ export function OrdersWorkspace({
           </section>
         ) : (
           <div className="riza-empty rounded-lg border bg-card p-8 text-muted-foreground">
-            <p className="eyebrow">CURRENT ORDER</p>
-            <h2>Ready when you are</h2>
-            <p>Select an order or create a draft to begin.</p>
+            <p className="eyebrow">{t('sales.currentOrderLabel')}</p>
+            <h2>{t('sales.readyWhenYouAre')}</h2>
+            <p>{t('sales.selectAnOrderOrCreateADraftToBegin')}</p>
             <div className="service-selector mt-6">
-              <span>Dine-in</span>
-              <span>Takeaway</span>
-              <button disabled title="Delivery is not available">
-                Delivery
+              <span>{t('sales.dineIn')}</span>
+              <span>{t('sales.takeaway')}</span>
+              <button disabled title={t('sales.deliveryIsNotAvailable')}>
+                {t('sales.delivery')}
               </button>
             </div>
           </div>
@@ -1045,7 +1047,7 @@ export function OrdersWorkspace({
       </div>
       {pos && order ? (
         <a className="mobile-cart-link" href="#pos-current-order">
-          <span>View order #{order.orderNumber}</span>
+          <span>{t('sales.viewOrderNumber', { number: order.orderNumber })}</span>
           <strong>
             {order.total} {order.currency}
           </strong>

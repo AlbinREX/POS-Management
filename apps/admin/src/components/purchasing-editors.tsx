@@ -1,4 +1,5 @@
 'use client';
+import { useI18n, serverMessage } from '../lib/i18n';
 import { useState, type ReactNode, type FormEvent } from 'react';
 import type {
   SupplierRecord,
@@ -53,10 +54,11 @@ export function PurchasingEditorDialog({
   onClose: () => void;
   submit: (path: string, body: Record<string, unknown>, method?: string) => void;
 }) {
+  const { t, locale } = useI18n();
   return (
     <dialog
       className="riza-dialog inventory-dialog purchase-dialog"
-      aria-label="Purchasing editor"
+      aria-label={t('operations.purchasingEditor')}
       ref={(el) => {
         if (el && !el.open) el.showModal();
       }}
@@ -69,23 +71,23 @@ export function PurchasingEditorDialog({
         <h2 className="text-xl font-semibold">
           {
             {
-              supplier: 'Supplier details',
-              draft: 'Purchase order draft',
-              receive: 'Receive goods',
-              payment: 'Record supplier payment',
-              cancel: 'Cancel purchase',
-              reverse: 'Reverse payment record',
-              archive: 'Archive supplier',
+              supplier: t('operations.supplierDetails'),
+              draft: t('operations.purchaseOrderDraft'),
+              receive: t('operations.receiveGoods'),
+              payment: t('operations.recordSupplierPayment'),
+              cancel: t('operations.cancelPurchase'),
+              reverse: t('operations.reversePaymentRecord'),
+              archive: t('operations.archiveSupplier'),
             }[editor.kind]
           }
         </h2>
         <Button variant="ghost" disabled={busy} onClick={onClose}>
-          Close editor
+          {t('operations.closeEditor')}
         </Button>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive mb-4">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {editor.kind === 'draft' ? (
@@ -138,14 +140,14 @@ export function PurchasingEditorDialog({
                 key={k}
                 name={
                   [
-                    'Supplier name',
-                    'Business number',
-                    'Tax number',
-                    'Contact person',
-                    'Phone',
-                    'Email',
-                    'Address',
-                    'Notes',
+                    t('operations.supplierName'),
+                    t('operations.businessNumber'),
+                    t('operations.taxNumber'),
+                    t('operations.contactPerson'),
+                    t('operations.phone'),
+                    t('operations.email'),
+                    t('operations.address'),
+                    t('operations.notes'),
                   ][index]!
                 }
               >
@@ -160,10 +162,10 @@ export function PurchasingEditorDialog({
             {editor.value ? (
               <label className="flex gap-2 items-center">
                 <input name="active" type="checkbox" defaultChecked={editor.value.active} />
-                Active supplier
+                {t('operations.activeSupplier')}
               </label>
             ) : null}
-            <Button type="submit">Save supplier</Button>
+            <Button type="submit">{t('operations.saveSupplier')}</Button>
           </fieldset>
         </form>
       ) : null}
@@ -187,46 +189,45 @@ export function PurchasingEditorDialog({
         >
           <fieldset disabled={locked} className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Post only quantities delivered now. This adds stock and a supplier charge. Use zero to
-              skip an item.
+              {t('operations.postOnlyQuantitiesDeliveredNowThisAddsStockAndASupplierChargeUseZeroToSkipAnItem')}
             </p>
             {editor.value.items
               .filter((i) => i.remainingQuantity !== '0.000000')
               .map((i) => (
-                <Field key={i.id} name={`Receive ${i.itemName} (${i.unitCode})`}>
+                <Field key={i.id} name={t('operations.receiveItem', { name: i.itemName, unit: i.unitCode })}>
                   <Input
                     name={i.id}
-                    aria-label={`Receive ${i.itemName} (${i.unitCode})`}
+                    aria-label={t('operations.receiveItem', { name: i.itemName, unit: i.unitCode })}
                     inputMode="decimal"
                     required
                     defaultValue={quantityLabel(i.remainingQuantity)}
                   />
                   <small>
-                    Remaining: {quantityLabel(i.remainingQuantity)} {i.unitCode}
+                    {t('operations.remaining2')} {quantityLabel(i.remainingQuantity)} {i.unitCode}
                   </small>
                 </Field>
               ))}
-            <Field name="Delivery reference">
+            <Field name={t('operations.deliveryReference')}>
               <Input name="reference" required maxLength={120} />
             </Field>
             <div className="purchase-form-grid">
-              <Field name="Invoice number">
+              <Field name={t('operations.invoiceNumber')}>
                 <Input name="invoiceNumber" maxLength={120} />
               </Field>
-              <Field name="Invoice date">
+              <Field name={t('operations.invoiceDate')}>
                 <Input name="invoiceDate" type="date" />
               </Field>
-              <Field name="Due date">
+              <Field name={t('operations.dueDate2')}>
                 <Input name="dueDate" type="date" />
               </Field>
-              <Field name="Document reference (HTTPS)">
+              <Field name={t('operations.documentReferenceHttps')}>
                 <Input name="documentReference" type="url" placeholder="https://" />
               </Field>
             </div>
-            <Field name="Receiving notes">
+            <Field name={t('operations.receivingNotes')}>
               <Input name="notes" maxLength={2000} />
             </Field>
-            <Button type="submit">Post goods receipt</Button>
+            <Button type="submit">{t('operations.postGoodsReceipt')}</Button>
           </fieldset>
         </form>
       ) : null}
@@ -234,10 +235,10 @@ export function PurchasingEditorDialog({
         <form onSubmit={(e) => submit('payments', { ...form(e), receiptId: editor.value.id })}>
           <fieldset disabled={locked} className="space-y-4">
             <p className="purchase-notice">
-              Confirm the payment outside this POS first. This records its reference against receipt{' '}
+              {t('operations.confirmThePaymentOutsideThisPosFirstThisRecordsItsReferenceAgainstReceipt')}{' '}
               {editor.value.reference}.
             </p>
-            <Field name="Supplier payment amount">
+            <Field name={t('operations.supplierPaymentAmount')}>
               <Input
                 name="amount"
                 inputMode="decimal"
@@ -245,21 +246,21 @@ export function PurchasingEditorDialog({
                 defaultValue={editor.value.outstanding}
               />
             </Field>
-            <Field name="Supplier payment method">
+            <Field name={t('operations.supplierPaymentMethod')}>
               <select name="method">
-                <option value="BANK_TRANSFER">Bank transfer</option>
-                <option value="CASH">Cash paid externally</option>
-                <option value="CARD">Card paid externally</option>
-                <option value="OTHER">Other</option>
+                <option value="BANK_TRANSFER">{t('operations.bankTransfer')}</option>
+                <option value="CASH">{t('operations.cashPaidExternally')}</option>
+                <option value="CARD">{t('operations.cardPaidExternally')}</option>
+                <option value="OTHER">{t('operations.other')}</option>
               </select>
             </Field>
-            <Field name="Payment reference">
+            <Field name={t('operations.paymentReference')}>
               <Input name="reference" required maxLength={120} />
             </Field>
-            <Field name="Payment reason">
+            <Field name={t('operations.paymentReason')}>
               <Input name="reason" required maxLength={500} />
             </Field>
-            <Button type="submit">Save supplier payment</Button>
+            <Button type="submit">{t('operations.saveSupplierPayment')}</Button>
           </fieldset>
         </form>
       ) : null}
@@ -275,14 +276,14 @@ export function PurchasingEditorDialog({
           <fieldset disabled={locked} className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {editor.kind === 'reverse'
-                ? 'This reverses the recorded supplier payment in the balance. It does not reverse an external bank or card transaction.'
-                : 'Cancel this unreceived purchase and keep its history.'}
+                ? t('operations.thisReversesTheRecordedSupplierPaymentInTheBalanceItDoesNotReverseAnExternalBankOrCardTransaction')
+                : t('operations.cancelThisUnreceivedPurchaseAndKeepItsHistory')}
             </p>
-            <Field name="Reason">
+            <Field name={t('operations.reason')}>
               <Input name="reason" required maxLength={500} />
             </Field>
             <Button type="submit">
-              {editor.kind === 'cancel' ? 'Confirm cancellation' : 'Confirm payment reversal'}
+              {editor.kind === 'cancel' ? t('operations.confirmCancellation') : t('operations.confirmPaymentReversal')}
             </Button>
           </fieldset>
         </form>
@@ -290,7 +291,7 @@ export function PurchasingEditorDialog({
       {editor.kind === 'archive' ? (
         <div className="space-y-4">
           <p>
-            Archive {editor.value.name}? Its purchase and account history will remain available.
+            {t('operations.archive')} {editor.value.name}{t('operations.itsPurchaseAndAccountHistoryWillRemainAvailable')}
           </p>
           <Button
             disabled={locked}
@@ -298,7 +299,7 @@ export function PurchasingEditorDialog({
               submit(`suppliers/${editor.value.id}/archive`, { version: editor.value.version })
             }
           >
-            Confirm supplier archive
+            {t('operations.confirmSupplierArchive')}
           </Button>
         </div>
       ) : null}
@@ -320,6 +321,7 @@ function DraftForm({
   locked: boolean;
   onSave: (v: Record<string, unknown>) => void;
 }) {
+  const { t } = useI18n();
   const [lines, setLines] = useState(
     () =>
       value?.items.map((i) => ({
@@ -356,9 +358,9 @@ function DraftForm({
     >
       <fieldset disabled={locked} className="space-y-5">
         <div className="purchase-form-grid">
-          <Field name="Supplier">
+          <Field name={t('operations.supplier')}>
             <select name="supplierId" required defaultValue={value?.supplierId ?? ''}>
-              <option value="">Choose a supplier</option>
+              <option value="">{t('operations.chooseASupplier')}</option>
               {suppliers
                 .filter((s) => s.active !== false && !s.deletedAt)
                 .map((s) => (
@@ -368,9 +370,9 @@ function DraftForm({
                 ))}
             </select>
           </Field>
-          <Field name="Receiving warehouse">
+          <Field name={t('operations.receivingWarehouse')}>
             <select name="warehouseId" required defaultValue={value?.warehouseId ?? ''}>
-              <option value="">Choose a warehouse</option>
+              <option value="">{t('operations.chooseAWarehouse')}</option>
               {warehouses.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -378,20 +380,19 @@ function DraftForm({
               ))}
             </select>
           </Field>
-          <Field name="Purchase reference">
+          <Field name={t('operations.purchaseReference')}>
             <Input name="reference" defaultValue={value?.reference ?? ''} />
           </Field>
-          <Field name="Expected delivery">
+          <Field name={t('operations.expectedDelivery')}>
             <Input name="expectedDate" type="date" defaultValue={value?.expectedDate ?? ''} />
           </Field>
         </div>
         <p className="text-sm text-muted-foreground">
-          Enter net unit prices before tax. Save the draft to calculate exact totals. Configure
-          stock items and warehouses in Inventory.
+          {t('operations.enterNetUnitPricesBeforeTaxSaveTheDraftToCalculateExactTotalsConfigureStockItemsAndWarehousesInInventory')}
         </p>
         {lines.map((l, index) => (
           <div key={l.key} className="purchase-line-editor">
-            <Field name={`Purchase item ${index + 1}`}>
+            <Field name={t('operations.purchaseItemNumber', { number: index + 1 })}>
               <select
                 required
                 value={l.itemId}
@@ -409,7 +410,7 @@ function DraftForm({
                   )
                 }
               >
-                <option value="">Choose an item</option>
+                <option value="">{t('operations.chooseAnItem')}</option>
                 {items.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}
@@ -421,7 +422,7 @@ function DraftForm({
               {(['quantity', 'unitPrice', 'taxRate'] as const).map((k, i) => (
                 <Field
                   key={k}
-                  name={`${['Quantity', 'Net unit price', 'Tax rate (%)'][i]} ${index + 1}`}
+                  name={`${[t('operations.quantity'), t('operations.netUnitPrice'), t('operations.taxRate')][i]} ${index + 1}`}
                 >
                   <Input
                     required
@@ -435,7 +436,7 @@ function DraftForm({
                   />
                 </Field>
               ))}
-              <Field name={`Purchase unit ${index + 1}`}>
+              <Field name={t('operations.purchaseUnitNumber', { number: index + 1 })}>
                 <select
                   value={l.unitCode}
                   onChange={(e) =>
@@ -449,7 +450,7 @@ function DraftForm({
                   }
                 >
                   {(['kg', 'g', 'l', 'ml', 'pcs'] as const).map((u) => (
-                    <option key={u}>{u}</option>
+                    <option key={u} value={u}>{u}</option>
                   ))}
                 </select>
               </Field>
@@ -459,7 +460,7 @@ function DraftForm({
               disabled={lines.length === 1}
               onClick={() => setLines((rows) => rows.filter((r) => r.key !== l.key))}
             >
-              Remove purchase item {index + 1}
+              {t('operations.removePurchaseItem')} {index + 1}
             </Button>
           </div>
         ))}
@@ -480,12 +481,12 @@ function DraftForm({
             ])
           }
         >
-          Add purchase item
+          {t('operations.addPurchaseItem')}
         </Button>
-        <Field name="Purchase notes">
+        <Field name={t('operations.purchaseNotes')}>
           <Input name="notes" defaultValue={value?.notes ?? ''} />
         </Field>
-        <Button type="submit">Save purchase draft</Button>
+        <Button type="submit">{t('operations.savePurchaseDraft')}</Button>
       </fieldset>
     </form>
   );

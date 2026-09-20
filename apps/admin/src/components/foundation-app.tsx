@@ -15,6 +15,8 @@ import {
   TableRow,
 } from '@restaurant/ui/table';
 import { api, ApiFailure, login, logout, refresh } from '../lib/api';
+import { formatDateTime, serverMessage, useI18n, type Locale, type MessageKey, type Translate } from '../lib/i18n';
+import { LanguageSwitcher } from './language-switcher';
 import { MenuCatalog } from './menu-catalog';
 import { RestaurantLayout } from './restaurant-layout';
 import { OrdersWorkspace } from './orders-workspace';
@@ -104,10 +106,14 @@ function Notice({ children }: { children: ReactNode }) {
     </p>
   );
 }
-function message(error: unknown) {
+/**
+ * Errors are stored raw and rendered through this, so switching language also
+ * re-renders any error already on screen rather than leaving it in the old one.
+ */
+function message(error: unknown, t: Translate, locale: Locale) {
   return error instanceof ApiFailure
-    ? error.message
-    : 'Cannot reach the local server. Check your restaurant connection and try again.';
+    ? serverMessage(error.message, locale)
+    : t('session.unreachable');
 }
 
 export function FoundationApp({
@@ -117,17 +123,18 @@ export function FoundationApp({
   kitchenOnly?: boolean;
   waiterOnly?: boolean;
 }) {
+  const { t, locale } = useI18n();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [pending, setPending] = useState(false);
   const restore = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError(null);
     try {
       setUser((await refresh()).user);
     } catch (error) {
-      if (!(error instanceof ApiFailure && error.status === 401)) setError(message(error));
+      if (!(error instanceof ApiFailure && error.status === 401)) setError(error);
     } finally {
       setLoading(false);
     }
@@ -139,23 +146,23 @@ export function FoundationApp({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setPending(true);
-    setError('');
+    setError(null);
     try {
       setUser((await login(Object.fromEntries(form))).user);
     } catch (error) {
-      setError(message(error));
+      setError(error);
     } finally {
       setPending(false);
     }
   }
   async function signOut() {
     setPending(true);
-    setError('');
+    setError(null);
     try {
       await logout();
       setUser(null);
     } catch (error) {
-      setError(message(error));
+      setError(error);
     } finally {
       setPending(false);
     }
@@ -163,7 +170,7 @@ export function FoundationApp({
   if (loading)
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <p role="status">Connecting to your restaurant…</p>
+        <p role="status">{t('session.connecting')}</p>
       </main>
     );
   if (user && kitchenOnly)
@@ -171,20 +178,23 @@ export function FoundationApp({
       <div className="min-h-screen p-4 md:p-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Kitchen display</h1>
+            <h1 className="text-3xl font-bold">{t('kitchen.displayTitle')}</h1>
             <p>
               {user.branchName} · {user.name}
             </p>
           </div>
-          <Button variant="outline" onClick={() => void signOut()} disabled={pending}>
-            Sign out
-          </Button>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <Button variant="outline" onClick={() => void signOut()} disabled={pending}>
+              {t('shell.signOut')}
+            </Button>
+          </div>
         </header>
-        {error ? <Notice>{error}</Notice> : null}
+        {error ? <Notice>{message(error, t, locale)}</Notice> : null}
         {user.permissions.includes('kitchen.read') ? (
           <KitchenDisplay user={user} />
         ) : (
-          <Notice>Kitchen access is not granted to this account.</Notice>
+          <Notice>{t('kitchen.noAccess')}</Notice>
         )}
       </div>
     );
@@ -194,18 +204,21 @@ export function FoundationApp({
         <div className="waiter-shell">
           <header className="waiter-header">
             <Brand />
-            <Button variant="outline" onClick={() => void signOut()} disabled={pending}>
-              Sign out
-            </Button>
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              <Button variant="outline" onClick={() => void signOut()} disabled={pending}>
+                {t('shell.signOut')}
+              </Button>
+            </div>
           </header>
           <p className="text-sm text-muted-foreground">
             {user.branchName} · {user.name}
           </p>
-          {error ? <Notice>{error}</Notice> : null}
+          {error ? <Notice>{message(error, t, locale)}</Notice> : null}
           {user.permissions.includes('order.read') ? (
             <WaiterApp user={user} />
           ) : (
-            <Notice>Table service is not granted to this account.</Notice>
+            <Notice>{t('waiter.noAccess')}</Notice>
           )}
         </div>
       </div>
@@ -216,7 +229,7 @@ export function FoundationApp({
         user={user}
         onLogout={() => void signOut()}
         pending={pending}
-        sessionError={error}
+        sessionError={error ? message(error, t, locale) : ''}
       />
     );
   return (
@@ -225,45 +238,50 @@ export function FoundationApp({
         <Brand />
         <div className="my-12 max-w-lg">
           <h1 className="text-4xl font-semibold leading-tight lg:text-5xl">
-            Made for the rush.
+            {t('login.headline1')}
             <br />
-            Ready for service.
+            {t('login.headline2')}
           </h1>
           <p className="mt-5 text-lg leading-relaxed">
-            Your menu, your team and every order. One focused workspace for FastFood Riza.
+            {t('login.intro')}
           </p>
         </div>
-        <p className="text-sm">Connect using your restaurant network.</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="text-sm">{t('login.network')}</p>
+          {/* Offered before sign-in: whoever is at the terminal should be able to
+              read the login form in their own language. */}
+          <LanguageSwitcher />
+        </div>
       </section>
       <section className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
-          <h2 className="text-3xl font-semibold tracking-tight">Sign in</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">{t('login.title')}</h2>
           <p className="mb-8 mt-3 text-muted-foreground">
-            Use the account provided by your administrator.
+            {t('login.subtitle')}
           </p>
           {error ? (
             <div className="mb-5">
-              <Notice>{error}</Notice>
+              <Notice>{message(error, t, locale)}</Notice>
             </div>
           ) : null}
           <form onSubmit={(event) => void signIn(event)} className="flex flex-col gap-5">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Organization" name="organization" autoComplete="off" />
-              <Field label="Branch code" name="branch" autoComplete="off" />
+              <Field label={t('login.organization')} name="organization" autoComplete="off" />
+              <Field label={t('login.branch')} name="branch" autoComplete="off" />
             </div>
-            <Field label="Email" name="email" type="email" autoComplete="username" />
+            <Field label={t('login.email')} name="email" type="email" autoComplete="username" />
             <Field
-              label="Password"
+              label={t('login.password')}
               name="password"
               type="password"
               autoComplete="current-password"
             />
             <Button type="submit" size="lg" disabled={pending}>
-              {pending ? 'Signing in…' : 'Sign in'}
+              {pending ? t('login.pending') : t('action.signIn')}
             </Button>
           </form>
           <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
-            Need access? Contact your restaurant administrator.
+            {t('login.help')}
           </p>
         </div>
       </section>
@@ -282,10 +300,46 @@ function Workspace({
   pending: boolean;
   sessionError: string;
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('Workspace');
   const [paymentOrder, setPaymentOrder] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const labels: Partial<Record<Tab, string>> = { Workspace: 'Home', Layout: 'Tables' };
+  // The Tab union is an identifier: it drives state, NavIcon lookup and render
+  // guards. Only its presentation is translated, so nothing downstream shifts.
+  const navKeys: Record<Tab, MessageKey> = {
+    Workspace: 'nav.workspace',
+    Dashboard: 'nav.dashboard',
+    POS: 'nav.pos',
+    Inventory: 'nav.inventory',
+    Purchasing: 'nav.purchasing',
+    Companies: 'nav.companies',
+    Menu: 'nav.menu',
+    Layout: 'nav.layout',
+    Orders: 'nav.orders',
+    Kitchen: 'nav.kitchen',
+    Payments: 'nav.payments',
+    Team: 'nav.team',
+    Roles: 'nav.roles',
+    Terminals: 'nav.terminals',
+    'Audit history': 'nav.audit',
+  };
+  const hintKeys: Record<Tab, MessageKey> = {
+    Workspace: 'tab.workspace.hint',
+    Dashboard: 'tab.dashboard.hint',
+    POS: 'tab.pos.hint',
+    Inventory: 'tab.inventory.hint',
+    Purchasing: 'tab.purchasing.hint',
+    Companies: 'tab.companies.hint',
+    Menu: 'tab.menu.hint',
+    Layout: 'tab.layout.hint',
+    Orders: 'tab.orders.hint',
+    Kitchen: 'tab.kitchen.hint',
+    Payments: 'tab.payments.hint',
+    Team: 'tab.team.hint',
+    Roles: 'tab.roles.hint',
+    Terminals: 'tab.terminals.hint',
+    'Audit history': 'tab.audit.hint',
+  };
   const can = (permission: PermissionKey) => user.permissions.includes(permission);
   const tabs: Tab[] = [
     'Workspace',
@@ -313,17 +367,18 @@ function Workspace({
         </div>
         <div className="flex items-center gap-5">
           <SyncIndicator user={user} />
+          <LanguageSwitcher />
           <div className="text-right">
             <p className="font-medium">{user.name}</p>
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
           <Button variant="outline" disabled={pending} onClick={onLogout}>
-            Sign out
+            {t('shell.signOut')}
           </Button>
         </div>
       </header>
       <div className="riza-shell">
-        <nav aria-label="Administration" className="riza-nav">
+        <nav aria-label={t('shell.administration')} className="riza-nav">
           {tabs.map((item) => (
             <Button
               key={item}
@@ -336,36 +391,17 @@ function Workspace({
               }}
             >
               <NavIcon name={item} />
-              {labels[item] ?? item}
+              {t(navKeys[item])}
             </Button>
           ))}
         </nav>
         <main className="riza-main">
           {sessionError ? <Notice>{sessionError}</Notice> : null}
           <h1 className={tab === 'POS' ? 'sr-only' : 'mb-2 text-3xl font-semibold tracking-tight'}>
-            {labels[tab] ?? tab}
+            {t(navKeys[tab])}
           </h1>
           <p className={tab === 'POS' ? 'sr-only' : 'mb-6 text-sm text-muted-foreground'}>
-            {
-              {
-                Workspace: 'Welcome back. Your restaurant, ready for service.',
-                POS: 'Choose an order, explore the menu and make it yours.',
-                Menu: 'Configure the menu available in this branch.',
-                Layout: 'Manage your areas, floor plan and table availability.',
-                Orders: 'Create and manage dine-in and takeaway orders.',
-                Kitchen: 'Station tickets, preparation progress and history.',
-                Payments: 'Collections, payment history and cash register shifts.',
-                Inventory: 'Ingredients, recipes and a complete stock history.',
-                Purchasing: 'Suppliers, purchase orders and goods receiving.',
-                Companies: 'Company accounts, contracts, employees and statements.',
-                Dashboard:
-                  'Sales, orders, products, staff, cash, stock, purchasing and company accounts.',
-                Team: 'Manage the people who can access this branch.',
-                Roles: 'Control what each role can do.',
-                Terminals: 'Register and manage restaurant devices.',
-                'Audit history': 'A permanent record of sensitive changes in this branch.',
-              }[tab]
-            }
+            {t(hintKeys[tab])}
           </p>
           {tab === 'Workspace' ? (
             <>
@@ -388,7 +424,7 @@ function Workspace({
                   .map((item) => (
                     <button key={item} className="riza-home-card" onClick={() => setTab(item)}>
                       <NavIcon name={item} />
-                      <strong>{labels[item] ?? item}</strong>
+                      <strong>{t(navKeys[item])}</strong>
                       <span>
                         Open workspace <span aria-hidden="true">↗</span>
                       </span>
@@ -439,25 +475,26 @@ function Workspace({
   );
 }
 function Overview({ user }: { user: SessionUser }) {
+  const { t } = useI18n();
   return (
     <section className="rounded-lg border bg-card p-6">
       <h2 className="text-xl font-semibold">{user.branchName}</h2>
       <dl className="mt-6 grid gap-6 sm:grid-cols-2">
         <div>
-          <dt className="text-sm text-muted-foreground">Signed in as</dt>
+          <dt className="text-sm text-muted-foreground">{t('overview.signedInAs')}</dt>
           <dd className="mt-1 font-medium">{user.name}</dd>
         </div>
         <div>
-          <dt className="text-sm text-muted-foreground">Access</dt>
+          <dt className="text-sm text-muted-foreground">{t('overview.access')}</dt>
           <dd className="mt-1">
             {user.permissions.length
-              ? `${user.permissions.length} assigned permissions`
-              : 'Account access only'}
+              ? t('roles.assigned', { count: user.permissions.length })
+              : t('overview.accountOnly')}
           </dd>
         </div>
       </dl>
       <div className="mt-8 border-t pt-6">
-        <h3 className="font-medium">Available permissions</h3>
+        <h3 className="font-medium">{t('overview.availablePermissions')}</h3>
         {user.permissions.length ? (
           <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
             {user.permissions.map((permission) => (
@@ -466,7 +503,7 @@ function Overview({ user }: { user: SessionUser }) {
           </ul>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            Your operational application will be available when enabled by your administrator.
+            {t('overview.pendingAccess')}
           </p>
         )}
       </div>
@@ -475,7 +512,7 @@ function Overview({ user }: { user: SessionUser }) {
 }
 function useRows<T>(path: string, enabled = true) {
   const [rows, setRows] = useState<T[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const reload = useCallback(async () => {
     if (!enabled) {
@@ -484,11 +521,11 @@ function useRows<T>(path: string, enabled = true) {
       return;
     }
     setLoading(true);
-    setError('');
+    setError(null);
     try {
       setRows(await api<T[]>(path));
     } catch (error) {
-      setError(message(error));
+      setError(error);
     } finally {
       setLoading(false);
     }
@@ -499,6 +536,7 @@ function useRows<T>(path: string, enabled = true) {
   return { rows, error, setError, loading, reload };
 }
 function Team({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const list = useRows<Member>('users');
   const roles = useRows<Role>('roles', user.permissions.includes('role.read'));
   const [busy, setBusy] = useState(false);
@@ -509,7 +547,7 @@ function Team({ user }: { user: SessionUser }) {
     const form = event.currentTarget;
     const data = new FormData(form);
     setBusy(true);
-    list.setError('');
+    list.setError(null);
     setSuccess('');
     try {
       await api('users', 'POST', {
@@ -522,7 +560,7 @@ function Team({ user }: { user: SessionUser }) {
       await list.reload();
       setSuccess('Team member created.');
     } catch (error) {
-      list.setError(message(error));
+      list.setError(error);
     } finally {
       setBusy(false);
     }
@@ -533,34 +571,36 @@ function Team({ user }: { user: SessionUser }) {
       await api(`users/${member.user.id}/access`, 'PATCH', { active: !member.active });
       await list.reload();
     } catch (error) {
-      list.setError(message(error));
+      list.setError(error);
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="flex flex-col gap-6">
-      {list.error || roles.error ? <Notice>{list.error || roles.error}</Notice> : null}
+      {list.error || roles.error ? (
+        <Notice>{message(list.error || roles.error, t, locale)}</Notice>
+      ) : null}
       {success ? <p role="status">{success}</p> : null}
       {canManage && user.permissions.includes('role.read') ? (
         <form
           onSubmit={(event) => void create(event)}
           className="grid gap-4 rounded-lg border bg-card p-5 sm:grid-cols-2"
         >
-          <Field label="Full name" name="name" autoComplete="off" />
-          <Field label="Email address" name="email" type="email" autoComplete="off" />
+          <Field label={t('team.fullName')} name="name" autoComplete="off" />
+          <Field label={t('team.emailAddress')} name="email" type="email" autoComplete="off" />
           <Field
-            label="Initial password"
+            label={t('team.initialPassword')}
             name="password"
             type="password"
             minLength={12}
             autoComplete="new-password"
           />
           <div className="flex flex-col gap-2">
-            <Label htmlFor="role">Role</Label>
+            <Label htmlFor="role">{t('team.role')}</Label>
             <select id="role" name="role" required defaultValue="">
               <option value="" disabled>
-                Select role
+                {t('team.selectRole')}
               </option>
               {roles.rows
                 .filter((role) => !role.protected)
@@ -573,22 +613,22 @@ function Team({ user }: { user: SessionUser }) {
           </div>
           <div>
             <Button disabled={busy || roles.loading} type="submit">
-              Add team member
+              {t('team.addTeamMember')}
             </Button>
           </div>
         </form>
       ) : null}
       {list.loading ? (
-        <p role="status">Loading team…</p>
+        <p role="status">{t('team.loading')}</p>
       ) : (
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead>{t('team.colName')}</TableHead>
+                <TableHead>{t('team.colRole')}</TableHead>
+                <TableHead>{t('team.colAccess')}</TableHead>
+                <TableHead>{t('team.colAction')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -599,13 +639,13 @@ function Team({ user }: { user: SessionUser }) {
                     <p className="mt-1 text-muted-foreground">{member.user.email}</p>
                   </TableCell>
                   <TableCell>{member.roles.map((r) => r.role.name).join(', ')}</TableCell>
-                  <TableCell>{member.active ? 'Active' : 'Disabled'}</TableCell>
+                  <TableCell>{member.active ? t('common.active') : t('team.disabled')}</TableCell>
                   <TableCell>
                     {canManage &&
                     member.user.id !== user.id &&
                     !member.roles.some((r) => r.role.name === 'OWNER') ? (
                       <Button variant="outline" disabled={busy} onClick={() => void toggle(member)}>
-                        {member.active ? 'Disable access' : 'Enable access'}
+                        {member.active ? t('team.disableAccess') : t('team.enableAccess')}
                       </Button>
                     ) : (
                       '—'
@@ -624,6 +664,7 @@ function Team({ user }: { user: SessionUser }) {
   );
 }
 function Roles({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const list = useRows<Role>('roles');
   const [selected, setSelected] = useState('');
   const [permissions, setPermissions] = useState<PermissionKey[]>([]);
@@ -636,28 +677,28 @@ function Roles({ user }: { user: SessionUser }) {
     const form = event.currentTarget;
     setBusy(true);
     setSuccess('');
-    list.setError('');
+    list.setError(null);
     try {
       if (role) await api(`roles/${role.id}/permissions`, 'PATCH', { permissions });
       else await api('roles', 'POST', { name: new FormData(form).get('roleName'), permissions });
       await list.reload();
       setSuccess('Role permissions saved.');
     } catch (error) {
-      list.setError(message(error));
+      list.setError(error);
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="flex flex-col gap-5">
-      {list.error ? <Notice>{list.error}</Notice> : null}
+      {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}
       {success ? <p role="status">{success}</p> : null}
       <form
         onSubmit={(event) => void save(event)}
         className="flex flex-col gap-5 rounded-lg border bg-card p-6"
       >
         <div className="flex flex-col gap-2">
-          <Label htmlFor="role-editor">Role</Label>
+          <Label htmlFor="role-editor">{t('roles.role')}</Label>
           <select
             id="role-editor"
             value={selected}
@@ -668,7 +709,7 @@ function Roles({ user }: { user: SessionUser }) {
               setSuccess('');
             }}
           >
-            <option value="">Create a new role</option>
+            <option value="">{t('roles.createNew')}</option>
             {list.rows.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -676,9 +717,9 @@ function Roles({ user }: { user: SessionUser }) {
             ))}
           </select>
         </div>
-        {!role ? <Field label="Role name" name="roleName" /> : null}
+        {!role ? <Field label={t('roles.roleName')} name="roleName" /> : null}
         <fieldset disabled={!canEdit || busy}>
-          <legend className="mb-3 font-medium">Permissions</legend>
+          <legend className="mb-3 font-medium">{t('roles.permissionsLegend')}</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {PERMISSIONS.map((key) => (
               <label key={key} className="flex min-h-11 items-center gap-3">
@@ -715,6 +756,7 @@ function Roles({ user }: { user: SessionUser }) {
   );
 }
 function Terminals({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const list = useRows<Terminal>('terminals');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState('');
@@ -731,7 +773,7 @@ function Terminals({ user }: { user: SessionUser }) {
       await list.reload();
       setSuccess('Terminal registered.');
     } catch (error) {
-      list.setError(message(error));
+      list.setError(error);
     } finally {
       setBusy(false);
     }
@@ -742,26 +784,28 @@ function Terminals({ user }: { user: SessionUser }) {
       await api(`terminals/${terminal.id}`, 'PATCH', { active: !terminal.active });
       await list.reload();
     } catch (error) {
-      list.setError(message(error));
+      list.setError(error);
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="flex flex-col gap-6">
-      {list.error ? <Notice>{list.error}</Notice> : null}
+      {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}
       {success ? <p role="status">{success}</p> : null}
       {canManage ? (
         <form
           onSubmit={(event) => void create(event)}
           className="grid items-end gap-4 rounded-lg border bg-card p-5 sm:grid-cols-[1fr_1fr_auto]"
         >
-          <Field label="Terminal name" name="name" />
+          <Field label={t('terminals.terminalName')} name="name" />
           <div className="flex flex-col gap-2">
-            <Label htmlFor="terminal-type">Type</Label>
+            <Label htmlFor="terminal-type">{t('terminals.typeLabel')}</Label>
             <select id="terminal-type" name="type">
               {['POS', 'KDS', 'WAITER', 'ADMIN', 'OWNER', 'KIOSK'].map((type) => (
-                <option key={type}>{type}</option>
+                <option key={type} value={type}>
+                  {type}
+                </option>
               ))}
             </select>
           </div>
@@ -771,16 +815,16 @@ function Terminals({ user }: { user: SessionUser }) {
         </form>
       ) : null}
       {list.loading ? (
-        <p role="status">Loading terminals…</p>
+        <p role="status">{t('terminals.loading')}</p>
       ) : list.rows.length ? (
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Device</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Last seen</TableHead>
-                <TableHead>Access</TableHead>
+                <TableHead>{t('terminals.colDevice')}</TableHead>
+                <TableHead>{t('terminals.colType')}</TableHead>
+                <TableHead>{t('terminals.colLastSeen')}</TableHead>
+                <TableHead>{t('terminals.colAccess')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -798,7 +842,7 @@ function Terminals({ user }: { user: SessionUser }) {
                   <TableCell>{terminal.type}</TableCell>
                   <TableCell>
                     {terminal.lastSeenAt
-                      ? new Date(terminal.lastSeenAt).toLocaleString()
+                      ? formatDateTime(terminal.lastSeenAt, locale)
                       : 'Not connected yet'}
                   </TableCell>
                   <TableCell>
@@ -823,9 +867,9 @@ function Terminals({ user }: { user: SessionUser }) {
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-8">
-          <h2 className="text-lg font-semibold">No terminals registered</h2>
+          <h2 className="text-lg font-semibold">{t('terminals.empty')}</h2>
           <p className="mt-2 text-muted-foreground">
-            Register a device to identify it in restaurant sessions.
+            {t('terminals.emptyHint')}
           </p>
         </div>
       )}
@@ -833,6 +877,7 @@ function Terminals({ user }: { user: SessionUser }) {
   );
 }
 function AuditHistory() {
+  const { t, locale } = useI18n();
   const list = useRows<AuditRow>('audit-logs');
   return (
     <div className="flex flex-col gap-5">
@@ -841,24 +886,24 @@ function AuditHistory() {
           Refresh history
         </Button>
       </div>
-      {list.error ? <Notice>{list.error}</Notice> : null}
+      {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}
       {list.loading ? (
-        <p role="status">Loading history…</p>
+        <p role="status">{t('audit.loading')}</p>
       ) : (
         <div className="rounded-lg border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Record</TableHead>
+                <TableHead>{t('audit.colTime')}</TableHead>
+                <TableHead>{t('audit.colAction')}</TableHead>
+                <TableHead>{t('audit.colRecord')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.rows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="whitespace-nowrap">
-                    {new Date(row.createdAt).toLocaleString()}
+                    {formatDateTime(row.createdAt, locale)}
                   </TableCell>
                   <TableCell>{row.action}</TableCell>
                   <TableCell>
@@ -877,7 +922,7 @@ function AuditHistory() {
         </div>
       )}
       <p className="text-sm text-muted-foreground">
-        Latest 100 events. Times are shown in your device timezone.
+        {t('audit.note')}
       </p>
     </div>
   );

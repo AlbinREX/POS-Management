@@ -110,9 +110,18 @@ export const productSchema = z
     taxRate: taxRateSchema,
     taxMode: z.enum(['INCLUSIVE', 'EXCLUSIVE']),
     imageUrl: z
-      .url()
+      .string()
+      .trim()
       .max(2048)
-      .refine((url) => /^https?:\/\//i.test(url), 'Use an HTTP or HTTPS image URL')
+      .refine(
+        // An absolute http(s) URL can point at a restaurant's own LAN host, and a
+        // root-relative path lets images bundled with the app stay portable across
+        // localhost, a LAN address and any deployment without rewriting stored rows.
+        // Protocol-relative ("//host") and scheme-bearing values such as javascript:
+        // or data: remain rejected, so this widens storage without widening risk.
+        (url) => /^https?:\/\/[^/]/i.test(url) || /^\/[^/]/.test(url),
+        'Use an HTTP or HTTPS image URL, or an app path such as /food/burger.webp',
+      )
       .nullable()
       .default(null),
     modifierGroupIds: uniqueIds.default([]),
