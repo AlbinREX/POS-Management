@@ -6,7 +6,18 @@
 // and must not be stored on a shared device or replayed from cache at order time.
 // This is not an offline ordering queue: without the local server the app reports an
 // explicit connection failure instead of accepting work it cannot commit.
-const VERSION = 'riza-waiter-v1';
+// The cache name must change whenever the build changes.
+//
+// Registration happens from the origin root, so this worker controls the whole admin
+// application, not only /waiter. Its build assets are served cache-first, which is
+// correct only while the cache name is unique per deployment: with a fixed name, a
+// browser that visited an earlier build keeps serving that build's JavaScript forever
+// and never sees new screens, even after the server has been rebuilt.
+//
+// The build replaces this placeholder with Next's BUILD_ID, which changes every build.
+// The literal is the development fallback, where no build step runs.
+const BUILD = 'nXr-4EsvGxKrZaj5uSgEr';
+const VERSION = `riza-shell-${BUILD}`;
 const SHELL = ['/waiter', '/manifest.webmanifest', '/icons/waiter-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -53,7 +64,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Build assets and icons are immutable per deployment: cache first, then network.
+  // Build assets are immutable within one deployment, and the cache name carries the
+  // build id, so a new deployment can never be served an old asset.
   event.respondWith(
     caches.match(request).then(
       (cached) =>
