@@ -26,7 +26,8 @@
     "dev:admin": "npm run dev -w @restaurant/admin",
     "verify:docker": "docker compose --env-file .env -f infrastructure/docker/compose.yml config --quiet",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "demo:menu": "node scripts/demo-menu.mjs"
   },
   "overrides": {
     "multer": "2.3.0",

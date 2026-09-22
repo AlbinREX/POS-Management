@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -81,14 +81,14 @@ test('purchasing operator orders, receives with retry, checks stock and reconcil
   await dialog.getByLabel('Purchase reference', { exact: true }).fill(prefix + ' order');
   await dialog.getByRole('button', { name: 'Save purchase draft', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(detail.getByTestId('purchase-detail-status')).toHaveText('draft');
+  await expect(detail.getByTestId('purchase-detail-status')).toHaveAttribute('data-status', 'DRAFT');
   await expect(detail.getByText('23.60 EUR', { exact: true })).toHaveCount(2);
   await detail.getByRole('button', { name: 'Edit draft', exact: true }).click();
   await dialog.getByLabel('Purchase notes', { exact: true }).fill('Deliver to kitchen');
   await dialog.getByRole('button', { name: 'Save purchase draft', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await detail.getByRole('button', { name: 'Confirm purchase order', exact: true }).click();
-  await expect(detail.getByTestId('purchase-detail-status')).toHaveText('ordered');
+  await expect(detail.getByTestId('purchase-detail-status')).toHaveAttribute('data-status', 'ORDERED');
   await detail.getByRole('button', { name: 'Receive goods', exact: true }).click();
   await dialog
     .getByRole('textbox', { name: `Receive ${prefix} chicken (kg)`, exact: true })
@@ -135,13 +135,13 @@ test('purchasing operator orders, receives with retry, checks stock and reconcil
   await expect(dialog).toHaveCount(0);
   await expect(receipt.getByTestId('receipt-balance')).toHaveText('6.80 EUR');
   await receipt.getByRole('button', { name: 'Open source purchase', exact: true }).click();
-  await expect(detail.getByTestId('purchase-detail-status')).toHaveText('partially received');
+  await expect(detail.getByTestId('purchase-detail-status')).toHaveAttribute('data-status', 'PARTIALLY_RECEIVED');
   await detail.getByRole('button', { name: 'Receive goods', exact: true }).click();
   await dialog.getByLabel('Delivery reference', { exact: true }).fill(prefix + ' delivery-2');
   await dialog.getByRole('button', { name: 'Post goods receipt', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await receipt.getByRole('button', { name: 'Open source purchase', exact: true }).click();
-  await expect(detail.getByTestId('purchase-detail-status')).toHaveText('received');
+  await expect(detail.getByTestId('purchase-detail-status')).toHaveAttribute('data-status', 'RECEIVED');
   await detail.getByRole('button', { name: 'Show purchase history', exact: true }).press('Enter');
   await expect(detail.locator('details').filter({ hasText: 'Deliver to kitchen' }).first()).toBeVisible();
   await views.getByRole('button', { name: 'Supplier balances', exact: true }).click();

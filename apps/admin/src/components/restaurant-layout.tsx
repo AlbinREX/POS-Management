@@ -23,12 +23,12 @@ import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api, ApiFailure } from '../lib/api';
+import { serverMessage, useI18n } from '../lib/i18n';
 import {
   collides,
   drawRect,
   GRID,
   HANDLE_CURSORS,
-  HANDLE_LABELS,
   HANDLES,
   isUniform,
   MIN_SIDE,
@@ -41,14 +41,14 @@ import {
   type Rect,
 } from '../lib/floor-geometry';
 
-const statusLabels: Record<TableStatus, string> = {
-  FREE: 'Free',
-  RESERVED: 'Reserved',
-  DISABLED: 'Disabled',
-  OCCUPIED: 'Occupied',
-  ORDER_SENT: 'Order sent',
-  WAITING_PAYMENT: 'Waiting payment',
-};
+const statusLabels = {
+  FREE: 'catalog.layout.status.FREE',
+  RESERVED: 'catalog.layout.status.RESERVED',
+  DISABLED: 'catalog.layout.status.DISABLED',
+  OCCUPIED: 'catalog.layout.status.OCCUPIED',
+  ORDER_SENT: 'catalog.layout.status.orderSent',
+  WAITING_PAYMENT: 'catalog.layout.status.waitingPayment',
+} as const;
 const colors: Record<TableStatus, string> = {
   FREE: '#193d32',
   RESERVED: '#4a3b20',
@@ -57,11 +57,21 @@ const colors: Record<TableStatus, string> = {
   ORDER_SENT: '#3d3157',
   WAITING_PAYMENT: '#503823',
 };
-const shapeLabels: Record<TableShape, string> = {
-  RECTANGLE: 'Rectangle',
-  SQUARE: 'Square',
-  CIRCLE: 'Circle',
-};
+const shapeLabels = {
+  RECTANGLE: 'catalog.layout.shape.RECTANGLE',
+  SQUARE: 'catalog.layout.shape.SQUARE',
+  CIRCLE: 'catalog.layout.shape.CIRCLE',
+} as const;
+const handleLabels = {
+  nw: 'catalog.layout.handle.nw',
+  n: 'catalog.layout.handle.n',
+  ne: 'catalog.layout.handle.ne',
+  e: 'catalog.layout.handle.e',
+  se: 'catalog.layout.handle.se',
+  s: 'catalog.layout.handle.s',
+  sw: 'catalog.layout.handle.sw',
+  w: 'catalog.layout.handle.w',
+} as const;
 /** Geometry may only change while a table is free or disabled, exactly as the API requires. */
 const isMovable = (status: TableStatus) => status === 'FREE' || status === 'DISABLED';
 const errorMessage = (e: unknown) =>
@@ -126,6 +136,7 @@ export function RestaurantLayout({
   canManage: boolean;
   canStatus: boolean;
 }) {
+  const { t, locale } = useI18n();
   const [areas, setAreas] = useState<AreaRecord[]>([]);
   const [areaId, setAreaId] = useState('');
   const [archived, setArchived] = useState(false);
@@ -280,7 +291,7 @@ export function RestaurantLayout({
     <section className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-full min-w-0 space-y-2 sm:w-auto sm:flex-1">
-          <Label htmlFor="layout-area">Area</Label>
+          <Label htmlFor="layout-area">{t('catalog.layout.area')}</Label>
           <select
             id="layout-area"
             value={areaId}
@@ -294,12 +305,12 @@ export function RestaurantLayout({
             }}
           >
             <option value="" disabled>
-              Select an area
+              {t('catalog.layout.selectArea')}
             </option>
             {areas.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
-                {a.active ? '' : ' (inactive)'}
+                {a.active ? '' : ` (${t('common.inactive')})`}
               </option>
             ))}
           </select>
@@ -314,7 +325,7 @@ export function RestaurantLayout({
             setError('');
           }}
         >
-          Reload layout
+          {t('catalog.layout.reload')}
         </Button>
         {canManage ? (
           <Button
@@ -325,7 +336,7 @@ export function RestaurantLayout({
               setDrawing(false);
             }}
           >
-            Add area
+            {t('catalog.layout.addArea')}
           </Button>
         ) : null}
       </div>
@@ -342,28 +353,28 @@ export function RestaurantLayout({
             setDrawing(false);
           }}
         />
-        Show archived areas
+        {t('catalog.layout.showArchived')}
       </label>
       <p role="status" className="text-sm text-muted-foreground">
         {connected
-          ? 'Connected · Changes checked every 5 seconds'
+          ? t('catalog.layout.connected')
           : connectionError
-            ? 'Connection unavailable · Map may be out of date · Editing paused'
-            : 'Loading layout…'}
+            ? t('catalog.layout.disconnected')
+            : t('catalog.layout.loading')}
       </p>
       {connectionError ? (
         <p role="alert" className="text-destructive">
-          {connectionError}
+          {serverMessage(connectionError, locale)}
         </p>
       ) : null}
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {notice ? (
         <p role="status" className="text-sm">
-          {notice}
+          {t('catalog.layout.saved')}
         </p>
       ) : null}
       {areaEditor ? (
@@ -386,8 +397,8 @@ export function RestaurantLayout({
             <div>
               <h2 className="text-xl font-semibold">{area.name}</h2>
               <p className="text-sm text-muted-foreground">
-                {area.description || 'Floor plan'} · {area.canvasWidth} × {area.canvasHeight}
-                {!area.active ? ' · Inactive' : ''}
+                {area.description || t('catalog.layout.floorPlan')} · {area.canvasWidth} × {area.canvasHeight}
+                {!area.active ? ` · ${t('common.inactive')}` : ''}
               </p>
             </div>
             {canManage && !area.deletedAt ? (
@@ -401,7 +412,7 @@ export function RestaurantLayout({
                     setDrawing(false);
                   }}
                 >
-                  Edit area
+                  {t('catalog.layout.editArea')}
                 </Button>
                 <Button
                   variant={drawing ? 'secondary' : 'default'}
@@ -409,16 +420,16 @@ export function RestaurantLayout({
                   disabled={busy || !area.active}
                   onClick={() => (drawing ? cancelDraw() : beginDraw())}
                 >
-                  {drawing ? 'Cancel drawing' : 'Add table'}
+                  {drawing ? t('catalog.layout.cancelDrawing') : t('catalog.layout.addTable')}
                 </Button>
               </div>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-4" aria-label="Table status legend">
+          <div className="flex flex-wrap gap-4" aria-label={t('catalog.layout.legend')}>
             {(['FREE', 'RESERVED', 'DISABLED'] as const).map((status) => (
               <span key={status} className="flex items-center gap-2 text-sm">
                 <span className="h-4 w-4 rounded border" style={{ background: colors[status] }} />
-                {statusLabels[status]}
+                {t(statusLabels[status])}
               </span>
             ))}
           </div>
@@ -461,21 +472,21 @@ export function RestaurantLayout({
           ) : (
             <p className="text-sm text-muted-foreground">
               {drawing
-                ? 'Drag on the floor plan to place a new table. Press Esc to cancel.'
+                ? t('catalog.layout.drawHint')
                 : map!.tables.length
-                  ? 'Select a table on the map or in the list.'
-                  : 'No tables in this area yet.'}
+                  ? t('catalog.layout.selectHint')
+                  : t('catalog.layout.noTables')}
             </p>
           )}
-          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Tables in area">
-            {map!.tables.map((t) => (
-              <li key={t.id}>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label={t('catalog.layout.tablesInArea')}>
+            {map!.tables.map((tableItem) => (
+              <li key={tableItem.id}>
                 <Button
-                  variant={selected === t.id ? 'secondary' : 'outline'}
+                  variant={selected === tableItem.id ? 'secondary' : 'outline'}
                   className="h-auto min-h-14 w-full justify-start whitespace-normal text-left"
-                  onClick={() => select(t.id)}
+                  onClick={() => select(tableItem.id)}
                 >
-                  {t.number} · {t.name} · {t.capacity} seats · {statusLabels[t.status]}
+                  {tableItem.number} · {tableItem.name} · {t('catalog.layout.seatCount', { count: tableItem.capacity })} · {t(statusLabels[tableItem.status])}
                 </Button>
               </li>
             ))}
@@ -483,8 +494,7 @@ export function RestaurantLayout({
         </>
       ) : connected ? (
         <p className="rounded-md border p-6 text-muted-foreground">
-          No {archived ? 'archived ' : ''}areas. Create an area with a name such as Indoor, Terrace
-          or Garden.
+          {archived ? t('catalog.layout.noArchivedAreas') : t('catalog.layout.noAreas')}
         </p>
       ) : null}
     </section>
@@ -533,6 +543,7 @@ function FloorMap({
   onCancelDraw: () => void;
   onGeometry: (rect: Rect) => void;
 }) {
+  const { t } = useI18n();
   const [zoom, setZoom] = useState(0.75);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [preview, setPreview] = useState<Rect | null>(null);
@@ -634,7 +645,7 @@ function FloorMap({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
-          aria-label="Zoom out"
+          aria-label={t('catalog.layout.zoomOut')}
           disabled={zoom <= 0.5}
           onClick={() => setZoom((v) => v - 0.25)}
         >
@@ -643,7 +654,7 @@ function FloorMap({
         <span className="text-sm">{Math.round(zoom * 100)}%</span>
         <Button
           variant="outline"
-          aria-label="Zoom in"
+          aria-label={t('catalog.layout.zoomIn')}
           disabled={zoom >= 2}
           onClick={() => setZoom((v) => v + 0.25)}
         >
@@ -651,21 +662,21 @@ function FloorMap({
         </Button>
         <p className="text-sm text-muted-foreground">
           {drawing
-            ? 'Drag on the grid to draw a table · Esc cancels'
+            ? t('catalog.layout.drawGridHint')
             : draft
-              ? 'Drag the table to move it, or drag a handle to resize · Save to apply'
-              : 'Select a table. Scroll the map to see more.'}
+              ? t('catalog.layout.moveHint')
+              : t('catalog.layout.scrollHint')}
         </p>
       </div>
       <div
         className="max-h-[600px] overflow-auto rounded-lg border bg-card"
         tabIndex={0}
-        aria-label="Scrollable floor plan"
+        aria-label={t('catalog.layout.scrollable')}
       >
         <svg
           ref={svg}
           role="group"
-          aria-label={'Floor plan for ' + map.area.name}
+          aria-label={t('catalog.layout.floorPlanFor', { name: map.area.name })}
           data-drawing={drawing ? 'true' : 'false'}
           data-gesture={gesture?.kind ?? 'none'}
           className="layout-map"
@@ -709,7 +720,7 @@ function FloorMap({
                 key={row.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`Table ${row.number}: ${row.name}, ${statusLabels[row.status]}, ${row.capacity} seats`}
+                aria-label={t('catalog.layout.tableDescription', { number: row.number, name: row.name, status: t(statusLabels[row.status]), count: row.capacity })}
                 aria-pressed={isSelected}
                 transform={`translate(${live.positionX} ${live.positionY})`}
                 className="layout-table"
@@ -725,7 +736,7 @@ function FloorMap({
                 }}
               >
                 <title>
-                  {row.name} · {statusLabels[row.status]} · {row.capacity} seats
+                  {row.name} · {t(statusLabels[row.status])} · {t('catalog.layout.seatCount', { count: row.capacity })}
                 </title>
                 <TableShapeNode
                   shape={draft?.row?.id === row.id ? draft.shape : row.shape}
@@ -753,7 +764,7 @@ function FloorMap({
                   fill="#d2d4da"
                   pointerEvents="none"
                 >
-                  {statusLabels[row.status]}
+                  {t(statusLabels[row.status])}
                 </text>
               </g>
             );
@@ -764,7 +775,7 @@ function FloorMap({
               transform={`translate(${draftRect.positionX} ${draftRect.positionY})`}
               className="layout-table"
               data-selected="true"
-              aria-label="New table placement"
+              aria-label={t('catalog.layout.newPlacement')}
             >
               <TableShapeNode
                 shape={draft.shape}
@@ -781,7 +792,7 @@ function FloorMap({
                 fill="#fafaf8"
                 pointerEvents="none"
               >
-                {draft.number || 'New'}
+                {draft.number || t('catalog.layout.new')}
               </text>
             </g>
           ) : null}
@@ -804,9 +815,8 @@ function FloorMap({
       </div>
       {draftRect ? (
         <p className="text-sm text-muted-foreground" role="status">
-          Position {draftRect.positionX}, {draftRect.positionY} · Size {draftRect.width} ×{' '}
-          {draftRect.height}
-          {invalid ? ' · Overlaps another table' : ''}
+          {t('catalog.layout.geometrySummary', { x: draftRect.positionX, y: draftRect.positionY, width: draftRect.width, height: draftRect.height })}
+          {invalid ? ` · ${t('catalog.layout.overlap')}` : ''}
         </p>
       ) : null}
     </div>
@@ -860,6 +870,7 @@ function ResizeHandles({
   rect: Rect;
   onStart: (e: PointerEvent<SVGRectElement>, handle: Handle, origin: Rect) => void;
 }) {
+  const { t } = useI18n();
   // The visible handle stays small so the map reads cleanly, while an invisible,
   // larger grab area makes it comfortable to hit with a mouse at any zoom.
   const size = 12;
@@ -904,7 +915,7 @@ function ResizeHandles({
               style={{ cursor: HANDLE_CURSORS[handle] }}
               onPointerDown={(e) => onStart(e, handle, rect)}
             >
-              <title>Resize {HANDLE_LABELS[handle]}</title>
+              <title>{t(handleLabels[handle])}</title>
             </rect>
           </g>
         );
@@ -926,18 +937,18 @@ function TableSummary({
   onEdit: () => void;
   canManage: boolean;
 }) {
+  const { t } = useI18n();
   return (
-    <section aria-label="Selected table" className="space-y-3 rounded-lg border bg-card p-5">
+    <section aria-label={t('catalog.layout.selectedTable')} className="space-y-3 rounded-lg border bg-card p-5">
       <h3 className="text-lg font-semibold">
         {row.number} · {row.name}
       </h3>
       <p>
-        {statusLabels[row.status]} · {row.capacity} seats · {row.shape.toLowerCase()} · {row.width}{' '}
-        × {row.height} · Position {row.positionX}, {row.positionY}
+        {t(statusLabels[row.status])} · {t('catalog.layout.seatCount', { count: row.capacity })} · {t(shapeLabels[row.shape])} · {t('catalog.layout.geometrySummary', { x: row.positionX, y: row.positionY, width: row.width, height: row.height })}
       </p>
       {canManage ? (
         <Button variant="outline" onClick={onEdit}>
-          Edit table
+          {t('catalog.layout.editTable')}
         </Button>
       ) : null}
     </section>
@@ -976,6 +987,7 @@ function TableDraftPanel({
   onSaved: (id: string) => void;
   onArchived: () => void;
 }) {
+  const { t, locale } = useI18n();
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
   const row = draft.row;
@@ -1026,31 +1038,31 @@ function TableDraftPanel({
 
   return (
     <form
-      aria-label="Table details"
+      aria-label={t('catalog.layout.tableDetails')}
       onSubmit={submit}
       className="space-y-4 rounded-lg border bg-card p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{row ? 'Edit table' : 'New table'}</h2>
+        <h2 className="text-lg font-semibold">{row ? t('catalog.layout.editTable') : t('catalog.layout.newTable')}</h2>
         <p className="text-sm text-muted-foreground" role="status">
-          {row ? statusLabels[row.status] : 'Not saved yet'}
-          {dirty ? ' · Unsaved changes' : ''}
+          {row ? t(statusLabels[row.status]) : t('catalog.layout.notSaved')}
+          {dirty ? ` · ${t('catalog.layout.unsaved')}` : ''}
         </p>
       </div>
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {row && !movable ? (
         <p className="text-sm text-muted-foreground">
-          This table is in service. Free it before changing its position, size or details.
+          {t('catalog.layout.tableInService')}
         </p>
       ) : null}
       <fieldset disabled={busy || !canManage || !movable} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="layout-name">Table name</Label>
+            <Label htmlFor="layout-name">{t('catalog.layout.tableName')}</Label>
             <Input
               id="layout-name"
               value={draft.name}
@@ -1060,7 +1072,7 @@ function TableDraftPanel({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="layout-tableArea">Table area</Label>
+            <Label htmlFor="layout-tableArea">{t('catalog.layout.tableArea')}</Label>
             <select
               id="layout-tableArea"
               value={draft.areaId}
@@ -1076,7 +1088,7 @@ function TableDraftPanel({
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="layout-number">Table number (unique in branch)</Label>
+            <Label htmlFor="layout-number">{t('catalog.layout.tableNumber')}</Label>
             <Input
               id="layout-number"
               type="number"
@@ -1087,7 +1099,7 @@ function TableDraftPanel({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="layout-capacity">Seats</Label>
+            <Label htmlFor="layout-capacity">{t('catalog.layout.seats')}</Label>
             <Input
               id="layout-capacity"
               type="number"
@@ -1098,7 +1110,7 @@ function TableDraftPanel({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="layout-shape">Shape</Label>
+            <Label htmlFor="layout-shape">{t('catalog.layout.shape')}</Label>
             <select
               id="layout-shape"
               value={draft.shape}
@@ -1106,25 +1118,26 @@ function TableDraftPanel({
             >
               {(Object.keys(shapeLabels) as TableShape[]).map((shape) => (
                 <option key={shape} value={shape}>
-                  {shapeLabels[shape]}
+                  {t(shapeLabels[shape])}
                 </option>
               ))}
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="layout-status">Status</Label>
+            <Label htmlFor="layout-status">{t('catalog.layout.status')}</Label>
             <Input
               id="layout-status"
-              value={row ? statusLabels[row.status] : statusLabels.FREE}
+              value={t(row ? statusLabels[row.status] : statusLabels.FREE)}
               readOnly
               disabled
             />
           </div>
         </div>
-        <fieldset className="layout-geometry" aria-label="Table geometry">
-          <legend className="text-sm text-muted-foreground">Geometry (drawn on the map)</legend>
+        <fieldset className="layout-geometry" aria-label={t('catalog.layout.geometry')}>
+          <legend className="text-sm text-muted-foreground">{t('catalog.layout.geometryDrawn')}</legend>
           <GeometryField
-            label="Position X"
+            id="layout-positionx"
+            label={t('catalog.layout.positionX')}
             value={draft.rect.positionX}
             onChange={(positionX) =>
               onChange({
@@ -1134,7 +1147,8 @@ function TableDraftPanel({
             }
           />
           <GeometryField
-            label="Position Y"
+            id="layout-positiony"
+            label={t('catalog.layout.positionY')}
             value={draft.rect.positionY}
             onChange={(positionY) =>
               onChange({
@@ -1144,7 +1158,8 @@ function TableDraftPanel({
             }
           />
           <GeometryField
-            label="Table width"
+            id="layout-tablewidth"
+            label={t('catalog.layout.tableWidth')}
             value={draft.rect.width}
             onChange={(width) =>
               onChange({
@@ -1154,7 +1169,8 @@ function TableDraftPanel({
             }
           />
           <GeometryField
-            label="Table height"
+            id="layout-tableheight"
+            label={t('catalog.layout.tableHeight')}
             value={draft.rect.height}
             onChange={(height) =>
               onChange({
@@ -1165,18 +1181,16 @@ function TableDraftPanel({
           />
         </fieldset>
         <p className="text-sm text-muted-foreground">
-          Drag the table to move it, or drag a handle to resize. Geometry snaps to a {GRID}-unit
-          grid, stays inside the area and keeps a minimum side of {MIN_SIDE}. Circles and squares
-          use equal sides. Nothing is saved until you press Save.
+          {t('catalog.layout.geometryHint', { grid: GRID, min: MIN_SIDE })}
         </p>
         <div className="flex flex-wrap gap-3">
-          <Button type="submit">Save table</Button>
+          <Button type="submit">{t('catalog.layout.saveTable')}</Button>
           <Button type="button" variant="outline" onClick={() => (row ? onChange(draftFrom(row)) : onClose())}>
-            {row ? 'Reset' : 'Cancel'}
+            {row ? t('catalog.layout.reset') : t('catalog.layout.cancel')}
           </Button>
           {row ? (
             <Button type="button" variant="outline" onClick={onClose}>
-              Close
+              {t('catalog.layout.close')}
             </Button>
           ) : null}
         </div>
@@ -1199,7 +1213,7 @@ function TableDraftPanel({
                     )
                   }
                 >
-                  Mark {statusLabels[status].toLowerCase()}
+                  {t('catalog.layout.markStatus', { status: t(statusLabels[status]).toLocaleLowerCase(locale) })}
                 </Button>
               ))
             : null}
@@ -1210,14 +1224,14 @@ function TableDraftPanel({
               disabled={busy || !movable}
               onClick={() => setConfirm(true)}
             >
-              Archive table
+              {t('catalog.layout.archiveTable')}
             </Button>
           ) : null}
         </div>
       ) : null}
       {confirm && row ? (
         <div className="space-y-2">
-          <p>Archive this table? Its number and change history will be retained.</p>
+          <p>{t('catalog.layout.archiveTablePrompt')}</p>
           <Button
             type="button"
             variant="destructive"
@@ -1229,7 +1243,7 @@ function TableDraftPanel({
               )
             }
           >
-            Confirm table archive
+            {t('catalog.layout.confirmTableArchive')}
           </Button>
         </div>
       ) : null}
@@ -1239,15 +1253,16 @@ function TableDraftPanel({
 
 /** A numeric geometry input that keeps the map and the panel in agreement. */
 function GeometryField({
+  id,
   label,
   value,
   onChange,
 }: {
+  id: string;
   label: string;
   value: number;
   onChange: (value: number) => void;
 }) {
-  const id = 'layout-' + label.toLowerCase().replace(/\s+/g, '');
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -1308,6 +1323,7 @@ function AreaEditor({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const [name, setName] = useState(row?.name ?? ''),
     [error, setError] = useState(''),
     [confirm, setConfirm] = useState(false);
@@ -1338,29 +1354,29 @@ function AreaEditor({
   }
   return (
     <form
-      aria-label="Area editor"
+      aria-label={t('catalog.layout.areaEditor')}
       className="space-y-4 rounded-lg border bg-card p-5"
       onSubmit={submit}
     >
-      <h2 className="text-lg font-semibold">{row ? 'Edit area' : 'New area'}</h2>
+      <h2 className="text-lg font-semibold">{row ? t('catalog.layout.editArea') : t('catalog.layout.newArea')}</h2>
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       <fieldset disabled={busy} className="space-y-4">
         {!row ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm">Start with a name:</span>
-            {['Indoor', 'Terrace'].map((value) => (
+            <span className="text-sm">{t('catalog.layout.startName')}</span>
+            {(['Indoor', 'Terrace'] as const).map((value) => (
               <Button key={value} type="button" variant="outline" onClick={() => setName(value)}>
-                {value}
+                {value === 'Indoor' ? t('catalog.layout.indoor') : t('catalog.layout.terrace')}
               </Button>
             ))}
           </div>
         ) : null}
         <div className="space-y-2">
-          <Label htmlFor="layout-areaName">Area name</Label>
+          <Label htmlFor="layout-areaName">{t('catalog.layout.areaName')}</Label>
           <Input
             id="layout-areaName"
             value={name}
@@ -1371,7 +1387,7 @@ function AreaEditor({
         </div>
         <Field
           name="description"
-          label="Area description"
+          label={t('catalog.layout.areaDescription')}
           value={row?.description}
           required={false}
           maxLength={2000}
@@ -1379,41 +1395,41 @@ function AreaEditor({
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
             name="sortOrder"
-            label="Area sort order"
+            label={t('catalog.layout.areaSort')}
             value={row?.sortOrder ?? 0}
             type="number"
           />
           <Field
             name="canvasWidth"
-            label="Canvas width"
+            label={t('catalog.layout.canvasWidth')}
             value={row?.canvasWidth ?? 1200}
             type="number"
           />
           <Field
             name="canvasHeight"
-            label="Canvas height"
+            label={t('catalog.layout.canvasHeight')}
             value={row?.canvasHeight ?? 800}
             type="number"
           />
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm">
           <input type="checkbox" name="active" defaultChecked={row?.active ?? true} />
-          Area active
+          {t('catalog.layout.areaActive')}
         </label>
         <div className="flex flex-wrap gap-3">
-          <Button type="submit">Save area</Button>
+          <Button type="submit">{t('catalog.layout.saveArea')}</Button>
           <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+            {t('catalog.layout.cancel')}
           </Button>
           {row ? (
             <Button type="button" variant="destructive" onClick={() => setConfirm(true)}>
-              Archive area
+              {t('catalog.layout.archiveArea')}
             </Button>
           ) : null}
         </div>
         {confirm && row ? (
           <div className="space-y-2">
-            <p>Archive this area? All tables must be moved or archived first.</p>
+            <p>{t('catalog.layout.archiveAreaPrompt')}</p>
             <Button
               type="button"
               variant="destructive"
@@ -1425,7 +1441,7 @@ function AreaEditor({
                 )
               }
             >
-              Confirm area archive
+              {t('catalog.layout.confirmAreaArchive')}
             </Button>
           </div>
         ) : null}

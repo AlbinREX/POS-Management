@@ -1,4 +1,5 @@
 'use client';
+import { useI18n, serverMessage, type Translate } from '../lib/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   SessionUser,
@@ -14,7 +15,14 @@ import { api, ApiFailure } from '../lib/api';
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Companies' | 'Contracts' | 'Employees' | 'Account' | 'Statements';
-const label = (v: string) => v.toLowerCase().replaceAll('_', ' ');
+const translatedLabel = (v: string, t: Translate) => {
+  const keys = {
+    DRAFT: 'operations.statusDraft', ACTIVE: 'operations.active', EXPIRED: 'operations.statusExpired', SUSPENDED: 'operations.statusSuspended', TERMINATED: 'operations.statusTerminated',
+    MONTHLY: 'operations.monthly', BIWEEKLY: 'operations.biweekly', WEEKLY: 'operations.weekly',
+    CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal', CREDIT: 'operations.entryCredit',
+  } as const;
+  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+};
 const form = (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   return Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
@@ -30,6 +38,8 @@ async function all<T>(path: string) {
   }
 }
 export function CompaniesWorkspace({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const can = (p: SessionUser['permissions'][number]) => user.permissions.includes(p),
     manage = can('company.manage'),
     contractManage = can('contract.manage'),
@@ -165,17 +175,17 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
   const views: View[] = ['Companies', 'Contracts', 'Employees', 'Account', 'Statements'];
   return (
     <section className="company-workspace">
-      {error ? <p className="purchase-notice">{error}</p> : null}
-      {notice ? <p className="purchase-notice">{notice}</p> : null}
+      {error ? <p className="purchase-notice">{serverMessage(error, locale)}</p> : null}
+      {notice ? <p className="purchase-notice">{serverMessage(notice, locale)}</p> : null}
       {pending?.path ? (
         <p className="purchase-notice">
-          A company command is unresolved.{' '}
+          {t('operations.aCompanyCommandIsUnresolved')}{' '}
           <Button type="button" disabled={busy} onClick={() => void execute(pending)}>
-            Retry saved command
+            {t('operations.retrySavedCommand')}
           </Button>
         </p>
       ) : null}
-      <div role="group" aria-label="Company views" className="purchase-filters">
+      <div role="group" aria-label={t('operations.companyViews')} className="purchase-filters">
         {views.map((item) => (
           <Button
             key={item}
@@ -183,14 +193,14 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
             variant={view === item ? 'default' : 'outline'}
             onClick={() => setView(item)}
           >
-            {item}
+            {t(({ Companies: 'operations.companies', Contracts: 'operations.contracts', Employees: 'operations.employees', Account: 'operations.account', Statements: 'operations.statements' } as const)[item])}
           </Button>
         ))}
         <Input
-          aria-label="Search companies"
+          aria-label={t('operations.searchCompanies')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search companies"
+          placeholder={t('operations.searchCompanies')}
         />
         <label>
           <input
@@ -198,18 +208,18 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
             checked={archived}
             onChange={(e) => setArchived(e.target.checked)}
           />{' '}
-          Include archived
+          {t('operations.includeArchived')}
         </label>
         <Button type="button" disabled={busy} onClick={() => void reload()}>
-          Refresh
+          {t('operations.refresh')}
         </Button>
       </div>
       <div className="purchase-grid">
         <div>
-          <h2>Companies</h2>
+          <h2>{t('operations.companies')}</h2>
           {manage ? (
             <Button type="button" disabled={locked} onClick={() => setEditor('company')}>
-              Add company
+              {t('operations.addCompany')}
             </Button>
           ) : null}
           {companies.length ? (
@@ -222,33 +232,33 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                     onClick={() => setSelected(c.id)}
                   >
                     <strong>{c.name}</strong>
-                    <span>{c.businessNumber || 'No business number'}</span>
-                    {c.deletedAt ? <span className="stock-badge">Archived</span> : null}
+                    <span>{c.businessNumber || t('operations.noBusinessNumber')}</span>
+                    {c.deletedAt ? <span className="stock-badge">{t('operations.archived')}</span> : null}
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="purchase-empty">No companies are configured.</p>
+            <p className="purchase-empty">{t('operations.noCompaniesAreConfigured')}</p>
           )}
         </div>
-        <section aria-label="Company detail" className="purchase-detail">
+        <section aria-label={t('operations.companyDetail')} className="purchase-detail">
           {!company ? (
-            <p className="purchase-empty">Select a company.</p>
+            <p className="purchase-empty">{t('operations.selectACompany')}</p>
           ) : view === 'Companies' ? (
             <>
               <h2>{company.name}</h2>
               <dl className="purchase-totals">
                 <div>
-                  <dt>Business number</dt>
+                  <dt>{t('operations.businessNumber')}</dt>
                   <dd>{company.businessNumber || '—'}</dd>
                 </div>
                 <div>
-                  <dt>Tax number</dt>
+                  <dt>{t('operations.taxNumber')}</dt>
                   <dd>{company.taxNumber || '—'}</dd>
                 </div>
                 <div>
-                  <dt>Contact</dt>
+                  <dt>{t('operations.contact')}</dt>
                   <dd>{company.contactPerson || '—'}</dd>
                 </div>
               </dl>
@@ -258,7 +268,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
               {manage && !company.deletedAt ? (
                 <>
                   <Button type="button" disabled={locked} onClick={() => setEditor('company-edit')}>
-                    Edit company
+                    {t('operations.editCompany')}
                   </Button>
                   <Button
                     type="button"
@@ -267,17 +277,17 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                       submit(`/${company.id}/archive`, { version: company.version })
                     }
                   >
-                    Archive
+                    {t('operations.archive')}
                   </Button>
                 </>
               ) : null}
             </>
           ) : view === 'Contracts' ? (
             <>
-              <h2>Contracts</h2>
+              <h2>{t('operations.contracts')}</h2>
               {contractManage ? (
                 <Button type="button" disabled={locked} onClick={() => setEditor('contract')}>
-                  Add contract
+                  {t('operations.addContract')}
                 </Button>
               ) : null}
               {contracts.length ? (
@@ -285,13 +295,13 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                   {contracts.map((c) => (
                     <li key={c.id}>
                       <strong>{c.contractNumber}</strong>
-                      <span className="stock-badge">{label(c.status)}</span>
+                      <span className="stock-badge" data-testid="contract-status" data-status={c.status}>{label(c.status)}</span>
                       <span>
-                        Limit {c.creditLimit} {c.currency} · {c.discountPercentage}% · net{' '}
-                        {c.paymentTermsDays} days · {label(c.billingCycle)}
+                        {t('operations.limit')} {c.creditLimit} {c.currency} · {c.discountPercentage}{t('operations.net')}{' '}
+                        {c.paymentTermsDays} {t('operations.days')} {label(c.billingCycle)}
                       </span>
                       <span>
-                        {c.startDate} → {c.endDate ?? 'open'}
+                        {c.startDate} → {c.endDate ?? t('operations.openEnded')}
                       </span>
                       {contractManage && c.status !== 'TERMINATED' ? (
                         <span>
@@ -307,7 +317,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                                 })
                               }
                             >
-                              Activate
+                              {t('operations.activate')}
                             </Button>
                           ) : null}
                           {c.status === 'ACTIVE' ? (
@@ -322,7 +332,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                                 })
                               }
                             >
-                              Suspend
+                              {t('operations.suspend')}
                             </Button>
                           ) : null}
                           <Button
@@ -336,7 +346,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                               })
                             }
                           >
-                            Terminate
+                            {t('operations.terminate')}
                           </Button>
                         </span>
                       ) : null}
@@ -344,15 +354,15 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                   ))}
                 </ul>
               ) : (
-                <p className="purchase-empty">This company has no contracts.</p>
+                <p className="purchase-empty">{t('operations.thisCompanyHasNoContracts')}</p>
               )}
             </>
           ) : view === 'Employees' ? (
             <>
-              <h2>Authorized employees</h2>
+              <h2>{t('operations.authorizedEmployees')}</h2>
               {manage ? (
                 <Button type="button" disabled={locked} onClick={() => setEditor('employee')}>
-                  Add employee
+                  {t('operations.addEmployee')}
                 </Button>
               ) : null}
               {employees.length ? (
@@ -360,11 +370,11 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                   {employees.map((e) => (
                     <li key={e.id}>
                       <strong>{e.name}</strong>
-                      <span>{e.code || 'No code'}</span>
+                      <span>{e.code || t('operations.noCode')}</span>
                       <span>
-                        Consumed {e.consumedTotal} across {e.orderCount} orders
+                        {t('operations.consumed')} {e.consumedTotal} {t('operations.across')} {e.orderCount} {t('operations.orders')}
                       </span>
-                      {e.deletedAt ? <span className="stock-badge">Archived</span> : null}
+                      {e.deletedAt ? <span className="stock-badge">{t('operations.archived')}</span> : null}
                       {manage && !e.deletedAt ? (
                         <Button
                           type="button"
@@ -373,57 +383,56 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                             submit(`/directory/employees/${e.id}/archive`, { version: e.version })
                           }
                         >
-                          Archive
+                          {t('operations.archive')}
                         </Button>
                       ) : null}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="purchase-empty">No authorized employees.</p>
+                <p className="purchase-empty">{t('operations.noAuthorizedEmployees')}</p>
               )}
             </>
           ) : view === 'Account' ? (
             <>
-              <h2>Account</h2>
+              <h2>{t('operations.account')}</h2>
               {account ? (
                 <>
                   <dl className="purchase-totals">
                     <div>
-                      <dt>Balance</dt>
+                      <dt>{t('operations.balance')}</dt>
                       <dd>
                         {account.balance} {account.currency}
                       </dd>
                     </div>
                     <div>
-                      <dt>Credit limit</dt>
+                      <dt>{t('operations.creditLimit')}</dt>
                       <dd>{account.creditLimit}</dd>
                     </div>
                     <div>
-                      <dt>Available</dt>
+                      <dt>{t('operations.available')}</dt>
                       <dd>{account.available}</dd>
                     </div>
                   </dl>
                   <p>
-                    Charged {account.charged} · paid {account.paid} · {account.orderCount} orders ·
-                    contract {account.contractStatus ? label(account.contractStatus) : 'none'}
+                    {t('operations.charged')} {account.charged} {t('operations.paid')} {account.paid} · {account.orderCount} {t('operations.ordersContract')} {account.contractStatus ? label(account.contractStatus) : t('common.none')}
                   </p>
                   {recordPayment && account.balance !== '0.00' ? (
                     <Button type="button" disabled={locked} onClick={() => setEditor('payment')}>
-                      Record payment
+                      {t('operations.recordPayment')}
                     </Button>
                   ) : null}
                   {account.items.length ? (
                     <ul className="company-list">
                       {account.items.map((entry) => (
                         <li key={entry.id} className="purchase-entry">
-                          <strong>{label(entry.kind)}</strong>
+                          <strong data-testid={`company-entry-${entry.kind}`}>{label(entry.kind)}</strong>
                           <span>{entry.amount}</span>
                           <span>
-                            {entry.orderNumber ? `Order ${entry.orderNumber}` : entry.reference}
+                            {entry.orderNumber ? t('operations.orderNumber', { number: entry.orderNumber }) : entry.reference}
                             {entry.employeeName ? ` · ${entry.employeeName}` : ''}
                           </span>
-                          <span>{entry.reason}</span>
+                          <span>{serverMessage(entry.reason, locale)}</span>
                           {reversePayment && entry.kind === 'PAYMENT' && !entry.reversed ? (
                             <Button
                               type="button"
@@ -434,54 +443,53 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                                 })
                               }
                             >
-                              Reverse
+                              {t('operations.reverse')}
                             </Button>
                           ) : null}
-                          {entry.reversed ? <span className="stock-badge">Reversed</span> : null}
+                          {entry.reversed ? <span className="stock-badge">{t('operations.reversed')}</span> : null}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="purchase-empty">No account activity.</p>
+                    <p className="purchase-empty">{t('operations.noAccountActivity')}</p>
                   )}
                 </>
               ) : null}
             </>
           ) : (
             <>
-              <h2>Statements</h2>
+              <h2>{t('operations.statements')}</h2>
               {statementManage ? (
                 <Button type="button" disabled={locked} onClick={() => setEditor('statement')}>
-                  Generate statement
+                  {t('operations.generateStatement')}
                 </Button>
               ) : null}
               {statements.length ? (
                 <ul className="company-list">
                   {statements.map((s) => (
                     <li key={s.id}>
-                      <strong>Statement {s.number}</strong>
+                      <strong>{t('operations.statement')} {s.number}</strong>
                       <span>
-                        {s.periodStart} → {s.periodEnd} · due {s.dueDate}
+                        {s.periodStart} → {s.periodEnd} {t('operations.due')} {s.dueDate}
                       </span>
                       <span>
-                        Opening {s.openingBalance} · charges {s.charges} · payments {s.payments} ·
-                        closing {s.closingBalance} {s.currency}
+                        {t('operations.opening')} {s.openingBalance} {t('operations.charges')} {s.charges} {t('operations.payments')} {s.payments} {t('operations.closing')} {s.closingBalance} {s.currency}
                       </span>
                       <span>
-                        {s.items.length} lines · issued by {s.issuedBy}
+                        {s.items.length} {t('operations.linesIssuedBy')} {s.issuedBy}
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="purchase-empty">No statements have been issued.</p>
+                <p className="purchase-empty">{t('operations.noStatementsHaveBeenIssued')}</p>
               )}
             </>
           )}
         </section>
       </div>
       {editor ? (
-        <dialog className="purchase-dialog riza-dialog" aria-label="Company editor" ref={(el) => { if (el && !el.open) el.showModal(); }}>
+        <dialog className="purchase-dialog riza-dialog" aria-label={t('operations.companyEditor')} ref={(el) => { if (el && !el.open) el.showModal(); }}>
           <form
             onSubmit={(e) => {
               const data = form(e);
@@ -550,43 +558,43 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
             <fieldset disabled={locked} className="purchase-form-grid">
               <legend>
                 {editor === 'contract'
-                  ? 'Contract'
+                  ? t('operations.contract')
                   : editor === 'employee'
-                    ? 'Authorized employee'
+                    ? t('operations.authorizedEmployee')
                     : editor === 'payment'
-                      ? 'Record company payment'
+                      ? t('operations.recordCompanyPayment')
                       : editor === 'statement'
-                        ? 'Generate statement'
-                        : 'Company'}
+                        ? t('operations.generateStatement')
+                        : t('operations.company')}
               </legend>
               {editor === 'company' || editor === 'company-edit' ? (
                 <>
                   <label>
-                    Company name
+                    {t('operations.companyName')}
                     <Input name="name" required defaultValue={editor === 'company-edit' ? company?.name : ''} />
                   </label>
                   <label>
-                    Business number
+                    {t('operations.businessNumber')}
                     <Input name="businessNumber" defaultValue={editor === 'company-edit' ? company?.businessNumber : ''} />
                   </label>
                   <label>
-                    Tax number
+                    {t('operations.taxNumber')}
                     <Input name="taxNumber" defaultValue={editor === 'company-edit' ? company?.taxNumber : ''} />
                   </label>
                   <label>
-                    Address
+                    {t('operations.address')}
                     <Input name="address" defaultValue={editor === 'company-edit' ? company?.address : ''} />
                   </label>
                   <label>
-                    Phone
+                    {t('operations.phone')}
                     <Input name="phone" defaultValue={editor === 'company-edit' ? company?.phone : ''} />
                   </label>
                   <label>
-                    Email
+                    {t('operations.email')}
                     <Input name="email" type="email" defaultValue={editor === 'company-edit' ? company?.email : ''} />
                   </label>
                   <label>
-                    Contact person
+                    {t('operations.contactPerson')}
                     <Input name="contactPerson" defaultValue={editor === 'company-edit' ? company?.contactPerson : ''} />
                   </label>
                 </>
@@ -594,39 +602,39 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
               {editor === 'contract' ? (
                 <>
                   <label>
-                    Contract number
+                    {t('operations.contractNumber')}
                     <Input name="contractNumber" required />
                   </label>
                   <label>
-                    Start date
+                    {t('operations.startDate')}
                     <Input name="startDate" type="date" required />
                   </label>
                   <label>
-                    End date
+                    {t('operations.endDate')}
                     <Input name="endDate" type="date" />
                   </label>
                   <label>
-                    Credit limit
+                    {t('operations.creditLimit')}
                     <Input name="creditLimit" required defaultValue="0.00" />
                   </label>
                   <label>
-                    Discount percentage
+                    {t('operations.discountPercentage')}
                     <Input name="discountPercentage" required defaultValue="0.00" />
                   </label>
                   <label>
-                    Payment terms (days)
+                    {t('operations.paymentTermsDays')}
                     <Input name="paymentTermsDays" type="number" required defaultValue="30" />
                   </label>
                   <label>
-                    Billing cycle
+                    {t('operations.billingCycle')}
                     <select name="billingCycle" defaultValue="MONTHLY">
-                      <option value="MONTHLY">MONTHLY</option>
-                      <option value="BIWEEKLY">BIWEEKLY</option>
-                      <option value="WEEKLY">WEEKLY</option>
+                      <option value="MONTHLY">{t('operations.monthly')}</option>
+                      <option value="BIWEEKLY">{t('operations.biweekly')}</option>
+                      <option value="WEEKLY">{t('operations.weekly')}</option>
                     </select>
                   </label>
                   <label>
-                    Notes
+                    {t('operations.notes')}
                     <Input name="notes" />
                   </label>
                 </>
@@ -634,19 +642,19 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
               {editor === 'employee' ? (
                 <>
                   <label>
-                    Employee name
+                    {t('operations.employeeName')}
                     <Input name="name" required />
                   </label>
                   <label>
-                    Code
+                    {t('operations.code')}
                     <Input name="code" />
                   </label>
                   <label>
-                    Email
+                    {t('operations.email')}
                     <Input name="email" type="email" />
                   </label>
                   <label>
-                    Phone
+                    {t('operations.phone')}
                     <Input name="phone" />
                   </label>
                 </>
@@ -654,24 +662,24 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
               {editor === 'payment' ? (
                 <>
                   <label>
-                    Amount
+                    {t('operations.amount2')}
                     <Input name="amount" required />
                   </label>
                   <label>
-                    Method
+                    {t('operations.method')}
                     <select name="method" defaultValue="BANK_TRANSFER">
-                      <option value="BANK_TRANSFER">BANK_TRANSFER</option>
-                      <option value="CASH">CASH</option>
-                      <option value="CARD">CARD</option>
-                      <option value="OTHER">OTHER</option>
+                      <option value="BANK_TRANSFER">{t('operations.bankTransfer2')}</option>
+                      <option value="CASH">{t('operations.cash')}</option>
+                      <option value="CARD">{t('operations.card')}</option>
+                      <option value="OTHER">{t('operations.other2')}</option>
                     </select>
                   </label>
                   <label>
-                    Reference
+                    {t('operations.reference2')}
                     <Input name="reference" required />
                   </label>
                   <label>
-                    Reason
+                    {t('operations.reason')}
                     <Input name="reason" required defaultValue="Company account settlement" />
                   </label>
                 </>
@@ -679,11 +687,11 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
               {editor === 'statement' ? (
                 <>
                   <label>
-                    Period start
+                    {t('operations.periodStart')}
                     <Input name="periodStart" type="date" required />
                   </label>
                   <label>
-                    Period end
+                    {t('operations.periodEnd')}
                     <Input name="periodEnd" type="date" required />
                   </label>
                 </>
@@ -691,10 +699,10 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
             </fieldset>
             <div className="purchase-filters">
               <Button type="submit" disabled={locked}>
-                Save
+                {t('operations.save')}
               </Button>
               <Button type="button" onClick={() => setEditor(null)}>
-                Cancel
+                {t('operations.cancel')}
               </Button>
             </div>
           </form>

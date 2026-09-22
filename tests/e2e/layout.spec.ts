@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('configure areas and geometry, drag a table, receive a remote status change and archive the layout', async ({
   page,

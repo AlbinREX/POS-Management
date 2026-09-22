@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 test('sign in, register a terminal, inspect audit, restore session, sign out', async ({
   page,
 }, info) => {
@@ -29,7 +29,7 @@ test('sign in, register a terminal, inspect audit, restore session, sign out', a
     local: { ...localStorage },
     session: { ...sessionStorage },
   }));
-  expect(storage).toEqual({ local: {}, session: {} });
+  expect(storage).toEqual({ local: { 'riza.locale': 'en' }, session: {} });
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   expect(errors).toEqual([]);

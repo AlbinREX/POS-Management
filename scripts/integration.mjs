@@ -218,19 +218,29 @@ try {
           .filter((name) => name.endsWith('.spec.ts'))
           .sort()
           .map((name) => ['tests/e2e/' + name]);
+    const browserFailures = [];
     for (const project of ['desktop', 'mobile']) {
       for (const browserRun of browserRuns) {
         await app.close();
         app = await createApp();
         await app.listen(4000, '127.0.0.1');
-        await run([
-          'node_modules/@playwright/test/cli.js',
-          'test',
-          ...browserRun,
-          '--project=' + project,
-        ]);
+        try {
+          await run([
+            'node_modules/@playwright/test/cli.js',
+            'test',
+            ...browserRun,
+            '--project=' + project,
+          ]);
+        } catch (error) {
+          // Finish independent workflows to report all bilingual regressions in one
+          // run. Any failure still fails the gate; no success report is written.
+          browserFailures.push(`${project}: ${browserRun.join(' ')}`);
+          console.error(error.message);
+        }
       }
     }
+    if (browserFailures.length)
+      throw new Error(`Browser workflows failed: ${browserFailures.join(', ')}`);
   }
   await writeFile(
     resolve('.local', 'last-verification.json'),

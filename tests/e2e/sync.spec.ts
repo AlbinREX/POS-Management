@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('the header reports local connectivity and sync state, and never caches authenticated data', async ({
   page,

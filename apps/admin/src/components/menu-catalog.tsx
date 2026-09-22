@@ -9,14 +9,22 @@ import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api, ApiFailure } from '../lib/api';
+import { serverMessage, useI18n } from '../lib/i18n';
 
-const kinds: Record<MenuKind, string> = {
-  products: 'Products',
-  categories: 'Categories',
-  'modifier-groups': 'Modifier groups',
-  modifiers: 'Modifiers',
-  'kitchen-stations': 'Kitchen stations',
-};
+const kinds = {
+  products: 'catalog.products',
+  categories: 'catalog.categories',
+  'modifier-groups': 'catalog.modifierGroups',
+  modifiers: 'catalog.modifiers',
+  'kitchen-stations': 'catalog.kitchenStations',
+} as const;
+const addLabels = {
+  products: 'catalog.addProduct',
+  categories: 'catalog.addCategory',
+  'modifier-groups': 'catalog.addGroup',
+  modifiers: 'catalog.addModifier',
+  'kitchen-stations': 'catalog.addStation',
+} as const;
 const selectClass = 'min-h-11 w-full rounded-md border bg-background px-3 text-sm';
 const message = (error: unknown) =>
   error instanceof ApiFailure ? error.message : 'Cannot reach the local server. Try again.';
@@ -30,6 +38,7 @@ async function references(kind: MenuKind) {
 }
 
 export function MenuCatalog({ canManage }: { canManage: boolean }) {
+  const { t, locale } = useI18n();
   const [kind, setKind] = useState<MenuKind>('products');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -67,8 +76,8 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
   }
   return (
     <section className="space-y-5">
-      <nav aria-label="Menu catalog" className="flex flex-wrap gap-2">
-        {(Object.entries(kinds) as [MenuKind, string][]).map(([value, label]) => (
+      <nav aria-label={t('catalog.navigation')} className="flex flex-wrap gap-2">
+        {(Object.entries(kinds) as [MenuKind, (typeof kinds)[MenuKind]][]).map(([value, label]) => (
           <Button
             key={value}
             variant={kind === value ? 'secondary' : 'outline'}
@@ -81,12 +90,12 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
               setNotice('');
             }}
           >
-            {label}
+            {t(label)}
           </Button>
         ))}
       </nav>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">{kinds[kind]}</h2>
+        <h2 className="text-xl font-semibold">{t(kinds[kind])}</h2>
         {canManage && !archived ? (
           <Button
             onClick={() => {
@@ -94,7 +103,7 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
               setNotice('');
             }}
           >
-            Add {kinds[kind].toLowerCase().replace(/ies$/, 'y').replace(/s$/, '')}
+            {t(addLabels[kind])}
           </Button>
         ) : null}
       </div>
@@ -109,14 +118,14 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
         <Input
           key={kind}
           name="search"
-          aria-label="Search catalog"
-          placeholder="Name, product SKU or barcode"
+          aria-label={t('catalog.searchLabel')}
+          placeholder={t('catalog.searchPlaceholder')}
           className="max-w-sm"
           maxLength={160}
           defaultValue={search}
         />
         <Button variant="outline" type="submit">
-          Search
+          {t('catalog.search')}
         </Button>
         <label className="flex min-h-11 items-center gap-2 text-sm">
           <input
@@ -128,7 +137,7 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
               setEditing(null);
             }}
           />
-          Show archived
+          {t('catalog.showArchived')}
         </label>
         <Button
           variant="ghost"
@@ -138,17 +147,17 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
             setEditing(null);
           }}
         >
-          Reload
+          {t('catalog.reload')}
         </Button>
       </form>
       {notice ? (
         <p role="status" className="text-sm">
-          {notice}
+          {t('catalog.saved')}
         </p>
       ) : null}
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {editing ? (
@@ -161,12 +170,12 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
         />
       ) : null}
       {loading ? (
-        <p role="status">Loading catalog…</p>
+        <p role="status">{t('catalog.loading')}</p>
       ) : !error ? (
         <>
           {!result?.items.length ? (
             <p className="rounded-md border p-6 text-muted-foreground">
-              No {kinds[kind].toLowerCase()} found.
+              {t('catalog.noResults', { kind: t(kinds[kind]).toLocaleLowerCase(locale) })}
             </p>
           ) : (
             <ul className="divide-y rounded-md border bg-card">
@@ -182,7 +191,7 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
                       {row.name}{' '}
                       {!row.active ? (
                         <span className="text-sm text-muted-foreground">
-                          ({row.deletedAt ? 'Archived' : 'Inactive'})
+                          ({row.deletedAt ? t('common.archived') : t('common.inactive')})
                         </span>
                       ) : null}
                     </p>
@@ -191,29 +200,29 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
                     ) : null}
                     {row.sku ? (
                       <p className="text-sm">
-                        SKU {row.sku} · Price {row.sellingPrice} · Tax {row.taxRate}%{' '}
-                        {row.taxMode?.toLowerCase()}
+                        {t('catalog.productSummary', { sku: row.sku, price: row.sellingPrice ?? '', tax: row.taxRate ?? '' })}{' '}
+                        {row.taxMode === 'INCLUSIVE' ? t('catalog.taxIncluded') : row.taxMode === 'EXCLUSIVE' ? t('catalog.taxExcluded') : ''}
                       </p>
                     ) : null}
                     {row.priceAdjustment ? (
-                      <p className="text-sm">Adjustment {row.priceAdjustment}</p>
+                      <p className="text-sm">{t('catalog.adjustmentAmount', { amount: row.priceAdjustment })}</p>
                     ) : null}
                     {row.minSelections !== undefined ? (
                       <p className="text-sm">
-                        Choose {row.minSelections}–{row.maxSelections}
+                        {t('catalog.chooseRange', { min: row.minSelections, max: row.maxSelections ?? 0 })}
                       </p>
                     ) : null}
                   </div>
                   {canManage && !row.deletedAt ? (
                     <Button
                       variant="outline"
-                      aria-label={`Edit ${row.name}`}
+                      aria-label={t('catalog.editNamed', { name: row.name })}
                       onClick={() => {
                         setEditing(row);
                         setNotice('');
                       }}
                     >
-                      Edit
+                      {t('catalog.edit')}
                     </Button>
                   ) : null}
                 </li>
@@ -222,15 +231,15 @@ export function MenuCatalog({ canManage }: { canManage: boolean }) {
           )}
           <div className="flex items-center gap-4">
             <Button variant="outline" disabled={page === 1} onClick={() => setPage((v) => v - 1)}>
-              Previous
+              {t('catalog.previous')}
             </Button>
-            <span className="text-sm">Page {page}</span>
+            <span className="text-sm">{t('catalog.page', { page })}</span>
             <Button
               variant="outline"
               disabled={!result?.hasMore}
               onClick={() => setPage((v) => v + 1)}
             >
-              Next
+              {t('catalog.next')}
             </Button>
           </div>
         </>
@@ -282,6 +291,7 @@ function CatalogEditor({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const { t, locale } = useI18n();
   const [refs, setRefs] = useState<Partial<Record<MenuKind, MenuRecord[]>>>({});
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -389,11 +399,11 @@ function CatalogEditor({
           className={selectClass}
           disabled={name === 'groupId' && !!row}
         >
-          <option value="">Select {label.toLowerCase()}</option>
+          <option value="">{t('catalog.selectReference', { label: label.toLocaleLowerCase(locale) })}</option>
           {refs[refKind]?.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
-              {item.active ? '' : ' (inactive)'}
+              {item.active ? '' : ` (${t('common.inactive')})`}
             </option>
           ))}
         </select>
@@ -414,12 +424,12 @@ function CatalogEditor({
                 defaultChecked={selected.includes(item.id)}
               />
               {item.name}
-              {item.active ? '' : ' (inactive)'}
+              {item.active ? '' : ` (${t('common.inactive')})`}
             </label>
           ))
         ) : (
           <p className="text-sm text-muted-foreground">
-            Configure {label.toLowerCase()} to assign them here.
+            {t('catalog.configureReference', { label: label.toLocaleLowerCase(locale) })}
           </p>
         )}
       </fieldset>
@@ -429,23 +439,23 @@ function CatalogEditor({
     <form
       onSubmit={(e) => void submit(e)}
       className="space-y-5 rounded-lg border bg-card p-5"
-      aria-label="Catalog editor"
+      aria-label={t('catalog.editor')}
     >
-      <h3 className="text-lg font-semibold">{row ? `Edit ${row.name}` : 'New catalog entry'}</h3>
+      <h3 className="text-lg font-semibold">{row ? t('catalog.editNamed', { name: row.name }) : t('catalog.newEntry')}</h3>
       {error ? (
         <p role="alert" className="break-words text-sm text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {!ready ? (
-        <p role="status">Loading options…</p>
+        <p role="status">{t('catalog.loadingOptions')}</p>
       ) : (
         <fieldset disabled={pending} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField name="name" label="Name" value={row?.name} required />
+            <TextField name="name" label={t('catalog.name')} value={row?.name} required />
             <TextField
               name="sortOrder"
-              label="Sort order"
+              label={t('catalog.sortOrder')}
               value={row?.sortOrder ?? 0}
               type="number"
               required
@@ -453,36 +463,36 @@ function CatalogEditor({
           </div>
           <TextField
             name="description"
-            label="Description"
+            label={t('catalog.description')}
             value={row?.description}
             maxLength={2000}
           />
           <label className="flex min-h-11 items-center gap-3 text-sm">
             <input name="active" type="checkbox" defaultChecked={row?.active ?? true} />
-            Active
+            {t('catalog.active')}
           </label>
           {kind === 'products' ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <TextField name="sku" label="SKU" value={row?.sku} maxLength={80} required />
-                <TextField name="barcode" label="Barcode" value={row?.barcode} maxLength={80} />
-                {select('categoryId', 'Category', 'categories', row?.categoryId)}
+                <TextField name="sku" label={t('catalog.sku')} value={row?.sku} maxLength={80} required />
+                <TextField name="barcode" label={t('catalog.barcode')} value={row?.barcode} maxLength={80} />
+                {select('categoryId', t('catalog.category'), 'categories', row?.categoryId)}
                 <TextField
                   name="sellingPrice"
-                  label="Selling price (branch currency)"
+                  label={t('catalog.sellingPrice')}
                   value={row?.sellingPrice}
                   decimal
                   required
                 />
                 <TextField
                   name="taxRate"
-                  label="Tax rate (%)"
+                  label={t('catalog.taxRate')}
                   value={row?.taxRate}
                   decimal
                   required
                 />
                 <div className="space-y-2">
-                  <Label htmlFor="menu-taxMode">Price tax mode</Label>
+                  <Label htmlFor="menu-taxMode">{t('catalog.taxMode')}</Label>
                   <select
                     id="menu-taxMode"
                     name="taxMode"
@@ -490,32 +500,37 @@ function CatalogEditor({
                     required
                     className={selectClass}
                   >
-                    <option value="">Select tax mode</option>
-                    <option value="INCLUSIVE">Tax included</option>
-                    <option value="EXCLUSIVE">Tax excluded</option>
+                    <option value="">{t('catalog.selectTaxMode')}</option>
+                    <option value="INCLUSIVE">{t('catalog.taxIncluded')}</option>
+                    <option value="EXCLUSIVE">{t('catalog.taxExcluded')}</option>
                   </select>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Enter prices and percentages with two decimals, for example 5.50. Use the tax
-                configuration provided by your business.
+                {t('catalog.decimalHint')}
               </p>
+              {/* Deliberately a text field: type="url" makes the browser reject an
+                  app path such as /food/riza-burger.webp, which is the portable way
+                  to reference an image bundled with the app. The schema still
+                  enforces that the value is a same-origin path or an http(s) URL. */}
               <TextField
                 name="imageUrl"
-                label="Image URL"
+                label={t('catalog.imageUrl')}
                 value={row?.imageUrl}
                 maxLength={2048}
-                type="url"
               />
+              <p className="text-sm text-muted-foreground">
+                {t('catalog.imageHint')}
+              </p>
               {choices(
                 'modifierGroupIds',
-                'Modifier groups',
+                t('catalog.modifierGroups'),
                 'modifier-groups',
                 row?.modifierGroupIds,
               )}
               {choices(
                 'kitchenStationIds',
-                'Kitchen stations',
+                t('catalog.kitchenStations'),
                 'kitchen-stations',
                 row?.kitchenStationIds,
               )}
@@ -525,14 +540,14 @@ function CatalogEditor({
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
                 name="minSelections"
-                label="Minimum selections"
+                label={t('catalog.minSelections')}
                 value={row?.minSelections ?? 0}
                 type="number"
                 required
               />
               <TextField
                 name="maxSelections"
-                label="Maximum selections"
+                label={t('catalog.maxSelections')}
                 value={row?.maxSelections ?? 1}
                 type="number"
                 required
@@ -541,10 +556,10 @@ function CatalogEditor({
           ) : null}
           {kind === 'modifiers' ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {select('groupId', 'Modifier group', 'modifier-groups', row?.groupId)}
+              {select('groupId', t('catalog.modifierGroup'), 'modifier-groups', row?.groupId)}
               <TextField
                 name="priceAdjustment"
-                label="Price adjustment"
+                label={t('catalog.priceAdjustment')}
                 value={row?.priceAdjustment ?? '0.00'}
                 decimal
                 required
@@ -552,27 +567,26 @@ function CatalogEditor({
             </div>
           ) : null}
           <div className="flex flex-wrap gap-3">
-            <Button type="submit">{pending ? 'Saving…' : 'Save entry'}</Button>
+            <Button type="submit">{pending ? t('catalog.saving') : t('catalog.save')}</Button>
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              {t('catalog.cancel')}
             </Button>
             {row ? (
               <Button type="button" variant="destructive" onClick={() => setConfirmArchive(true)}>
-                Archive entry
+                {t('catalog.archive')}
               </Button>
             ) : null}
           </div>
           {confirmArchive ? (
             <div className="space-y-3 rounded-md border p-4">
               <p>
-                Archive this entry? It will leave the active catalog and remain in the audit
-                history.
+                {t('catalog.archivePrompt')}
               </p>
               <Button type="button" variant="destructive" onClick={() => void archive()}>
-                Confirm archive
+                {t('catalog.confirmArchive')}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setConfirmArchive(false)}>
-                Keep entry
+                {t('catalog.keep')}
               </Button>
             </div>
           ) : null}
@@ -580,7 +594,7 @@ function CatalogEditor({
       )}
       {!ready ? (
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('catalog.cancel')}
         </Button>
       ) : null}
     </form>
