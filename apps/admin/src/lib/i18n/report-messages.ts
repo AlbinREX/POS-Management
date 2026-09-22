@@ -829,7 +829,7 @@ export const REPORT_MESSAGES = {
   },
   "report.freshFromOurKitchen": {
     "en": "FRESH FROM OUR KITCHEN",
-    "sq": "E FRESKëT NGA KUZHINA JONë"
+    "sq": "E FRESKËT NGA KUZHINA JONË"
   },
   "report.orderCount": {
     "sq": "Porosi: {count}",
@@ -856,12 +856,12 @@ export const REPORT_MESSAGES = {
     "en": "collected {amount}"
   },
   "report.paymentCount": {
-    "sq": "Pagesa: {count} ë rimbursuar {amount}",
-    "en": "{count} payments ? refunded {amount}"
+    "sq": "Pagesa: {count} · rimbursuar {amount}",
+    "en": "{count} payments · refunded {amount}"
   },
   "report.stockCount": {
-    "sq": "Negativ: {negative} ë pozicione: {positions}",
-    "en": "{negative} negative ? {positions} positions"
+    "sq": "Negativ: {negative} · pozicione: {positions}",
+    "en": "{negative} negative · {positions} positions"
   },
   "report.viewTitle": {
     "sq": "Raporti: {view}",
@@ -1241,6 +1241,7 @@ export const REPORT_LABEL_KEYS = {
 } as const;
 
 export const REPORT_ENUM_KEYS = {
+  "ORDERED": "operations.ordered",
   "DINE_IN": "report.enumDineIn",
   "TAKEAWAY": "report.enumTakeaway",
   "DRAFT": "report.enumDraft",

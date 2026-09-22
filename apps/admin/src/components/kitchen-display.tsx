@@ -235,7 +235,7 @@ export function KitchenDisplay({ user }: { user: SessionUser }) {
                   <h2 className="text-2xl font-bold">
                     #{ticket.content.orderNumber} · {ticket.content.stationName}
                   </h2>
-                  <strong>{minutes} min</strong>
+                  <strong>{minutes} {t('common.minutes')}</strong>
                 </div>
                 <p className="text-lg">
                   {ticket.content.tableName

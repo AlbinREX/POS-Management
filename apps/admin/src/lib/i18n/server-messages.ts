@@ -10,8 +10,42 @@
  * or unmapped server message still reaches the operator rather than disappearing.
  */
 import type { Locale } from './locale';
+import { MESSAGES } from './messages';
 
 const SQ: Record<string, string> = {
+  'Too many requests': 'Ka shumë kërkesa. Prit pak dhe provo përsëri.',
+  'Request origin rejected': 'Kërkesa u refuzua për shkak të burimit të saj.',
+  'Request body is too large': 'Kërkesa përmban tepër të dhëna.',
+  'Invalid JSON body': 'Formati i të dhënave të kërkesës është i pavlefshëm.',
+  'Internal server error': 'Ndodhi një gabim në server. Provo përsëri.',
+  'Modifiers produce a negative unit price': 'Shtesat e zgjedhura e bëjnë çmimin e njësisë negativ.',
+  'Order amount exceeds supported range': 'Shuma e porosisë e tejkalon kufirin e lejuar.',
+  'Discount exceeds order subtotal': 'Zbritja e tejkalon nëntotalin e porosisë.',
+  'Invalid decimal money': 'Format i pavlefshëm i shumës monetare.',
+  'Money exceeds supported range': 'Shuma monetare e tejkalon kufirin e lejuar.',
+  'Invalid unit selection': 'Sasi e pavlefshme e artikujve të zgjedhur.',
+  'Invalid line total': 'Total i pavlefshëm i artikullit.',
+  'Tendered cash is less than payment': 'Paratë e pranuara janë më pak se shuma për pagesë.',
+  'Sandbox provider is unreachable': 'Ofruesi testues nuk është i arritshëm.',
+  'Sandbox provider rejected the sale': 'Ofruesi testues e refuzoi shitjen.',
+  'Protected owner role requires an operator-controlled migration': 'Roli i mbrojtur i pronarit kërkon migrim të kontrolluar nga operatori.',
+  'Cannot edit a role assigned to yourself or another branch; create a dedicated role': 'Nuk mund ta ndryshosh rolin tënd ose një rol të degës tjetër. Krijo një rol të veçantë.',
+  'Database unavailable': 'Databaza nuk është në dispozicion.',
+  'Disable or revise active recipes before deactivating this record': 'Çaktivizo ose ndrysho recetat aktive para se ta çaktivizosh këtë regjistrim.',
+  'This status transition is not available in the layout foundation': 'Ky ndryshim i gjendjes nuk është i disponueshëm në planin e sallës.',
+  'Modifier selection does not satisfy the product configuration': 'Shtesat e zgjedhura nuk përputhen me konfigurimin e produktit.',
+  'Submitted orders are immutable; kitchen amendments are not available': 'Porositë e dërguara nuk mund të ndryshohen. Ndryshimet pas dërgimit në kuzhinë nuk janë të disponueshme.',
+  'Only a nonempty zero-total waiting order can settle without payment': 'Vetëm porosia me artikuj, me total zero dhe në pritje të pagesës mund të përfundohet pa pagesë.',
+  'Cancel an unsettled payment in full, or refund a settled payment': 'Anulo tërësisht pagesën e papërfunduar ose rimburso pagesën e përfunduar.',
+  'Use original method: cash needs a shift; card needs external reversal confirmation; a company account needs neither': 'Përdor mënyrën fillestare: paratë në dorë kërkojnë ndërrim arke, kartela kërkon konfirmim të jashtëm të kthimit, ndërsa llogaria e kompanisë nuk kërkon asnjërën.',
+  'The local server is unavailable. Try again.': 'Serveri lokal nuk është në dispozicion. Provo përsëri.',
+  'No fiscal provider transport is implemented. EnterNet F-LINK integration requires the provider specification.': 'Lidhja me ofruesin fiskal ende nuk është implementuar. Integrimi EnterNet F-LINK kërkon specifikimet e ofruesit.',
+  'Cloud delivery transport is not implemented in this phase': 'Dërgimi në cloud ende nuk është implementuar.',
+  'Invalid input': 'Të dhëna të pavlefshme',
+  'Invalid request': 'Kërkesë e pavlefshme',
+  'Use 0.00 for zero': 'Përdor 0.00 për zeron',
+  'Duplicate IDs': 'Identifikues të përsëritur',
+  'Minimum exceeds maximum': 'Minimumi e tejkalon maksimumin',
   "Authentication required": "Kërkohet vërtetimi i identitetit",
   "Invalid session": "Sesion i pavlefshëm",
   "Invalid credentials or unavailable branch": "Kredenciale të pasakta ose degë e padisponueshme",
@@ -102,7 +136,6 @@ const SQ: Record<string, string> = {
   "Payment not found": "Pagesa nuk u gjet",
   "Payment exceeds remaining balance or is zero": "Pagesa e tejkalon bilancin e mbetur ose është zero",
   "Payment history limit reached": "U arrit kufiri i historikut të pagesave",
-  "Tendered cash is less than payment": "Paraja e dhënë është më e vogël se pagesa",
   "Bill split mode is immutable": "Mënyra e ndarjes së faturës nuk mund të ndryshohet",
   "Item split supports at most 2000 units per order": "Ndarja sipas artikujve mbështet maksimum 2000 njësi për porosi",
   "Selected item units are already paid": "Njësitë e zgjedhura janë paguar tashmë",
@@ -184,8 +217,45 @@ const SQ: Record<string, string> = {
   "Branch timezone is not a valid IANA zone": "Zona kohore e degës nuk është një zonë e vlefshme IANA",
 };
 
-/** Translate a message the API produced, or return it unchanged when unmapped. */
+// Build once. The catalogue also contains the client's raw fallback messages and
+// notices, so all displayed errors use the same language without changing API data.
+const catalogue = new Map<string, string>(Object.values(MESSAGES).map(({ en, sq }) => [en, sq]));
+const templates = Object.values(MESSAGES)
+  .filter(({ en }) => en.includes('{') && en.replace(/\{\w+\}/g, '').length >= 12)
+  .map(({ en, sq }) => {
+    const names: string[] = [];
+    const escaped = en.split(/(\{\w+\})/g).map((part) => {
+      if (/^\{\w+\}$/.test(part)) {
+        names.push(part.slice(1, -1));
+        return '(.+?)';
+      }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('');
+    return { pattern: new RegExp(`^${escaped}$`), names, sq };
+  });
+
+/** Render-only translation. Unknown messages remain intact for diagnosis. */
 export function serverMessage(message: string, locale: Locale): string {
   if (locale === 'en') return message;
-  return SQ[message] ?? message;
+  const exact = SQ[message] ?? catalogue.get(message);
+  if (exact) return exact;
+  for (const { pattern, names, sq } of templates) {
+    const match = pattern.exec(message);
+    if (match) return sq.replace(/\{(\w+)\}/g, (token, name: string) => {
+      const index = names.indexOf(name);
+      return index < 0 ? token : match[index + 1] ?? token;
+    });
+  }
+  // Zod errors may be joined and prefixed with a field path. Keep the path (an
+  // internal identifier) intact while translating its human-readable explanation.
+  if (message.includes('; ')) return message.split('; ').map((part) => serverMessage(part, locale)).join('; ');
+  const field = /^([\w.[\]]+): (.+)$/.exec(message);
+  if (field) return `${field[1]}: ${serverMessage(field[2]!, locale)}`;
+  const minimum = /^Too small: expected (string|number|array) to have >=?(\d+) (characters|items)$/.exec(message);
+  if (minimum) return `Kërkohen së paku ${minimum[2]} ${minimum[3] === 'characters' ? 'karaktere' : 'artikuj'}.`;
+  const maximum = /^Too big: expected (string|number|array) to have <=?(\d+) (characters|items)$/.exec(message);
+  if (maximum) return `Lejohen deri në ${maximum[2]} ${maximum[3] === 'characters' ? 'karaktere' : 'artikuj'}.`;
+  if (/^Invalid (string|input|option|format|email address|URL|UUID)/.test(message)) return 'Vlerë e pavlefshme. Kontrollo formatin dhe fushat e kërkuara.';
+  if (/^Too (small|big): expected (number|int)/.test(message)) return 'Vlera është jashtë kufijve të lejuar.';
+  return message;
 }

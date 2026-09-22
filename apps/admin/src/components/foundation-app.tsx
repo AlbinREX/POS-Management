@@ -46,6 +46,12 @@ type Tab =
   | 'Purchasing'
   | 'Companies'
   | 'Dashboard';
+const roleLabels: Record<string, MessageKey> = {
+  OWNER: 'role.OWNER', ADMIN: 'role.ADMIN', MANAGER: 'role.MANAGER',
+  CASHIER: 'role.CASHIER', WAITER: 'role.WAITER', KITCHEN: 'role.KITCHEN', STOREKEEPER: 'role.STOREKEEPER',
+};
+const roleLabel = (name: string, t: Translate) => roleLabels[name] ? t(roleLabels[name]!) : name;
+
 interface Role {
   id: string;
   name: string;
@@ -72,6 +78,10 @@ interface AuditRow {
   entityId: string | null;
   userId: string | null;
 }
+const terminalLabels: Record<string, MessageKey> = {
+  POS: 'terminal.POS', KDS: 'terminal.KDS', WAITER: 'terminal.WAITER',
+  ADMIN: 'terminal.ADMIN', OWNER: 'terminal.OWNER', KIOSK: 'terminal.KIOSK',
+};
 function Field({
   label,
   name,
@@ -90,6 +100,7 @@ function Field({
       <Label htmlFor={name}>{label}</Label>
       <Input
         id={name}
+        data-testid={`field-${name}`}
         name={name}
         type={type}
         autoComplete={autoComplete}
@@ -276,7 +287,7 @@ export function FoundationApp({
               type="password"
               autoComplete="current-password"
             />
-            <Button type="submit" size="lg" disabled={pending}>
+            <Button type="submit" size="lg" disabled={pending} data-testid="login-submit">
               {pending ? t('login.pending') : t('action.signIn')}
             </Button>
           </form>
@@ -382,6 +393,7 @@ function Workspace({
           {tabs.map((item) => (
             <Button
               key={item}
+              data-testid={`nav-${item.toLowerCase().replaceAll(' ', '-')}`}
               variant={tab === item ? 'secondary' : 'ghost'}
               className="shrink-0 justify-start gap-3"
               aria-current={tab === item ? 'page' : undefined}
@@ -426,7 +438,7 @@ function Workspace({
                       <NavIcon name={item} />
                       <strong>{t(navKeys[item])}</strong>
                       <span>
-                        Open workspace <span aria-hidden="true">↗</span>
+                        {t('home.openWorkspace')} <span aria-hidden="true">↗</span>
                       </span>
                     </button>
                   ))}
@@ -498,7 +510,7 @@ function Overview({ user }: { user: SessionUser }) {
         {user.permissions.length ? (
           <ul className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
             {user.permissions.map((permission) => (
-              <li key={permission}>{permission.replace('.', ' / ')}</li>
+              <li key={permission} title={permission}>{t(permission)}</li>
             ))}
           </ul>
         ) : (
@@ -581,7 +593,7 @@ function Team({ user }: { user: SessionUser }) {
       {list.error || roles.error ? (
         <Notice>{message(list.error || roles.error, t, locale)}</Notice>
       ) : null}
-      {success ? <p role="status">{success}</p> : null}
+      {success ? <p role="status">{serverMessage(success, locale)}</p> : null}
       {canManage && user.permissions.includes('role.read') ? (
         <form
           onSubmit={(event) => void create(event)}
@@ -606,7 +618,7 @@ function Team({ user }: { user: SessionUser }) {
                 .filter((role) => !role.protected)
                 .map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.name}
+                    {roleLabel(role.name, t)}
                   </option>
                 ))}
             </select>
@@ -638,7 +650,7 @@ function Team({ user }: { user: SessionUser }) {
                     <p className="font-medium">{member.user.name}</p>
                     <p className="mt-1 text-muted-foreground">{member.user.email}</p>
                   </TableCell>
-                  <TableCell>{member.roles.map((r) => r.role.name).join(', ')}</TableCell>
+                  <TableCell>{member.roles.map((r) => roleLabel(r.role.name, t)).join(', ')}</TableCell>
                   <TableCell>{member.active ? t('common.active') : t('team.disabled')}</TableCell>
                   <TableCell>
                     {canManage &&
@@ -658,7 +670,7 @@ function Team({ user }: { user: SessionUser }) {
         </div>
       )}
       <p className="text-sm text-muted-foreground">
-        Showing up to 200 branch members. Access changes apply immediately.
+        {t('team.limitHint')}
       </p>
     </div>
   );
@@ -692,7 +704,7 @@ function Roles({ user }: { user: SessionUser }) {
   return (
     <div className="flex flex-col gap-5">
       {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}
-      {success ? <p role="status">{success}</p> : null}
+      {success ? <p role="status">{serverMessage(success, locale)}</p> : null}
       <form
         onSubmit={(event) => void save(event)}
         className="flex flex-col gap-5 rounded-lg border bg-card p-6"
@@ -712,7 +724,7 @@ function Roles({ user }: { user: SessionUser }) {
             <option value="">{t('roles.createNew')}</option>
             {list.rows.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.name}
+                {roleLabel(r.name, t)}
               </option>
             ))}
           </select>
@@ -725,6 +737,7 @@ function Roles({ user }: { user: SessionUser }) {
               <label key={key} className="flex min-h-11 items-center gap-3">
                 <input
                   type="checkbox"
+                  data-testid={`permission-${key}`}
                   checked={permissions.includes(key)}
                   disabled={!user.permissions.includes(key)}
                   onChange={(event) =>
@@ -735,19 +748,19 @@ function Roles({ user }: { user: SessionUser }) {
                     )
                   }
                 />
-                <span className="text-sm">{key.replace('.', ' / ')}</span>
+                <span className="text-sm" title={key}>{t(key)}</span>
               </label>
             ))}
           </div>
         </fieldset>
         {role?.protected ? (
           <p className="text-sm text-muted-foreground">
-            Owner access is protected from accidental changes.
+            {t('roles.protectedHint')}
           </p>
         ) : canEdit ? (
           <div>
             <Button type="submit" disabled={busy || list.loading}>
-              Save permissions
+              {t('roles.save')}
             </Button>
           </div>
         ) : null}
@@ -792,7 +805,7 @@ function Terminals({ user }: { user: SessionUser }) {
   return (
     <div className="flex flex-col gap-6">
       {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}
-      {success ? <p role="status">{success}</p> : null}
+      {success ? <p role="status">{serverMessage(success, locale)}</p> : null}
       {canManage ? (
         <form
           onSubmit={(event) => void create(event)}
@@ -804,13 +817,13 @@ function Terminals({ user }: { user: SessionUser }) {
             <select id="terminal-type" name="type">
               {['POS', 'KDS', 'WAITER', 'ADMIN', 'OWNER', 'KIOSK'].map((type) => (
                 <option key={type} value={type}>
-                  {type}
+                  {t(terminalLabels[type]!)}
                 </option>
               ))}
             </select>
           </div>
           <Button type="submit" disabled={busy}>
-            Register terminal
+            {t('terminals.register')}
           </Button>
         </form>
       ) : null}
@@ -839,11 +852,11 @@ function Terminals({ user }: { user: SessionUser }) {
                       {terminal.id}
                     </p>
                   </TableCell>
-                  <TableCell>{terminal.type}</TableCell>
+                  <TableCell>{terminalLabels[terminal.type] ? t(terminalLabels[terminal.type]!) : terminal.type}</TableCell>
                   <TableCell>
                     {terminal.lastSeenAt
                       ? formatDateTime(terminal.lastSeenAt, locale)
-                      : 'Not connected yet'}
+                      : t('terminal.notConnected')}
                   </TableCell>
                   <TableCell>
                     {canManage ? (
@@ -852,12 +865,12 @@ function Terminals({ user }: { user: SessionUser }) {
                         disabled={busy}
                         onClick={() => void toggle(terminal)}
                       >
-                        {terminal.active ? 'Disable' : 'Enable'}
+                        {terminal.active ? t('terminal.disable') : t('terminal.enable')}
                       </Button>
                     ) : terminal.active ? (
-                      'Active'
+                      t('common.active')
                     ) : (
-                      'Disabled'
+                      t('team.disabled')
                     )}
                   </TableCell>
                 </TableRow>
@@ -883,7 +896,7 @@ function AuditHistory() {
     <div className="flex flex-col gap-5">
       <div>
         <Button variant="outline" disabled={list.loading} onClick={() => void list.reload()}>
-          Refresh history
+          {t('audit.refresh')}
         </Button>
       </div>
       {list.error ? <Notice>{message(list.error, t, locale)}</Notice> : null}

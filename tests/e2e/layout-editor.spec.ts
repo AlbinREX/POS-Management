@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 /**
  * The visual floor-plan editor: draw, move, resize, snap, clamp, edit and save.

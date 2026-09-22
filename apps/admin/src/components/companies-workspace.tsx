@@ -15,7 +15,7 @@ import { api, ApiFailure } from '../lib/api';
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Companies' | 'Contracts' | 'Employees' | 'Account' | 'Statements';
-const label = (v: string, t: Translate) => {
+const translatedLabel = (v: string, t: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ACTIVE: 'operations.active', EXPIRED: 'operations.statusExpired', SUSPENDED: 'operations.statusSuspended', TERMINATED: 'operations.statusTerminated',
     MONTHLY: 'operations.monthly', BIWEEKLY: 'operations.biweekly', WEEKLY: 'operations.weekly',
@@ -39,6 +39,7 @@ async function all<T>(path: string) {
 }
 export function CompaniesWorkspace({ user }: { user: SessionUser }) {
   const { t, locale } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const can = (p: SessionUser['permissions'][number]) => user.permissions.includes(p),
     manage = can('company.manage'),
     contractManage = can('contract.manage'),
@@ -294,7 +295,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                   {contracts.map((c) => (
                     <li key={c.id}>
                       <strong>{c.contractNumber}</strong>
-                      <span className="stock-badge">{label(c.status)}</span>
+                      <span className="stock-badge" data-testid="contract-status" data-status={c.status}>{label(c.status)}</span>
                       <span>
                         {t('operations.limit')} {c.creditLimit} {c.currency} · {c.discountPercentage}{t('operations.net')}{' '}
                         {c.paymentTermsDays} {t('operations.days')} {label(c.billingCycle)}
@@ -414,7 +415,7 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                     </div>
                   </dl>
                   <p>
-                    {t('operations.charged')} {account.charged} {t('operations.paid')} {account.paid} · {account.orderCount} {t('operations.ordersContract')} {account.contractStatus ? label(account.contractStatus) : 'none'}
+                    {t('operations.charged')} {account.charged} {t('operations.paid')} {account.paid} · {account.orderCount} {t('operations.ordersContract')} {account.contractStatus ? label(account.contractStatus) : t('common.none')}
                   </p>
                   {recordPayment && account.balance !== '0.00' ? (
                     <Button type="button" disabled={locked} onClick={() => setEditor('payment')}>
@@ -425,13 +426,13 @@ export function CompaniesWorkspace({ user }: { user: SessionUser }) {
                     <ul className="company-list">
                       {account.items.map((entry) => (
                         <li key={entry.id} className="purchase-entry">
-                          <strong>{label(entry.kind)}</strong>
+                          <strong data-testid={`company-entry-${entry.kind}`}>{label(entry.kind)}</strong>
                           <span>{entry.amount}</span>
                           <span>
                             {entry.orderNumber ? t('operations.orderNumber', { number: entry.orderNumber }) : entry.reference}
                             {entry.employeeName ? ` · ${entry.employeeName}` : ''}
                           </span>
-                          <span>{entry.reason}</span>
+                          <span>{serverMessage(entry.reason, locale)}</span>
                           {reversePayment && entry.kind === 'PAYMENT' && !entry.reversed ? (
                             <Button
                               type="button"

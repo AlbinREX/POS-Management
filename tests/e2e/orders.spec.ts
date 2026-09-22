@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('dine-in and takeaway orders retain snapshots and recover an uncertain save without duplicates', async ({
   page,

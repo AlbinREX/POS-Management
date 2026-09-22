@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useI18n } from '../lib/i18n';
 
 export function Brand() {
+  const { t } = useI18n();
   return (
     <div className="riza-brand">
       <span className="riza-mark" aria-hidden="true">
@@ -10,7 +12,7 @@ export function Brand() {
       </span>
       <div>
         <strong>FastFood Riza</strong>
-        <span>RESTAURANT WORKSPACE</span>
+        <span>{t('brand.workspace')}</span>
       </div>
     </div>
   );
@@ -53,6 +55,7 @@ export function NavIcon({ name }: { name: string }) {
 }
 
 export function ProductImage({ name, src }: { name: string; src?: string | null }) {
+  const { t } = useI18n();
   const [failed, setFailed] = useState<string | null>(null);
   return (
     <div className="product-image">
@@ -60,9 +63,9 @@ export function ProductImage({ name, src }: { name: string; src?: string | null 
         // Configured catalog URLs can belong to a restaurant's LAN; no image proxy is required.
         <img src={src} alt={name} loading="lazy" onError={() => setFailed(src)} />
       ) : (
-        <div className="product-placeholder" aria-label={`No image for ${name}`}>
+        <div className="product-placeholder" aria-label={t('report.noImage', { name })}>
           <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
-          <small>FRESH FROM OUR KITCHEN</small>
+          <small>{t('report.freshFromOurKitchen')}</small>
         </div>
       )}
     </div>

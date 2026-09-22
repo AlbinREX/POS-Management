@@ -3,8 +3,6 @@ import './globals.css';
 import { DEFAULT_LOCALE, LocaleProvider } from '../lib/i18n';
 export const metadata: Metadata = {
   title: 'FastFood Riza · POS',
-  description: 'FastFood Riza restaurant workspace',
-  manifest: '/manifest.webmanifest',
   applicationName: 'FastFood Riza',
   icons: {
     icon: [
@@ -15,7 +13,6 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Riza Waiter',
     statusBarStyle: 'black-translucent',
   },
 };

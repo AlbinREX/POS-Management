@@ -34,6 +34,16 @@ describe('Locale identity', () => {
 });
 
 describe('Message catalogue', () => {
+  it('keeps interpolation parameters identical in both languages', () => {
+    const tokens = (value: string) => [...value.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
+    for (const key of keys) expect(tokens(MESSAGES[key].sq), key).toEqual(tokens(MESSAGES[key].en));
+  });
+  it('contains the requested device labels without changing device identifiers', () => {
+    expect(translate('sq', 'nav.devices')).toBe('Pajisjet');
+    expect(translate('en', 'devices.receiptPrinter')).toBe('Receipt Printer');
+    expect(translate('en', 'devices.testNfc')).toBe('Test NFC');
+    expect(translate('sq', 'devices.connected')).toBe('I lidhur');
+  });
   it('has both languages for every key, with no empty strings', () => {
     const incomplete = keys.filter((key) => {
       const entry = MESSAGES[key];
@@ -65,7 +75,7 @@ describe('Message catalogue', () => {
   });
   it('uses no key that looks like a translated identifier', () => {
     // Keys are internal identifiers and must stay stable ASCII regardless of language.
-    for (const key of keys) expect(key).toMatch(/^[a-z][a-zA-Z0-9.]*$/);
+    for (const key of keys) expect(key).toMatch(/^[a-z][a-zA-Z0-9._]*$/);
   });
 });
 
@@ -75,10 +85,8 @@ describe('translate()', () => {
     expect(translate('en', 'action.save')).toBe('Save');
   });
   it('substitutes named parameters', () => {
-    // A representative parameterised message is asserted through the real catalogue in
-    // the component tests; here the substitution mechanism itself is what matters.
-    const rendered = translate('en', 'common.version');
-    expect(rendered).not.toContain('{');
+    expect(translate('sq', 'report.noImage', { name: 'Burger' })).toBe('Nuk ka fotografi për Burger');
+    expect(translate('en', 'report.noImage', { name: 'Burger' })).toBe('No image for Burger');
   });
   it('never throws and never warns for an unknown key', () => {
     const warnings: unknown[] = [];
@@ -97,6 +105,12 @@ describe('translate()', () => {
 });
 
 describe('Server message translation', () => {
+  it('translates rendered notices and parameters without modifying raw messages', () => {
+    const raw = 'Last successful backup 12h ago.';
+    expect(serverMessage(raw, 'sq')).toBe(translate('sq', 'ops.backupAge', { hours: 12 }));
+    expect(serverMessage(raw, 'en')).toBe(raw);
+    expect(raw).toBe('Last successful backup 12h ago.');
+  });
   it('translates a known API message into Albanian', () => {
     expect(serverMessage('Free the table before moving, resizing or archiving it', 'sq')).toBe(
       'Liro tavolinën para se ta zhvendosësh, ta ripërmasosh ose ta arkivosh',

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -70,9 +70,9 @@ test('company operator configures an account, recovers a lost save and settles a
   await expect(dialog).toHaveCount(0);
   const contractRow = detail.locator('li').filter({ hasText: contractNumber });
   // The workspace lowercases status labels for display.
-  await expect(contractRow.getByText('draft', { exact: true })).toBeVisible();
+  await expect(contractRow.getByTestId('contract-status')).toHaveAttribute('data-status', 'DRAFT');
   await contractRow.getByRole('button', { name: 'Activate', exact: true }).click();
-  await expect(contractRow.getByText('active', { exact: true })).toBeVisible();
+  await expect(contractRow.getByTestId('contract-status')).toHaveAttribute('data-status', 'ACTIVE');
 
   // Authorize an employee for this company. The sessionStorage retry-receipt path is shared
   // with Purchasing and Inventory and is covered by their specs plus companies integration
@@ -144,7 +144,7 @@ test('company operator configures an account, recovers a lost save and settles a
   // The charge was posted out of band, so refresh before asserting on the account view.
   await views.getByRole('button', { name: 'Account', exact: true }).click();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(detail.getByText('charge', { exact: true })).toBeVisible();
+  await expect(detail.getByTestId('company-entry-CHARGE')).toBeVisible();
   await expect(detail.getByText(`${prefix} Employee`)).toBeVisible();
 
   // A statement freezes the period. Desktop and mobile share one database, so each project

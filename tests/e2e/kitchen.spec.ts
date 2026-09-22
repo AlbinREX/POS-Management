@@ -1,4 +1,4 @@
-import { test, expect, request as apiRequest } from '@playwright/test';
+import { test, expect, request as apiRequest } from './fixtures';
 import { randomUUID } from 'node:crypto';
 test('submit immutable order snapshots and operate a kitchen-only display with retry and cancellation', async ({
   page,

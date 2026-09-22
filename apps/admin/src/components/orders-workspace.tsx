@@ -258,7 +258,7 @@ export function OrdersWorkspace({
               .map((g) => (
                 <fieldset className="rounded-md border p-3" key={g.id}>
                   <legend>
-                    {t('sales.chooseRange', { name: g.name, min: g.minSelections, max: g.maxSelections })}
+                    {t('sales.chooseRange', { name: g.name, min: g.minSelections ?? '', max: g.maxSelections ?? '' })}
                   </legend>
                   {modifiers
                     .filter((m) => m.groupId === g.id)
@@ -302,6 +302,7 @@ export function OrdersWorkspace({
     <aside className="space-y-4">
       {manage ? (
         <form
+          data-testid="new-order-form"
           aria-label={t('sales.newOrder')}
           onSubmit={submitCreate}
           className="space-y-3 rounded-lg border p-4"
@@ -334,6 +335,7 @@ export function OrdersWorkspace({
               <label className="block space-y-1">
                 <span>{t('sales.orderType')}</span>
                 <select
+                  data-testid="order-type"
                   aria-label={t('sales.orderType')}
                   className={selectClass}
                   value={type}
@@ -378,9 +380,9 @@ export function OrdersWorkspace({
             )}
             <label className="block space-y-1">
               <span>{t('sales.orderNotes')}</span>
-              <Input name="notes" maxLength={2000} className="min-h-12" />
+              <Input data-testid="order-notes" name="notes" maxLength={2000} className="min-h-12" />
             </label>
-            <Button className="min-h-12 w-full" type="submit">
+            <Button data-testid="create-draft" className="min-h-12 w-full" type="submit">
               {t('sales.createDraft')}
             </Button>
           </fieldset>
@@ -828,7 +830,7 @@ export function OrdersWorkspace({
                     }}
                   >
                     <label className="block">
-                      {t('sales.discountAmount')}{order.currency}{t('sales.gross')}
+                      {t('sales.discountAmount', { currency: order.currency })}
                       <Input
                         key={order.discount}
                         name="amount"

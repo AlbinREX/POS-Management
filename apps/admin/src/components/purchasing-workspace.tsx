@@ -23,7 +23,7 @@ import {
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Orders' | 'Suppliers' | 'Receipts' | 'Account';
-const label = (v: string, t: Translate) => {
+const translatedLabel = (v: string, t: Translate) => {
   const keys = {
     DRAFT: 'operations.statusDraft', ORDERED: 'operations.ordered', PARTIALLY_RECEIVED: 'operations.statusPartiallyReceived', RECEIVED: 'operations.received', CANCELLED: 'operations.statusCancelled',
     RECEIPT: 'operations.entryReceipt', CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal',
@@ -69,6 +69,7 @@ function Totals({
 }
 export function PurchasingWorkspace({ user }: { user: SessionUser }) {
   const { t, locale } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const can = (p: SessionUser['permissions'][number]) => user.permissions.includes(p),
     purchaseRead = can('purchase.read'),
     supplierRead = can('supplier.read');
@@ -591,7 +592,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                     <p className="text-sm text-muted-foreground">
                       {e.reference} {e.method ? label(e.method) : ''}
                     </p>
-                    <p className="text-sm">{e.reason}</p>
+                    <p className="text-sm">{serverMessage(e.reason, locale)}</p>
                     <small className="text-muted-foreground">
                       {e.userName} · {formatDateTime(e.createdAt, locale)}
                     </small>
@@ -650,7 +651,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {selectedOrder.warehouseName} ·{' '}
-                <span data-testid="purchase-detail-status">{label(selectedOrder.status)}</span>
+                <span data-testid="purchase-detail-status" data-status={selectedOrder.status}>{label(selectedOrder.status)}</span>
               </p>
             </div>
             <Button
@@ -853,6 +854,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
 
 function PurchaseHistorySummary({ value }: { value: unknown }) {
   const { t } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const r = value as {
     reference?: string;
     notes?: string;

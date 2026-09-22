@@ -62,6 +62,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     writeStoredLocale(next);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('lang')) {
+      url.searchParams.set('lang', next);
+      window.history.replaceState(window.history.state, '', url);
+    }
   }, []);
 
   const value = useMemo<I18nValue>(
@@ -72,7 +77,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     }),
     [locale, setLocale],
   );
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={value}>
+      <link rel="manifest" href={`/manifest.webmanifest?lang=${locale}`} />
+      <meta name="description" content={MESSAGES['brand.description'][locale]} />
+      <meta name="apple-mobile-web-app-title" content={MESSAGES['pwa.shortName'][locale]} />
+      {children}
+    </I18nContext.Provider>
+  );
 }
 
 export function useI18n(): I18nValue {

@@ -579,7 +579,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                   {qty(m.quantity)} {m.unitCode}
                 </strong>
               </div>
-              <p className="mt-3 text-sm">{m.reason}</p>
+              <p className="mt-3 text-sm">{serverMessage(m.reason, locale)}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {m.userName} {t('operations.entered')} {m.enteredQuantity} {m.enteredUnit}
                 {m.orderNumber ? t('operations.sourceOrder', { number: m.orderNumber }) : ''}

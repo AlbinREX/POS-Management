@@ -12,9 +12,22 @@
  *
  * `{name}` placeholders are substituted by `t(key, params)`.
  */
+import { CATALOG_MESSAGES } from './catalog-messages';
+import { OPERATIONS_MESSAGES } from './operations-messages';
+import { REPORT_MESSAGES } from './report-messages';
+import { SALES_MESSAGES } from './sales-messages';
+import { UI_MESSAGES } from './ui-messages';
+import { PERMISSION_MESSAGES } from './permission-messages';
+
 export type Message = { sq: string; en: string };
 
 export const MESSAGES = {
+  ...CATALOG_MESSAGES,
+  ...OPERATIONS_MESSAGES,
+  ...REPORT_MESSAGES,
+  ...SALES_MESSAGES,
+  ...UI_MESSAGES,
+  ...PERMISSION_MESSAGES,
   // --- Brand and shell ---------------------------------------------------------
   'brand.workspace': { sq: 'HAPËSIRA E RESTORANTIT', en: 'RESTAURANT WORKSPACE' },
   'brand.tagline': { sq: 'Ushqimi i mirë i bashkon njerëzit.', en: 'Good food brings people together.' },
