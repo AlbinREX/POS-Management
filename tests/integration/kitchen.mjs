@@ -143,13 +143,27 @@ export async function runKitchenIntegration(app) {
       await submit(order, {}, 403, kitchenUser.accessToken);
     });
     await test('missing or inactive routing rejects the whole submission with no partial tickets', async () => {
-      await submit(order, {}, 409);
+      const missing = await submit(order, {}, 409);
+      // The rejection must name the product, so the operator knows which menu item to
+      // fix rather than being told only that "every item" needs routing.
+      assert.match(missing.message, /has no active kitchen station assigned/);
+      assert.ok(
+        missing.message.includes(product.name),
+        `expected the offending product name in: ${missing.message}`,
+      );
       assert.equal(await db.kitchenSubmission.count(), 0);
       await db.productKitchenStation.createMany({
         data: [grill, bar].map((s) => ({ ...scope, productId: product.id, stationId: s.id })),
       });
       await db.kitchenStation.update({ where: { id: bar.id }, data: { active: false } });
-      await submit(order, {}, 409);
+      const inactive = await submit(order, {}, 409);
+      // A routed-but-closed station is a different fault from no routing at all, and
+      // naming the station is what tells the operator where to look.
+      assert.match(inactive.message, /unavailable station/);
+      assert.ok(
+        inactive.message.includes(product.name) && inactive.message.includes(bar.name),
+        `expected product and station names in: ${inactive.message}`,
+      );
       assert.equal(await db.kitchenTicket.count(), 0);
       assert.equal((await getOrder(order.id)).version, order.version);
       await db.kitchenStation.update({ where: { id: bar.id }, data: { active: true } });

@@ -119,6 +119,28 @@ describe('Server message translation', () => {
       'Tavolina mbivendoset me një tavolinë tjetër',
     );
   });
+  it('translates each kitchen routing problem, including when several are listed', () => {
+    expect(serverMessage('Riza Burger has no active kitchen station assigned', 'sq')).toBe(
+      'Riza Burger nuk ka stacion aktiv kuzhine të caktuar',
+    );
+    expect(serverMessage('French Fries is routed to unavailable station Grill', 'sq')).toBe(
+      'French Fries dërgohet te stacioni i padisponueshëm Grill',
+    );
+    // Without splitting first, a template placeholder would capture the whole list and
+    // leave the earlier problems in English.
+    const several =
+      'Riza Burger has no active kitchen station assigned; ' +
+      'Pepperoni Pizza is routed to unavailable stations Bar, Grill';
+    expect(serverMessage(several, 'sq')).toBe(
+      'Riza Burger nuk ka stacion aktiv kuzhine të caktuar; ' +
+        'Pepperoni Pizza dërgohet te stacionet e padisponueshme Bar, Grill',
+    );
+    expect(serverMessage(several, 'en')).toBe(several);
+    // A known message that itself contains '; ' still matches whole, before any split.
+    expect(serverMessage('Password changed concurrently; sign in again', 'sq')).toBe(
+      'Fjalëkalimi u ndryshua në ndërkohë; hyr sërish',
+    );
+  });
   it('leaves English untouched', () => {
     const message = 'Free the table before moving, resizing or archiving it';
     expect(serverMessage(message, 'en')).toBe(message);
