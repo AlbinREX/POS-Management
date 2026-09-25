@@ -66,7 +66,8 @@ export const MESSAGES = {
   'tab.dashboard.hint': { sq: 'Shitjet, porositë, produktet, stafi, arka, stoku, blerjet dhe llogaritë e kompanive.', en: 'Sales, orders, products, staff, cash, stock, purchasing and company accounts.' },
   'tab.team.hint': { sq: 'Menaxho personat që kanë qasje në këtë degë.', en: 'Manage the people who can access this branch.' },
   'tab.roles.hint': { sq: 'Kontrollo çfarë mund të bëjë secili rol.', en: 'Control what each role can do.' },
-  'tab.terminals.hint': { sq: 'Regjistro dhe menaxho pajisjet e restorantit.', en: 'Register and manage restaurant devices.' },
+  'tab.terminals.hint': { sq: 'Regjistro dhe menaxho terminalet e restorantit.', en: 'Register and manage restaurant workstations.' },
+  'tab.devices.hint': { sq: 'Printerët dhe lexuesit e kartelave, gjendja e tyre dhe lidhja me stacionet.', en: 'Printers and card readers, their status and station routing.' },
   'tab.audit.hint': { sq: 'Regjistër i përhershëm i ndryshimeve të ndjeshme në këtë degë.', en: 'A permanent record of sensitive changes in this branch.' },
 
   // --- Shared actions ----------------------------------------------------------

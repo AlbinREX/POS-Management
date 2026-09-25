@@ -1,4 +1,4 @@
-/** Shared display text. Device labels are prepared for the separately implemented module. */
+/** Shared display text, including Settings → Devices and the local Device Agent's messages. */
 export const UI_MESSAGES = {
   'brand.description': {
     sq: 'Hapësira e punës së restorantit FastFood Riza',
@@ -98,4 +98,90 @@ export const UI_MESSAGES = {
   'devices.configure': { sq: 'Konfiguro', en: 'Configure' },
   'devices.testPrint': { sq: 'Testo printimin', en: 'Test Print' },
   'devices.testNfc': { sq: 'Testo NFC-në', en: 'Test NFC' },
+  'devices.disabled': { sq: 'Joaktiv', en: 'Disabled' },
+  'devices.noAddress': { sq: 'Pa adresë', en: 'No address' },
+  'devices.loading': { sq: 'Duke i ngarkuar pajisjet…', en: 'Loading devices…' },
+  'devices.agentMissingHint': {
+    sq: 'Agjenti lokal i pajisjeve nuk është konfiguruar në këtë kompjuter, prandaj nga këtu nuk mund të testohen pajisjet as të printohet. Pajisjet mund të konfigurohen gjithsesi.',
+    en: 'The local device agent is not configured on this machine, so hardware cannot be tested or printed to from here. Devices can still be configured.',
+  },
+  'devices.add': { sq: 'Shto pajisje', en: 'Add device' },
+  'devices.saved': { sq: 'Pajisja u ruajt.', en: 'Device saved.' },
+  'devices.answered': { sq: '{name} u përgjigj.', en: '{name} answered.' },
+  'devices.noAnswer': { sq: '{name} nuk u përgjigj.', en: '{name} did not answer.' },
+  'devices.requeued': { sq: 'U vendos sërish për printim.', en: 'Queued for printing again.' },
+  'devices.configuredList': { sq: 'Pajisjet e konfiguruara', en: 'Configured devices' },
+  'devices.empty': {
+    sq: 'Ende nuk ka pajisje të konfiguruara. Shto printerin e faturave, lexuesin e kartelave dhe printerët e kuzhinës e të banakut.',
+    en: 'No devices configured yet. Add the receipt printer, the card reader and the kitchen and bar printers.',
+  },
+  'devices.stationPrinters': { sq: 'Printerët e stacioneve', en: 'Station printers' },
+  'devices.stationPrintersTitle': { sq: 'Printerët e stacioneve të kuzhinës', en: 'Kitchen station printers' },
+  'devices.stationPrintersHint': {
+    sq: "Çdo stacion printon në një printer. Disa stacione mund ta ndajnë të njëjtin printer; një stacion pa printer nuk mund t'i printojë fletëporositë e veta.",
+    en: 'Each station prints to one printer. Stations may share a printer; a station with none cannot print its tickets.',
+  },
+  'devices.printerFor': { sq: 'Printeri për {station}', en: 'Printer for {station}' },
+  'devices.stationPrinterSaved': { sq: 'Printeri i stacionit u ruajt.', en: 'Station printer saved.' },
+  'devices.noPrinter': { sq: 'Pa printer', en: 'No printer' },
+  'devices.unprinted': { sq: 'Dokumentet e paprintuara', en: 'Unprinted documents' },
+  'devices.waitingToPrint': { sq: 'Në pritje për printim', en: 'Waiting to print' },
+  'devices.waitingHint': {
+    sq: 'Këto dokumente nuk kanë arritur te printeri. Porositë dhe fletëporositë e kuzhinës nuk preken.',
+    en: 'These documents have not reached a printer. The orders and kitchen tickets themselves are unaffected.',
+  },
+  'devices.noPrinterAssigned': { sq: 'Nuk ka printer të caktuar', en: 'No printer assigned' },
+  'devices.jobPending': { sq: 'në pritje', en: 'pending' },
+  'devices.jobSent': { sq: 'dërguar', en: 'sent' },
+  'devices.jobConfirmed': { sq: 'konfirmuar', en: 'confirmed' },
+  'devices.jobFailed': { sq: 'dështoi', en: 'failed' },
+  'devices.jobRetryRequired': { sq: 'duhet riprovuar', en: 'retry required' },
+  'devices.configurationForm': { sq: 'Konfigurimi i pajisjes', en: 'Device configuration' },
+  'devices.configureTitle': { sq: 'Konfiguro pajisjen', en: 'Configure device' },
+  'devices.name': { sq: 'Emri i pajisjes', en: 'Device name' },
+  'devices.type': { sq: 'Lloji i pajisjes', en: 'Device type' },
+  'devices.connection': { sq: 'Lidhja', en: 'Connection' },
+  'devices.connectionSerial': { sq: 'Serike / COM', en: 'Serial / COM' },
+  'devices.connectionUsb': { sq: 'USB', en: 'USB' },
+  'devices.connectionWindows': { sq: 'Printer i Windows-it', en: 'Windows printer' },
+  'devices.connectionNetwork': { sq: 'Rrjet (LAN)', en: 'Network (LAN)' },
+  'devices.comPort': { sq: 'Porta COM', en: 'COM port' },
+  // A COM port name is a Windows identifier, the same in both languages.
+  'devices.comPortExample': { sq: 'COM3', en: 'COM3' },
+  'devices.baudRate': { sq: 'Shpejtësia (baud)', en: 'Baud rate' },
+  'devices.windowsPrinterName': { sq: 'Emri i printerit në Windows', en: 'Windows printer name' },
+  'devices.printerIp': { sq: 'Adresa IP e printerit', en: 'Printer IP address' },
+  'devices.port': { sq: 'Porta', en: 'Port' },
+  'devices.inUse': { sq: 'Në përdorim', en: 'In use' },
+  'devices.saveDevice': { sq: 'Ruaj pajisjen', en: 'Save device' },
+  // Raw messages from the local Device Agent. They stay English at the source, because
+  // they are also recorded as a device's last error, and are translated only on display.
+  'devices.agentNotConfigured': {
+    sq: 'Agjenti i pajisjeve nuk është konfiguruar në këtë kompjuter.',
+    en: 'The device agent is not configured on this machine.',
+  },
+  'devices.agentNotRunning': {
+    sq: 'Agjenti i pajisjeve nuk po punon në këtë kompjuter.',
+    en: 'The device agent is not running on this computer.',
+  },
+  'devices.agentRefused': { sq: 'Agjenti i pajisjeve e refuzoi këtë kërkesë.', en: 'The device agent refused this request.' },
+  'devices.agentNoResponse': { sq: 'Agjenti i pajisjeve nuk u përgjigj.', en: 'The device agent did not respond.' },
+  'devices.agentNoAnswer': { sq: '{address} nuk u përgjigj', en: '{address} did not answer' },
+  'devices.agentUnreachable': { sq: '{address} nuk është i arritshëm ({code})', en: '{address} is unreachable ({code})' },
+  'devices.agentSerialNeedsModel': {
+    sq: 'Adapteri i printerit serik për {port} ka nevojë për markën, modelin dhe grupin e komandave të printerit (për shembull ESC/POS), kodimin e karaktereve për tekstin shqip dhe gjerësinë e letrës para se të printojë një dokument.',
+    en: 'The serial printer adapter for {port} requires the printer make, model and command set (for example ESC/POS), the character encoding for Albanian text and the paper width before it can render a document.',
+  },
+  'devices.agentWindowsNeedsModel': {
+    sq: 'Adapteri i printerit të Windows-it për {queue} ka nevojë për markën, modelin dhe grupin e komandave të printerit (për shembull ESC/POS), kodimin e karaktereve për tekstin shqip dhe gjerësinë e letrës para se të printojë një dokument. Duhet të dijë gjithashtu nëse radha e printimit pranon printim të drejtpërdrejtë (raw).',
+    en: 'The Windows printer adapter for {queue} requires the printer make, model and command set (for example ESC/POS), the character encoding for Albanian text and the paper width before it can render a document. It also needs to know whether the queue accepts raw pass-through printing.',
+  },
+  'devices.agentNetworkNeedsModel': {
+    sq: '{address} u përgjigj, por adapteri i printerit në rrjet ka nevojë për markën, modelin dhe grupin e komandave të printerit (për shembull ESC/POS), kodimin e karaktereve për tekstin shqip dhe gjerësinë e letrës para se të printojë një dokument.',
+    en: '{address} answered, but the network printer adapter requires the printer make, model and command set (for example ESC/POS), the character encoding for Albanian text and the paper width before it can render a document.',
+  },
+  'devices.agentNfcNeedsModel': {
+    sq: 'Adapteri NFC ka nevojë për markën dhe modelin e lexuesit dhe ndërfaqen e tij: një lexues si tastierë e shkruan ID-në e kartelës, një lexues serik ka nevojë për portën dhe protokollin, ndërsa një lexues PC/SC ka nevojë për teknologjinë e kartelës dhe gjatësinë e UID-së.',
+    en: 'The NFC adapter requires the reader make and model and its interface: a keyboard-wedge reader types the card id, a serial reader needs its port and protocol, and a PC/SC reader needs the card technology and UID length.',
+  },
 } as const;

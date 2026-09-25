@@ -67,6 +67,7 @@ test('workspace modules and draft commands work in both languages with stable in
       ['team', 'nav.team'],
       ['roles', 'nav.roles'],
       ['terminals', 'nav.terminals'],
+      ['devices', 'nav.devices'],
     ];
     for (const [id, key] of modules) {
       await page.getByTestId(`nav-${id}`).click();
@@ -78,6 +79,14 @@ test('workspace modules and draft commands work in both languages with stable in
         ).toBeVisible();
         await expect(
           page.getByText(MESSAGES['sales.searchTheMenu'][locale], { exact: true }),
+        ).toBeVisible();
+      }
+      if (id === 'devices') {
+        await expect(
+          page.getByRole('heading', { name: MESSAGES['devices.stationPrintersTitle'][locale] }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: MESSAGES['devices.add'][locale], exact: true }),
         ).toBeVisible();
       }
     }

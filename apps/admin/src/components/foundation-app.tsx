@@ -29,6 +29,7 @@ import { WaiterApp } from './waiter-app';
 import { PurchasingWorkspace } from './purchasing-workspace';
 import { InventoryWorkspace } from './inventory-workspace';
 import { PaymentsWorkspace } from './payments-workspace';
+import { DevicesWorkspace } from './devices-workspace';
 
 type Tab =
   | 'Workspace'
@@ -45,6 +46,7 @@ type Tab =
   | 'Inventory'
   | 'Purchasing'
   | 'Companies'
+  | 'Devices'
   | 'Dashboard';
 const roleLabels: Record<string, MessageKey> = {
   OWNER: 'role.OWNER', ADMIN: 'role.ADMIN', MANAGER: 'role.MANAGER',
@@ -332,6 +334,7 @@ function Workspace({
     Team: 'nav.team',
     Roles: 'nav.roles',
     Terminals: 'nav.terminals',
+    Devices: 'nav.devices',
     'Audit history': 'nav.audit',
   };
   const hintKeys: Record<Tab, MessageKey> = {
@@ -349,6 +352,7 @@ function Workspace({
     Team: 'tab.team.hint',
     Roles: 'tab.roles.hint',
     Terminals: 'tab.terminals.hint',
+    Devices: 'tab.devices.hint',
     'Audit history': 'tab.audit.hint',
   };
   const can = (permission: PermissionKey) => user.permissions.includes(permission);
@@ -367,6 +371,7 @@ function Workspace({
     ...(can('user.read') ? ['Team' as const] : []),
     ...(can('role.read') ? ['Roles' as const] : []),
     ...(can('terminal.read') ? ['Terminals' as const] : []),
+    ...(can('device.read') ? ['Devices' as const] : []),
     ...(can('audit.read') ? ['Audit history' as const] : []),
   ];
   return (
@@ -451,6 +456,7 @@ function Workspace({
           {tab === 'Purchasing' ? <PurchasingWorkspace user={user} /> : null}
           {tab === 'Inventory' ? <InventoryWorkspace user={user} /> : null}
           {tab === 'Menu' ? <MenuCatalog canManage={can('menu.manage')} /> : null}
+          {tab === 'Devices' ? <DevicesWorkspace user={user} /> : null}
           {tab === 'POS' ? (
             <OrdersWorkspace
               user={user}

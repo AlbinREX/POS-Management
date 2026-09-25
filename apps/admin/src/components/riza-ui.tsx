@@ -35,6 +35,7 @@ export function NavIcon({ name }: { name: string }) {
     Team: 'M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21v-3a6 6 0 0 1 12 0v3M17 4a4 4 0 0 1 0 8M18 15a5 5 0 0 1 4 5',
     Roles: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6ZM8 12l3 3 5-6',
     Terminals: 'M3 3h18v14H3ZM8 21h8M12 17v4',
+    Devices: 'M4 7h16v6H4ZM7 13v6h10v-6M8 4h8v3H8ZM8 16h3',
     'Audit history': 'M12 7v5l3 2M3 12a9 9 0 1 0 3-7M3 3v5h5',
   };
   return (

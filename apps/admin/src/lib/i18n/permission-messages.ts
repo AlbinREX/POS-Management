@@ -42,6 +42,8 @@ export const PERMISSION_MESSAGES = {
   'role.manage': { sq: 'Menaxho rolet', en: 'Manage roles' },
   'terminal.read': { sq: 'Shiko terminalet', en: 'View terminals' },
   'terminal.manage': { sq: 'Menaxho terminalet', en: 'Manage terminals' },
+  'device.read': { sq: 'Shiko pajisjet', en: 'View devices' },
+  'device.manage': { sq: 'Menaxho pajisjet', en: 'Manage devices' },
   'audit.read': { sq: 'Shiko historikun e auditimit', en: 'View audit history' },
   'menu.read': { sq: 'Shiko menynë', en: 'View menu' },
   'menu.manage': { sq: 'Menaxho menynë', en: 'Manage menu' },

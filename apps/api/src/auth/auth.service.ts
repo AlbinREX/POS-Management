@@ -216,6 +216,114 @@ export class AuthService {
     });
     return this.result(principal, refreshToken, expiresAt);
   }
+  /**
+   * Sign in with a staff card.
+   *
+   * Deliberately the same shape as password login: the same branch, membership, terminal
+   * and active checks, the same audited failure, the same session and the same principal.
+   * Only the credential differs.
+   *
+   * The client sends a card and the branch it is standing in. It never sends a user, a
+   * role or a permission: identity is resolved from the credential, and authority comes
+   * from the roles that user already holds.
+   */
+  async nfcLogin(
+    input: { organization: string; branch: string; credential: string; terminalId?: string },
+    context: AuditContext,
+  ) {
+    const branch = await this.db.client.branch.findFirst({
+      where: { code: input.branch, organization: { slug: input.organization } },
+    });
+    const candidates = branch
+      ? await this.db.client.userNfcCredential.findMany({
+          where: { branchId: branch.id, organizationId: branch.organizationId, revokedAt: null },
+          include: { member: { include: { user: true } } },
+        })
+      : [];
+    // Compare against every live card in the branch. A restaurant has a handful of
+    // staff, and the alternative - indexing by a reversible value - would mean storing
+    // something equivalent to the card itself.
+    let matched: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates)
+      if (await verify(candidate.credentialHash, input.credential)) {
+        matched = candidate;
+        break;
+      }
+    // Spend comparable work when nothing matched, so a valid card is not distinguishable
+    // from an unknown one by how long the answer takes.
+    if (!matched) await verify(await this.dummyHash, input.credential);
+
+    const terminal =
+      input.terminalId && branch
+        ? await this.db.client.terminal.findFirst({
+            where: {
+              id: input.terminalId,
+              branchId: branch.id,
+              organizationId: branch.organizationId,
+              active: true,
+              deletedAt: null,
+            },
+          })
+        : null;
+    const member = matched?.member;
+    if (
+      !branch ||
+      !matched ||
+      !member ||
+      !member.active ||
+      !member.user.active ||
+      member.user.deletedAt ||
+      !branch.active ||
+      branch.deletedAt ||
+      (input.terminalId && !terminal)
+    ) {
+      await audit(
+        this.db.client,
+        { requestId: context.requestId, ip: context.ip },
+        'auth.nfc_login_failed',
+        'Authentication',
+      );
+      throw new UnauthorizedException('This card is not recognised');
+    }
+    const refreshToken = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + SESSION_MS);
+    const principal = await this.db.client.$transaction(async (tx) => {
+      const session = await tx.authSession.create({
+        data: {
+          userId: member.userId,
+          branchId: branch.id,
+          organizationId: branch.organizationId,
+          terminalId: input.terminalId,
+          expiresAt,
+          tokens: { create: { tokenHash: hashToken(refreshToken), expiresAt } },
+        },
+        include: sessionInclude,
+      });
+      const principal = this.principal(session);
+      if (!principal) throw new UnauthorizedException('This card is not recognised');
+      await audit(
+        tx,
+        {
+          ...context,
+          userId: member.userId,
+          branchId: branch.id,
+          organizationId: branch.organizationId,
+          terminalId: input.terminalId,
+        },
+        'auth.nfc_login',
+        'AuthSession',
+        session.id,
+      );
+      await tx.userNfcCredential.update({
+        where: { id: matched.id },
+        data: { lastUsedAt: new Date() },
+      });
+      if (terminal)
+        await tx.terminal.update({ where: { id: terminal.id }, data: { lastSeenAt: new Date() } });
+      return principal;
+    });
+    return this.result(principal, refreshToken, expiresAt);
+  }
   async refresh(rawToken: string | undefined, context: AuditContext) {
     if (!rawToken || !/^[A-Za-z0-9_-]{43}$/.test(rawToken))
       throw new UnauthorizedException('Invalid session');

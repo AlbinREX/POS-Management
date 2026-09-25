@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { changePasswordSchema, loginSchema } from '@restaurant/validation';
+import { changePasswordSchema, loginSchema, nfcLoginSchema } from '@restaurant/validation';
 import { COOKIE_NAME, getConfig } from '../config';
 import { AuthService } from './auth.service';
 import { Authenticated, type ApiRequest, Public } from './authorization';
@@ -19,6 +19,28 @@ export class AuthController {
     const { refreshToken, expiresAt, ...body } = result;
     response.cookie(COOKIE_NAME, refreshToken, { ...this.cookieOptions(), expires: expiresAt });
     return body;
+  }
+  /**
+   * Sign in by tapping a staff card.
+   *
+   * Public like password login, and rate limited by the same middleware. The body names
+   * a card and a branch; the server resolves who that is and what they may do.
+   */
+  @Public()
+  @Post('nfc')
+  @HttpCode(200)
+  async nfcLogin(
+    @Body() body: unknown,
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.sendSession(
+      res,
+      await this.auth.nfcLogin(nfcLoginSchema.parse(body), {
+        requestId: req.requestId,
+        ip: req.ip,
+      }),
+    );
   }
   @Public()
   @Post('login')

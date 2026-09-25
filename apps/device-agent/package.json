@@ -1,0 +1,13 @@
+{
+  "name": "@restaurant/device-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@restaurant/shared-types": "0.1.0"
+  }
+}

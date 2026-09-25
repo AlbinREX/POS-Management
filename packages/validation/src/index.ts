@@ -2,6 +2,7 @@ export * from './companies';
 export * from './reporting';
 export * from './sync';
 export * from './fiscal';
+export * from './devices';
 export * from './purchasing';
 export * from './inventory';
 import { z } from 'zod';
