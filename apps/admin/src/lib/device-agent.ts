@@ -10,7 +10,13 @@
  * plain message and the rest of the application keeps working: devices can still be
  * configured, orders still take payment, and kitchen tickets are still created. Only the
  * physical delivery of paper is unavailable.
+ *
+ * Failures are thrown in English because the caller also records them as the device's
+ * last error; the catalogue translates them on display. Taking the text from the
+ * catalogue keeps that lookup exact.
  */
+import { MESSAGES } from './i18n';
+
 const PORT = process.env.NEXT_PUBLIC_DEVICE_AGENT_PORT ?? '7717';
 const TOKEN = process.env.NEXT_PUBLIC_DEVICE_AGENT_TOKEN ?? '';
 
@@ -27,8 +33,7 @@ export async function agentRequest<T>(
   command: AgentCommand,
   body?: Record<string, unknown>,
 ): Promise<T> {
-  if (!TOKEN)
-    throw new Error('The device agent is not configured on this machine.');
+  if (!TOKEN) throw new Error(MESSAGES['devices.agentNotConfigured'].en);
   let response: Response;
   try {
     response = await fetch(`${agentOrigin()}/${command}`, {
@@ -41,11 +46,11 @@ export async function agentRequest<T>(
     });
   } catch {
     // A refused connection is the normal "agent is not running" case.
-    throw new Error('The device agent is not running on this computer.');
+    throw new Error(MESSAGES['devices.agentNotRunning'].en);
   }
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(detail.error ?? 'The device agent refused this request.');
+    throw new Error(detail.error ?? MESSAGES['devices.agentRefused'].en);
   }
   return (await response.json()) as T;
 }

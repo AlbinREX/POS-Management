@@ -28,7 +28,18 @@ import {
   type ReceiptSource,
 } from '../../apps/api/src/devices/receipt-contract';
 import { COMMANDS, isCommand, tokenMatches } from '../../apps/device-agent/src/agent';
-import { adapterFor, NetworkPrinterAdapter } from '../../apps/device-agent/src/adapters';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createServer, type AddressInfo } from 'node:net';
+import { translate } from '../../apps/admin/src/lib/i18n/provider';
+import { serverMessage } from '../../apps/admin/src/lib/i18n/server-messages';
+import {
+  adapterFor,
+  NetworkPrinterAdapter,
+  NfcReaderAdapter,
+  SerialPrinterAdapter,
+  WindowsPrinterAdapter,
+  type DeviceTarget,
+} from '../../apps/device-agent/src/adapters';
 
 const serial = { name: 'Receipt', kind: 'RECEIPT_PRINTER', connection: 'SERIAL' } as const;
 const network = { name: 'Kitchen', kind: 'KITCHEN_PRINTER', connection: 'NETWORK' } as const;
@@ -419,5 +430,78 @@ describe('Device inputs and permissions', () => {
       expect(DEFAULT_ROLE_PERMISSIONS[role]).not.toContain('device.read');
       expect(DEFAULT_ROLE_PERMISSIONS[role]).not.toContain('device.manage');
     }
+  });
+});
+
+describe('Device messages reach operators in Albanian', () => {
+  const target = (overrides: Partial<DeviceTarget>): DeviceTarget => ({
+    kind: 'RECEIPT_PRINTER',
+    connection: 'SERIAL',
+    port: null,
+    host: null,
+    tcpPort: null,
+    windowsPrinterName: null,
+    ...overrides,
+  });
+  // Each case runs the real adapter, so a change to its wording that the catalogue does
+  // not follow fails here instead of silently showing English to Albanian staff.
+  it('translates the refusals each adapter actually returns', async () => {
+    const serial = await new SerialPrinterAdapter().deliver(target({ port: 'COM3' }));
+    expect(serverMessage(serial.error!, 'sq')).toBe(
+      translate('sq', 'devices.agentSerialNeedsModel', { port: 'COM3' }),
+    );
+    const windows = await new WindowsPrinterAdapter().deliver(
+      target({ connection: 'WINDOWS_PRINTER', windowsPrinterName: 'POS-80' }),
+    );
+    expect(serverMessage(windows.error!, 'sq')).toBe(
+      translate('sq', 'devices.agentWindowsNeedsModel', { queue: 'POS-80' }),
+    );
+    const reader = new NfcReaderAdapter();
+    expect(serverMessage((await reader.deliver()).error!, 'sq')).toBe(
+      'Lexuesi i kartelave nuk mund të printojë',
+    );
+    expect(serverMessage((await reader.read()).error!, 'sq')).toBe(
+      translate('sq', 'devices.agentNfcNeedsModel'),
+    );
+    for (const result of [serial, windows]) expect(serverMessage(result.error!, 'en')).toBe(result.error);
+  });
+  it('translates what a network printer reports, answering or not', async () => {
+    const server = createServer((socket) => socket.destroy());
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    const network = target({ kind: 'KITCHEN_PRINTER', connection: 'NETWORK', host: '127.0.0.1', tcpPort: port });
+    const answered = await new NetworkPrinterAdapter().deliver(network);
+    expect(serverMessage(answered.error!, 'sq')).toBe(
+      translate('sq', 'devices.agentNetworkNeedsModel', { address: `127.0.0.1:${port}` }),
+    );
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    // The port is now closed, which is how a switched-off printer looks.
+    const off = await new NetworkPrinterAdapter().deliver(network);
+    const code = /is unreachable \((\w+)\)$/.exec(off.error!)?.[1];
+    expect(code).toBeTruthy();
+    expect(serverMessage(off.error!, 'sq')).toBe(
+      translate('sq', 'devices.agentUnreachable', { address: `127.0.0.1:${port}`, code: code! }),
+    );
+  }, 15000);
+  it('has an Albanian rendering for every message the device code can show', () => {
+    // English literals thrown by the API or returned by the agent. The agent's start-up
+    // configuration errors are excluded: they are written to its log, never shown.
+    const sources = [
+      ...readdirSync('apps/api/src/devices').map((file) => `apps/api/src/devices/${file}`),
+      'packages/validation/src/devices.ts',
+      'apps/device-agent/src/agent.ts',
+      'apps/device-agent/src/adapters.ts',
+    ];
+    const messages = new Set<string>();
+    for (const file of sources) {
+      const source = readFileSync(file, 'utf8');
+      // A message is a sentence; identifiers such as audit entity names have no space.
+      for (const [, text] of source.matchAll(/(?:Exception\(|error: |, )'([A-Z][^'${}]* [^'${}]+)'/g))
+        if (!/^[A-Z_]{4,} must/.test(text!)) messages.add(text!);
+    }
+    messages.add('This card is not recognised'); // NFC sign-in, raised by the auth service
+    expect(messages.size).toBeGreaterThan(20);
+    const untranslated = [...messages].filter((text) => serverMessage(text, 'sq') === text);
+    expect(untranslated).toEqual([]);
   });
 });

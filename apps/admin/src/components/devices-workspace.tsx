@@ -6,6 +6,7 @@ import type {
   DeviceOverview,
   DeviceRecord,
   DeviceStatus,
+  PrintJobState,
   SessionUser,
 } from '@restaurant/shared-types';
 import { Button } from '@restaurant/ui/button';
@@ -13,6 +14,7 @@ import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api, ApiFailure } from '../lib/api';
 import { agentRequest, agentConfigured } from '../lib/device-agent';
+import { MESSAGES, serverMessage, useI18n, type MessageKey, type Translate } from '../lib/i18n';
 
 /**
  * Settings → Devices.
@@ -22,21 +24,22 @@ import { agentRequest, agentConfigured } from '../lib/device-agent';
  * Device Agent to probe the device, and the result is recorded through the API so the
  * status an operator sees is the status the server holds.
  *
- * Text here is English only. The Albanian/English translation layer lives on its own
- * branch and will absorb this workspace once both are merged, so this file deliberately
- * does not carry a second, smaller translation mechanism of its own.
+ * Device kinds, connection types and statuses are identifiers: they are sent to the API
+ * and stored unchanged, and only their labels are translated. Messages from the API or
+ * the agent stay English in state, because a failed test is also recorded as the
+ * device's last error, and are translated only where they are shown.
  */
-const KIND_LABELS: Record<DeviceKind, string> = {
-  RECEIPT_PRINTER: 'Receipt Printer',
-  NFC_READER: 'NFC Reader',
-  KITCHEN_PRINTER: 'Kitchen Printer',
-  BAR_PRINTER: 'Bar Printer',
+const KIND_KEYS: Record<DeviceKind, MessageKey> = {
+  RECEIPT_PRINTER: 'devices.receiptPrinter',
+  NFC_READER: 'devices.nfcReader',
+  KITCHEN_PRINTER: 'devices.kitchenPrinter',
+  BAR_PRINTER: 'devices.barPrinter',
 };
-const STATUS_LABELS: Record<DeviceStatus, string> = {
-  ONLINE: 'Connected',
-  OFFLINE: 'Offline',
-  UNKNOWN: 'Not tested',
-  DISABLED: 'Disabled',
+const STATUS_KEYS: Record<DeviceStatus, MessageKey> = {
+  ONLINE: 'devices.connected',
+  OFFLINE: 'devices.offline',
+  UNKNOWN: 'devices.notTested',
+  DISABLED: 'devices.disabled',
 };
 const STATUS_TONE: Record<DeviceStatus, 'ok' | 'warn' | 'bad' | 'idle'> = {
   ONLINE: 'ok',
@@ -44,17 +47,25 @@ const STATUS_TONE: Record<DeviceStatus, 'ok' | 'warn' | 'bad' | 'idle'> = {
   UNKNOWN: 'warn',
   DISABLED: 'idle',
 };
+const JOB_STATE_KEYS: Record<PrintJobState, MessageKey> = {
+  PENDING: 'devices.jobPending',
+  SENT: 'devices.jobSent',
+  CONFIRMED: 'devices.jobConfirmed',
+  FAILED: 'devices.jobFailed',
+  RETRY_REQUIRED: 'devices.jobRetryRequired',
+};
 const message = (error: unknown) =>
-  error instanceof ApiFailure ? error.message : 'Cannot reach the local server. Try again.';
+  error instanceof ApiFailure ? error.message : MESSAGES['session.unreachableRetry'].en;
 
 /** The address as an operator recognises it: a COM port or an IP and port. */
-function address(device: DeviceRecord): string {
+function address(device: DeviceRecord, t: Translate): string {
   if (device.connection === 'NETWORK')
-    return device.host ? `${device.host}:${device.tcpPort ?? 9100}` : 'No address';
-  return device.port ?? device.windowsPrinterName ?? 'No address';
+    return device.host ? `${device.host}:${device.tcpPort ?? 9100}` : t('devices.noAddress');
+  return device.port ?? device.windowsPrinterName ?? t('devices.noAddress');
 }
 
 export function DevicesWorkspace({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const canManage = user.permissions.includes('device.manage');
   const [overview, setOverview] = useState<DeviceOverview | null>(null);
   const [error, setError] = useState('');
@@ -92,11 +103,13 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
         ok: probe.delivered,
         ...(probe.error ? { error: probe.error } : {}),
       });
-      setNotice(probe.delivered ? `${device.name} answered.` : `${device.name} did not answer.`);
+      setNotice(
+        t(probe.delivered ? 'devices.answered' : 'devices.noAnswer', { name: device.name }),
+      );
     } catch (e) {
       // A missing agent is a normal state on a machine that has not been set up yet, and
       // it is reported as such rather than as a device fault.
-      const reason = e instanceof Error ? e.message : 'The device agent did not respond.';
+      const reason = e instanceof Error ? e.message : MESSAGES['devices.agentNoResponse'].en;
       await api(`devices/${device.id}/test`, 'POST', { ok: false, error: reason }).catch(() => {});
       setError(reason);
     } finally {
@@ -109,7 +122,7 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
     setBusy(jobId);
     try {
       await api(`devices/jobs/${jobId}/retry`, 'POST', { commandId: crypto.randomUUID() });
-      setNotice('Queued for printing again.');
+      setNotice(t('devices.requeued'));
     } catch (e) {
       setError(message(e));
     } finally {
@@ -118,19 +131,19 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
     }
   }
 
-  if (!overview) return <p role="status">{error || 'Loading devices…'}</p>;
+  if (!overview)
+    return <p role="status">{error ? serverMessage(error, locale) : t('devices.loading')}</p>;
 
   return (
-    <section className="space-y-5" aria-label="Devices">
+    <section className="space-y-5" aria-label={t('nav.devices')}>
       {!agentConfigured() ? (
         <p className="device-hint" role="status">
-          The local device agent is not configured on this machine, so hardware cannot be
-          tested or printed to from here. Devices can still be configured.
+          {t('devices.agentMissingHint')}
         </p>
       ) : null}
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {notice ? (
@@ -141,7 +154,7 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
 
       {canManage ? (
         <Button onClick={() => setEditing('new')} disabled={Boolean(busy)}>
-          Add device
+          {t('devices.add')}
         </Button>
       ) : null}
 
@@ -152,24 +165,26 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
-            setNotice('Device saved.');
+            setNotice(t('devices.saved'));
             await load();
           }}
         />
       ) : null}
 
-      <ul className="device-list" aria-label="Configured devices">
+      <ul className="device-list" aria-label={t('devices.configuredList')}>
         {overview.devices.map((device) => (
           <li key={device.id} className="device-card" data-testid={`device-${device.kind}`}>
             <div className="device-identity">
-              <strong>{KIND_LABELS[device.kind]}</strong>
+              <strong>{t(KIND_KEYS[device.kind])}</strong>
               <span className="device-name">{device.name}</span>
-              <span className="device-address">{address(device)}</span>
+              <span className="device-address">{address(device, t)}</span>
             </div>
             <span className="device-status" data-tone={STATUS_TONE[device.status]}>
-              {STATUS_LABELS[device.status]}
+              {t(STATUS_KEYS[device.status])}
             </span>
-            {device.lastError ? <span className="device-error">{device.lastError}</span> : null}
+            {device.lastError ? (
+              <span className="device-error">{serverMessage(device.lastError, locale)}</span>
+            ) : null}
             <div className="device-actions">
               <Button
                 variant="outline"
@@ -177,37 +192,31 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
                 disabled={busy === device.id || !canManage}
                 onClick={() => void test(device)}
               >
-                {device.kind === 'NFC_READER' ? 'Test NFC' : 'Test Print'}
+                {device.kind === 'NFC_READER' ? t('devices.testNfc') : t('devices.testPrint')}
               </Button>
               {canManage ? (
                 <Button variant="outline" size="sm" onClick={() => setEditing(device)}>
-                  Configure
+                  {t('devices.configure')}
                 </Button>
               ) : null}
             </div>
           </li>
         ))}
         {overview.devices.length === 0 ? (
-          <li className="device-empty">
-            No devices configured yet. Add the receipt printer, the card reader and the
-            kitchen and bar printers.
-          </li>
+          <li className="device-empty">{t('devices.empty')}</li>
         ) : null}
       </ul>
 
-      <section aria-label="Station printers" className="space-y-2">
-        <h2 className="text-lg font-semibold">Kitchen station printers</h2>
-        <p className="text-sm text-muted-foreground">
-          Each station prints to one printer. Stations may share a printer; a station with
-          none cannot print its tickets.
-        </p>
+      <section aria-label={t('devices.stationPrinters')} className="space-y-2">
+        <h2 className="text-lg font-semibold">{t('devices.stationPrintersTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('devices.stationPrintersHint')}</p>
         <ul className="device-station-list">
           {overview.stations.map((station) => (
             <li key={station.stationId} className="device-station">
               <span>{station.stationName}</span>
               {canManage ? (
                 <select
-                  aria-label={`Printer for ${station.stationName}`}
+                  aria-label={t('devices.printerFor', { station: station.stationName })}
                   value={station.deviceId ?? ''}
                   onChange={async (event) => {
                     try {
@@ -215,14 +224,14 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
                         stationId: station.stationId,
                         deviceId: event.target.value || null,
                       });
-                      setNotice('Station printer saved.');
+                      setNotice(t('devices.stationPrinterSaved'));
                       await load();
                     } catch (e) {
                       setError(message(e));
                     }
                   }}
                 >
-                  <option value="">No printer</option>
+                  <option value="">{t('devices.noPrinter')}</option>
                   {overview.devices
                     .filter((d) => d.kind !== 'NFC_READER' && d.enabled)
                     .map((d) => (
@@ -232,7 +241,7 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
                     ))}
                 </select>
               ) : (
-                <span>{station.deviceName ?? 'No printer'}</span>
+                <span>{station.deviceName ?? t('devices.noPrinter')}</span>
               )}
             </li>
           ))}
@@ -240,18 +249,17 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
       </section>
 
       {overview.unresolvedJobs.length ? (
-        <section aria-label="Unprinted documents" className="space-y-2">
-          <h2 className="text-lg font-semibold">Waiting to print</h2>
-          <p className="text-sm text-muted-foreground">
-            These documents have not reached a printer. The orders and kitchen tickets
-            themselves are unaffected.
-          </p>
+        <section aria-label={t('devices.unprinted')} className="space-y-2">
+          <h2 className="text-lg font-semibold">{t('devices.waitingToPrint')}</h2>
+          <p className="text-sm text-muted-foreground">{t('devices.waitingHint')}</p>
           <ul className="device-job-list">
             {overview.unresolvedJobs.map((job) => (
               <li key={job.id} className="device-job">
-                <span>{job.deviceName ?? 'No printer assigned'}</span>
-                <span className="device-job-state">{job.state.replace('_', ' ').toLowerCase()}</span>
-                {job.lastError ? <span className="device-error">{job.lastError}</span> : null}
+                <span>{job.deviceName ?? t('devices.noPrinterAssigned')}</span>
+                <span className="device-job-state">{t(JOB_STATE_KEYS[job.state])}</span>
+                {job.lastError ? (
+                  <span className="device-error">{serverMessage(job.lastError, locale)}</span>
+                ) : null}
                 {canManage ? (
                   <Button
                     variant="outline"
@@ -259,7 +267,7 @@ export function DevicesWorkspace({ user }: { user: SessionUser }) {
                     disabled={busy === job.id}
                     onClick={() => void retryJob(job.id)}
                   >
-                    Retry
+                    {t('action.retry')}
                   </Button>
                 ) : null}
               </li>
@@ -281,6 +289,7 @@ function DeviceEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
   const [kind, setKind] = useState<DeviceKind>(device?.kind ?? 'RECEIPT_PRINTER');
   const [connection, setConnection] = useState(device?.connection ?? 'SERIAL');
   const [error, setError] = useState('');
@@ -319,58 +328,60 @@ function DeviceEditor({
   }
 
   return (
-    <form aria-label="Device configuration" onSubmit={submit} className="device-form">
-      <h2 className="text-lg font-semibold">{device ? 'Configure device' : 'Add device'}</h2>
+    <form aria-label={t('devices.configurationForm')} onSubmit={submit} className="device-form">
+      <h2 className="text-lg font-semibold">
+        {device ? t('devices.configureTitle') : t('devices.add')}
+      </h2>
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       <div className="space-y-2">
-        <Label htmlFor="device-name">Device name</Label>
+        <Label htmlFor="device-name">{t('devices.name')}</Label>
         <Input id="device-name" name="name" defaultValue={device?.name} maxLength={100} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="device-kind">Device type</Label>
+        <Label htmlFor="device-kind">{t('devices.type')}</Label>
         <select
           id="device-kind"
           value={kind}
           onChange={(e) => setKind(e.target.value as DeviceKind)}
         >
-          {(Object.keys(KIND_LABELS) as DeviceKind[]).map((k) => (
+          {(Object.keys(KIND_KEYS) as DeviceKind[]).map((k) => (
             <option key={k} value={k}>
-              {KIND_LABELS[k]}
+              {t(KIND_KEYS[k])}
             </option>
           ))}
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="device-connection">Connection</Label>
+        <Label htmlFor="device-connection">{t('devices.connection')}</Label>
         <select
           id="device-connection"
           value={connection}
           onChange={(e) => setConnection(e.target.value as DeviceRecord['connection'])}
         >
-          <option value="SERIAL">Serial / COM</option>
-          <option value="USB">USB</option>
-          <option value="WINDOWS_PRINTER">Windows printer</option>
-          <option value="NETWORK">Network (LAN)</option>
+          <option value="SERIAL">{t('devices.connectionSerial')}</option>
+          <option value="USB">{t('devices.connectionUsb')}</option>
+          <option value="WINDOWS_PRINTER">{t('devices.connectionWindows')}</option>
+          <option value="NETWORK">{t('devices.connectionNetwork')}</option>
         </select>
       </div>
       {connection === 'SERIAL' || connection === 'USB' ? (
         <div className="space-y-2">
-          <Label htmlFor="device-port">COM port</Label>
+          <Label htmlFor="device-port">{t('devices.comPort')}</Label>
           <Input
             id="device-port"
             name="port"
             defaultValue={device?.port ?? ''}
-            placeholder="COM3"
+            placeholder={t('devices.comPortExample')}
           />
         </div>
       ) : null}
       {connection === 'SERIAL' ? (
         <div className="space-y-2">
-          <Label htmlFor="device-baud">Baud rate</Label>
+          <Label htmlFor="device-baud">{t('devices.baudRate')}</Label>
           <select id="device-baud" name="baudRate" defaultValue={String(device?.baudRate ?? 9600)}>
             {[9600, 19200, 38400, 57600, 115200].map((rate) => (
               <option key={rate} value={rate}>
@@ -382,7 +393,7 @@ function DeviceEditor({
       ) : null}
       {connection === 'WINDOWS_PRINTER' || connection === 'USB' ? (
         <div className="space-y-2">
-          <Label htmlFor="device-queue">Windows printer name</Label>
+          <Label htmlFor="device-queue">{t('devices.windowsPrinterName')}</Label>
           <Input
             id="device-queue"
             name="windowsPrinterName"
@@ -393,7 +404,7 @@ function DeviceEditor({
       {connection === 'NETWORK' ? (
         <>
           <div className="space-y-2">
-            <Label htmlFor="device-host">Printer IP address</Label>
+            <Label htmlFor="device-host">{t('devices.printerIp')}</Label>
             <Input
               id="device-host"
               name="host"
@@ -402,7 +413,7 @@ function DeviceEditor({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="device-tcp">Port</Label>
+            <Label htmlFor="device-tcp">{t('devices.port')}</Label>
             <Input
               id="device-tcp"
               name="tcpPort"
@@ -414,12 +425,12 @@ function DeviceEditor({
       ) : null}
       <label className="flex min-h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="enabled" defaultChecked={device?.enabled ?? true} />
-        In use
+        {t('devices.inUse')}
       </label>
       <div className="flex flex-wrap gap-3">
-        <Button type="submit">Save device</Button>
+        <Button type="submit">{t('devices.saveDevice')}</Button>
         <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
+          {t('action.cancel')}
         </Button>
       </div>
     </form>
