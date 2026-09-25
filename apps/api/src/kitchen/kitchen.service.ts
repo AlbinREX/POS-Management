@@ -114,15 +114,45 @@ export class KitchenService {
         include: { kitchenStations: { include: { station: true } } },
       });
       const routed = new Map<string, { name: string; items: typeof items }>();
+      // Collect every routing problem before rejecting, and name the products involved.
+      // The rule itself is unchanged: an order still reaches the kitchen only when each
+      // item routes to at least one station and every one of those stations is live.
+      // Reporting all of them at once means the operator fixes the menu in one pass
+      // instead of resubmitting to discover the next offending item.
+      const unrouted: string[] = [];
+      const unavailable = new Map<string, Set<string>>();
       for (const item of items) {
         const links = products.find((product) => product.id === item.productId)?.kitchenStations;
-        if (!links?.length || links.some((l) => !l.station.active || l.station.deletedAt))
-          throw new ConflictException('Every order item needs active kitchen station routing');
+        if (!links?.length) {
+          if (!unrouted.includes(item.productName)) unrouted.push(item.productName);
+          continue;
+        }
+        const closed = links.filter((l) => !l.station.active || l.station.deletedAt);
+        if (closed.length) {
+          const stations = unavailable.get(item.productName) ?? new Set<string>();
+          for (const link of closed) stations.add(link.station.name);
+          unavailable.set(item.productName, stations);
+          continue;
+        }
         for (const link of links) {
           const route = routed.get(link.stationId) ?? { name: link.station.name, items: [] };
           route.items.push(item);
           routed.set(link.stationId, route);
         }
+      }
+      if (unrouted.length || unavailable.size) {
+        // Product names come from the order's own frozen item snapshots, so this text
+        // reflects what the operator sees on the bill. Problems are joined with '; ',
+        // the separator the admin splits on, so each one is translated on its own.
+        const problems = [
+          ...unrouted.map((name) => `${name} has no active kitchen station assigned`),
+          ...[...unavailable].map(
+            ([name, stations]) =>
+              `${name} is routed to unavailable station${stations.size > 1 ? 's' : ''} ` +
+              `${[...stations].sort().join(', ')}`,
+          ),
+        ];
+        throw new ConflictException(problems.join('; '));
       }
       const submission = await tx.kitchenSubmission.create({
         data: { ...scope(p), orderId: id, submittedBy: p.userId },

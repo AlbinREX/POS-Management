@@ -117,6 +117,10 @@ export const MESSAGES = {
   'session.serverUnavailable': { sq: "Serveri lokal nuk është i disponueshëm. Provo sërish.", en: "The local server is unavailable. Try again." },
   'kitchen.displayTitle': { sq: "Ekrani i kuzhinës", en: "Kitchen display" },
   'kitchen.noAccess': { sq: "Kjo llogari nuk ka qasje në kuzhinë.", en: "Kitchen access is not granted to this account." },
+  // Kitchen routing rejections from the API, matched as templates by server-messages.ts.
+  'kitchen.routingMissing': { sq: "{product} nuk ka stacion aktiv kuzhine të caktuar", en: "{product} has no active kitchen station assigned" },
+  'kitchen.routingUnavailable': { sq: "{product} dërgohet te stacioni i padisponueshëm {station}", en: "{product} is routed to unavailable station {station}" },
+  'kitchen.routingUnavailableMany': { sq: "{product} dërgohet te stacionet e padisponueshme {stations}", en: "{product} is routed to unavailable stations {stations}" },
   'waiter.noAccess': { sq: "Kjo llogari nuk ka qasje në shërbimin e tavolinave.", en: "Table service is not granted to this account." },
   'team.title': { sq: "Ekipi", en: "Team" },
   'team.created': { sq: "Anëtari i ekipit u krijua.", en: "Team member created." },

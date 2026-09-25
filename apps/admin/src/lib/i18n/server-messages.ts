@@ -96,7 +96,6 @@ const SQ: Record<string, string> = {
   "This order is locked": "Kjo porosi është e bllokuar",
   "Active item not found on this order": "Artikulli aktiv nuk u gjet në këtë porosi",
   "Active order item not found": "Artikulli aktiv i porosisë nuk u gjet",
-  "Every order item needs active kitchen station routing": "Çdo artikull i porosisë duhet të ketë një stacion aktiv kuzhine",
   "Cancel outstanding payments before cancelling this order": "Anulo pagesat e papërfunduara para se ta anulosh këtë porosi",
   "Payment history freezes this order": "Historiku i pagesave e ngrin këtë porosi",
   "Eligible waiter not found": "Kamerieri i përshtatshëm nuk u gjet",
@@ -239,6 +238,10 @@ export function serverMessage(message: string, locale: Locale): string {
   if (locale === 'en') return message;
   const exact = SQ[message] ?? catalogue.get(message);
   if (exact) return exact;
+  // Several problems may be joined with '; ' (Zod issues, kitchen routing). Split before
+  // matching templates, whose placeholders would otherwise swallow the whole list and
+  // leave all but the last problem untranslated.
+  if (message.includes('; ')) return message.split('; ').map((part) => serverMessage(part, locale)).join('; ');
   for (const { pattern, names, sq } of templates) {
     const match = pattern.exec(message);
     if (match) return sq.replace(/\{(\w+)\}/g, (token, name: string) => {
@@ -246,9 +249,8 @@ export function serverMessage(message: string, locale: Locale): string {
       return index < 0 ? token : match[index + 1] ?? token;
     });
   }
-  // Zod errors may be joined and prefixed with a field path. Keep the path (an
-  // internal identifier) intact while translating its human-readable explanation.
-  if (message.includes('; ')) return message.split('; ').map((part) => serverMessage(part, locale)).join('; ');
+  // Zod errors may be prefixed with a field path. Keep the path (an internal
+  // identifier) intact while translating its human-readable explanation.
   const field = /^([\w.[\]]+): (.+)$/.exec(message);
   if (field) return `${field[1]}: ${serverMessage(field[2]!, locale)}`;
   const minimum = /^Too small: expected (string|number|array) to have >=?(\d+) (characters|items)$/.exec(message);
