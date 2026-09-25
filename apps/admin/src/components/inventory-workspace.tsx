@@ -1,4 +1,5 @@
 'use client';
+import { useI18n, serverMessage, formatDateTime, type Translate } from '../lib/i18n';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type {
@@ -20,13 +21,13 @@ type Page<T> = { items: T[]; hasMore: boolean };
 type Product = { id: string; name: string; active: boolean };
 const units: InventoryUnitCode[] = ['kg', 'g', 'l', 'ml', 'pcs'];
 const qty = (v: string) => (v.includes('.') ? v.replace(/\.?0+$/, '') || '0' : v);
-const unitLabel = (unit: InventoryUnitCode) =>
+const unitLabel = (unit: InventoryUnitCode, t: Translate) =>
   ({
-    kg: 'kg — kilograms',
-    g: 'g — grams',
-    l: 'l — litres',
-    ml: 'ml — millilitres',
-    pcs: 'pcs — pieces',
+    kg: t('operations.kgKilograms'),
+    g: t('operations.gGrams'),
+    l: t('operations.lLitres'),
+    ml: t('operations.mlMillilitres'),
+    pcs: t('operations.pcsPieces'),
   })[unit];
 const data = (e: FormEvent<HTMLFormElement>) => {
   e.preventDefault();
@@ -50,6 +51,7 @@ async function all<T>(path: string) {
 }
 
 export function InventoryWorkspace({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const can = (key: SessionUser['permissions'][number]) => user.permissions.includes(key);
   const [view, setView] = useState<View>('Stock');
   const [items, setItems] = useState<InventoryItemRecord[]>([]),
@@ -199,13 +201,13 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
   const selectItem = (name: string, value?: string, change?: (value: string) => void) => (
     <select
       name={name}
-      aria-label="Inventory item"
+      aria-label={t('operations.inventoryItem')}
       required
       {...(change
         ? { value, onChange: (e) => change(e.target.value) }
         : { defaultValue: value ?? '' })}
     >
-      <option value="">Choose an item</option>
+      <option value="">{t('operations.chooseAnItem')}</option>
       {items
         .filter((i) => i.active)
         .map((i) => (
@@ -218,11 +220,11 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
   const selectWarehouse = (name: string, value = '', change?: (value: string) => void) => (
     <select
       name={name}
-      aria-label="Warehouse"
+      aria-label={t('operations.warehouse')}
       required
       {...(change ? { value, onChange: (e) => change(e.target.value) } : { defaultValue: value })}
     >
-      <option value="">Choose a warehouse</option>
+      <option value="">{t('operations.chooseAWarehouse')}</option>
       {warehouses
         .filter((w) => w.active)
         .map((w) => (
@@ -233,10 +235,10 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
     </select>
   );
   const selectUnit = (value: string, name = 'unitCode') => (
-    <select name={name} aria-label="Quantity unit" defaultValue={value}>
+    <select name={name} aria-label={t('operations.quantityUnit')} defaultValue={value}>
       {units.map((u) => (
         <option key={u} value={u}>
-          {unitLabel(u)}
+          {unitLabel(u, t)}
         </option>
       ))}
     </select>
@@ -269,26 +271,26 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
     <div className="space-y-5">
       <div className="inventory-banner">
         <div>
-          <p className="eyebrow">STOCK, UNDER CONTROL</p>
-          <h2 className="text-xl font-semibold">Know what’s in your kitchen.</h2>
+          <p className="eyebrow">{t('operations.stockUnderControl')}</p>
+          <h2 className="text-xl font-semibold">{t('operations.knowWhatSInYourKitchen')}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {user.branchName} · Every adjustment, sale and waste entry leaves a history.
+            {user.branchName} {t('operations.everyAdjustmentSaleAndWasteEntryLeavesAHistory')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {can('inventory.adjust') ? (
             <Button disabled={locked} onClick={() => startMovement('ADJUSTMENT')}>
-              Adjust stock
+              {t('operations.adjustStock')}
             </Button>
           ) : null}
           {can('inventory.waste') ? (
             <Button variant="outline" disabled={locked} onClick={() => startMovement('WASTE')}>
-              Record waste
+              {t('operations.recordWaste')}
             </Button>
           ) : null}
         </div>
       </div>
-      <div role="group" aria-label="Inventory views" className="flex gap-2 overflow-x-auto pb-1">
+      <div role="group" aria-label={t('operations.inventoryViews')} className="flex gap-2 overflow-x-auto pb-1">
         {(['Stock', 'Items', 'Warehouses', 'Recipes', 'History'] as View[]).map((v) => (
           <Button
             key={v}
@@ -302,49 +304,49 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               setStale(true);
             }}
           >
-            {v === 'Items' ? 'Ingredients & items' : v}
+            {t({ Stock: 'operations.stock', Items: 'operations.ingredientsItems', Warehouses: 'operations.warehouses', Recipes: 'operations.recipes', History: 'operations.history' }[v] as 'operations.stock' | 'operations.ingredientsItems' | 'operations.warehouses' | 'operations.recipes' | 'operations.history')}
           </Button>
         ))}
       </div>
       {error ? (
         <p role="alert" className="rounded-lg border border-destructive p-3 text-destructive">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {notice ? (
         <p role="status" className="text-sm text-primary">
-          {notice}
+          {serverMessage(notice, locale)}
         </p>
       ) : null}
-      {stale ? <p role="status">Refreshing inventory. Changes are paused.</p> : null}
+      {stale ? <p role="status">{t('operations.refreshingInventoryChangesArePaused')}</p> : null}
       {pending ? (
         <div className="rounded-lg border border-primary p-4">
-          <p>A previous save needs confirmation. Review the result by retrying the same command.</p>
+          <p>{t('operations.aPreviousSaveNeedsConfirmationReviewTheResultByRetryingTheSameCommand')}</p>
           <Button
             className="mt-3"
             disabled={busy || !pending.path}
             onClick={() => void execute(pending)}
           >
-            Retry inventory command
+            {t('operations.retryInventoryCommand')}
           </Button>
         </div>
       ) : null}
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-48 flex-1">
-          <Field label="Search inventory">
+          <Field label={t('operations.searchInventory')}>
             <Input
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Find an item or recipe…"
+              placeholder={t('operations.findAnItemOrRecipe')}
             />
           </Field>
         </div>
         {view === 'Stock' || view === 'History' ? (
           <div className="min-w-48">
-            <Field label="Filter warehouse">
+            <Field label={t('operations.filterWarehouse')}>
               <select
                 value={warehouseId}
                 onChange={(e) => {
@@ -352,7 +354,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                   setPage(1);
                 }}
               >
-                <option value="">All warehouses</option>
+                <option value="">{t('operations.allWarehouses')}</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}
@@ -370,36 +372,35 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
             void reload();
           }}
         >
-          Refresh inventory
+          {t('operations.refreshInventory')}
         </Button>
         {(view === 'Items' || view === 'Warehouses') && can('inventory.manage') ? (
           <Button disabled={locked} onClick={() => setCreating(true)}>
-            {view === 'Items' ? 'Add inventory item' : 'Add warehouse'}
+            {view === 'Items' ? t('operations.addInventoryItem') : t('operations.addWarehouse')}
           </Button>
         ) : null}
         {view === 'Recipes' && can('recipe.manage') ? (
           <Button disabled={locked} onClick={() => openRecipe('new')}>
-            Create recipe
+            {t('operations.createRecipe')}
           </Button>
         ) : null}
         {view === 'Stock' && can('inventory.manage') ? (
           <Button variant="outline" disabled={locked} onClick={() => setThreshold('new')}>
-            Set low-stock alert
+            {t('operations.setLowStockAlert')}
           </Button>
         ) : null}
       </div>
       {view === 'Stock' ? (
         <>
           <p className="text-sm text-muted-foreground">
-            Quantities are calculated from recorded movements. Negative quantities are shown, never
-            hidden.
+            {t('operations.quantitiesAreCalculatedFromRecordedMovementsNegativeQuantitiesAreShownNeverHidden')}
           </p>
           <div className="inventory-stock-grid">
             {stock.map((r) => (
               <article
                 key={r.id}
                 className="inventory-stock-card"
-                aria-label={`Stock ${r.itemName} at ${r.warehouseName}`}
+                aria-label={t('operations.stockAtWarehouse', { item: r.itemName, warehouse: r.warehouseName })}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -407,7 +408,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     <h3 className="mt-1 font-semibold">{r.itemName}</h3>
                   </div>
                   <span className={r.lowStock ? 'stock-badge stock-low' : 'stock-badge'}>
-                    {r.lowStock ? 'Low stock' : 'In stock'}
+                    {r.lowStock ? t('operations.lowStock') : t('operations.inStock')}
                   </span>
                 </div>
                 <p
@@ -417,8 +418,8 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                   <small className="text-sm font-normal text-muted-foreground">{r.unitCode}</small>
                 </p>
                 <p className="mb-4 text-xs text-muted-foreground">
-                  Alert at {qty(r.lowStockThreshold)} {r.unitCode}
-                  {!r.active ? ' · Inactive configuration' : ''}
+                  {t('operations.alertAt')} {qty(r.lowStockThreshold)} {r.unitCode}
+                  {!r.active ? t('operations.inactiveConfiguration') : ''}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {can('inventory.adjust') && r.active ? (
@@ -427,7 +428,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       disabled={locked}
                       onClick={() => startMovement('ADJUSTMENT', r)}
                     >
-                      Adjust
+                      {t('operations.adjust')}
                     </Button>
                   ) : null}
                   {can('inventory.waste') && r.active ? (
@@ -436,12 +437,12 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       disabled={locked}
                       onClick={() => startMovement('WASTE', r)}
                     >
-                      Waste
+                      {t('operations.waste')}
                     </Button>
                   ) : null}
                   {can('inventory.manage') && r.active ? (
                     <Button variant="ghost" disabled={locked} onClick={() => setThreshold(r)}>
-                      Edit alert
+                      {t('operations.editAlert')}
                     </Button>
                   ) : null}
                 </div>
@@ -450,8 +451,8 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
           </div>
           {!stock.length && !stale ? (
             <Empty
-              title="Start with your opening stock"
-              text="Add a warehouse and inventory items, then record an opening-stock adjustment or set a low-stock alert."
+              title={t('operations.startWithYourOpeningStock')}
+              text={t('operations.addAWarehouseAndInventoryItemsThenRecordAnOpeningStockAdjustmentOrSetALowStockAlert')}
             />
           ) : null}
         </>
@@ -469,9 +470,9 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                   <h3 className="font-semibold">{r.name}</h3>
                   <p className="text-sm text-muted-foreground">
                     {'sku' in r
-                      ? `${r.sku} · ${r.unitCode} · ${r.kind === 'INGREDIENT' ? 'Ingredient' : 'Stock item'}`
+                      ? `${r.sku} · ${r.unitCode} · ${r.kind === 'INGREDIENT' ? t('operations.ingredient') : t('operations.stockItem')}`
                       : r.description}
-                    {!r.active ? ' · Inactive' : ''}
+                    {!r.active ? t('operations.inactive') : ''}
                   </p>
                 </div>
                 {can('inventory.manage') ? (
@@ -479,20 +480,20 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     variant="outline"
                     disabled={locked}
                     onClick={() => setEditor(r)}
-                    aria-label={`Edit ${r.name}`}
+                    aria-label={t('operations.editName', { name: r.name })}
                   >
-                    Edit
+                    {t('operations.edit')}
                   </Button>
                 ) : null}
               </article>
             ))}
           {!(view === 'Items' ? items : warehouses).length && !stale ? (
             <Empty
-              title={view === 'Items' ? 'Your stock catalog starts here' : 'Give your stock a home'}
+              title={view === 'Items' ? t('operations.yourStockCatalogStartsHere') : t('operations.giveYourStockAHome')}
               text={
                 view === 'Items'
-                  ? 'Create ingredients and other items you want to track.'
-                  : 'Create independently managed kitchens, stores or other warehouses.'
+                  ? t('operations.createIngredientsAndOtherItemsYouWantToTrack')
+                  : t('operations.createIndependentlyManagedKitchensStoresOrOtherWarehouses')
               }
             />
           ) : null}
@@ -506,7 +507,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                 <div>
                   <h3 className="font-semibold">{r.productName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {r.warehouseName} · Version {r.version} · {r.active ? 'Active' : 'Inactive'}
+                    {r.warehouseName} {t('operations.version')} {r.version} · {r.active ? t('operations.active') : t('operations.inactive2')}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -515,9 +516,9 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       variant="outline"
                       disabled={locked}
                       onClick={() => openRecipe(r)}
-                      aria-label={`Edit recipe ${r.productName}`}
+                      aria-label={t('operations.editRecipeName', { name: r.productName })}
                     >
-                      Edit recipe
+                      {t('operations.editRecipe')}
                     </Button>
                   ) : null}
                   <Button
@@ -532,7 +533,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       }
                     }}
                   >
-                    Versions
+                    {t('operations.versions')}
                   </Button>
                 </div>
               </div>
@@ -547,13 +548,12 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
           ))}
           {!recipes.length && !stale ? (
             <Empty
-              title="Connect your menu to your stock"
-              text="A recipe defines the ingredients consumed for one sold product. Products without an active recipe do not consume stock."
+              title={t('operations.connectYourMenuToYourStock')}
+              text={t('operations.aRecipeDefinesTheIngredientsConsumedForOneSoldProductProductsWithoutAnActiveRecipeDoNotConsumeStock')}
             />
           ) : null}
           <p className="text-sm text-muted-foreground">
-            Recipes cover the base product. Modifier-specific ingredients are not configured in this
-            phase.
+            {t('operations.recipesCoverTheBaseProductModifierSpecificIngredientsAreNotConfiguredInThisPhase')}
           </p>
         </div>
       ) : null}
@@ -570,7 +570,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     </span>
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {m.kind.replaceAll('_', ' ')} · {new Date(m.createdAt).toLocaleString()}
+                    {t(({ PURCHASE: 'operations.movementPurchase', SALE_CONSUMPTION: 'operations.movementSaleConsumption', WASTE: 'operations.waste', ADJUSTMENT: 'operations.movementAdjustment', TRANSFER_IN: 'operations.movementTransferIn', TRANSFER_OUT: 'operations.movementTransferOut', RETURN: 'operations.movementReturn' } as const)[m.kind])} · {formatDateTime(m.createdAt, locale)}
                   </p>
                 </div>
                 <strong
@@ -579,17 +579,17 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                   {qty(m.quantity)} {m.unitCode}
                 </strong>
               </div>
-              <p className="mt-3 text-sm">{m.reason}</p>
+              <p className="mt-3 text-sm">{serverMessage(m.reason, locale)}</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                {m.userName} · Entered {m.enteredQuantity} {m.enteredUnit}
-                {m.orderNumber ? ` · Order #${m.orderNumber}` : ''}
+                {m.userName} {t('operations.entered')} {m.enteredQuantity} {m.enteredUnit}
+                {m.orderNumber ? t('operations.sourceOrder', { number: m.orderNumber }) : ''}
               </p>
             </article>
           ))}
           {!movements.length && !stale ? (
             <Empty
-              title="No stock movements yet"
-              text="Opening stock, adjustments, waste and completed sales will appear here."
+              title={t('operations.noStockMovementsYet')}
+              text={t('operations.openingStockAdjustmentsWasteAndCompletedSalesWillAppearHere')}
             />
           ) : null}
         </div>
@@ -597,18 +597,18 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
       {!['Items', 'Warehouses'].includes(view) ? (
         <div className="flex items-center gap-3">
           <Button variant="outline" disabled={page === 1 || busy} onClick={() => setPage(page - 1)}>
-            Previous inventory page
+            {t('operations.previousInventoryPage')}
           </Button>
           <span className="text-sm">{page}</span>
           <Button variant="outline" disabled={!more || busy} onClick={() => setPage(page + 1)}>
-            Next inventory page
+            {t('operations.nextInventoryPage')}
           </Button>
         </div>
       ) : null}
       {dialogOpen ? (
         <dialog
           className="riza-dialog inventory-dialog"
-          aria-label="Inventory editor"
+          aria-label={t('operations.inventoryEditor')}
           ref={(node) => {
             if (node && !node.open) node.showModal();
           }}
@@ -620,28 +620,28 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
           <div className="mb-5 flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">
               {movementKind === 'WASTE'
-                ? 'Record waste'
+                ? t('operations.recordWaste')
                 : movementKind
-                  ? 'Adjust stock'
+                  ? t('operations.adjustStock')
                   : threshold
-                    ? 'Low-stock alert'
+                    ? t('operations.lowStockAlert')
                     : recipe
-                      ? 'Recipe per product'
+                      ? t('operations.recipePerProduct')
                       : recipeHistory
-                        ? 'Recipe versions'
+                        ? t('operations.recipeVersions')
                         : editor
-                          ? 'Edit details'
+                          ? t('operations.editDetails')
                           : view === 'Items'
-                            ? 'Add inventory item'
-                            : 'Add warehouse'}
+                            ? t('operations.addInventoryItem')
+                            : t('operations.addWarehouse')}
             </h2>
             <Button variant="outline" disabled={busy} onClick={close}>
-              Close
+              {t('operations.close')}
             </Button>
           </div>
           {error ? (
             <p role="alert" className="mb-4 text-destructive">
-              {error}
+              {serverMessage(error, locale)}
             </p>
           ) : null}
           {movementKind ? (
@@ -652,40 +652,40 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               }}
             >
               <fieldset disabled={locked} className="space-y-4">
-                <Field label="Warehouse">
+                <Field label={t('operations.warehouse')}>
                   {selectWarehouse('warehouseId', movementWarehouse, setMovementWarehouse)}
                 </Field>
-                <Field label="Inventory item">
+                <Field label={t('operations.inventoryItem')}>
                   {selectItem('itemId', selectedItem, setSelectedItem)}
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label={movementKind === 'WASTE' ? 'Quantity wasted' : 'Quantity change'}>
+                  <Field label={movementKind === 'WASTE' ? t('operations.quantityWasted') : t('operations.quantityChange')}>
                     <Input
                       name="quantity"
                       required
                       inputMode="decimal"
-                      placeholder={movementKind === 'WASTE' ? '0.250' : '5 or -0.250'}
+                      placeholder={movementKind === 'WASTE' ? '0.250' : t('operations.5Or0250')}
                     />
                   </Field>
-                  <Field key={selectedItem} label="Quantity unit">
+                  <Field key={selectedItem} label={t('operations.quantityUnit')}>
                     {selectUnit(items.find((i) => i.id === selectedItem)?.unitCode ?? 'kg')}
                   </Field>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {movementKind === 'WASTE'
-                    ? 'Enter a positive quantity. Waste will reduce recorded stock.'
-                    : 'Use a positive quantity to add stock or a negative quantity to remove it. This is a change, not a replacement balance.'}
+                    ? t('operations.enterAPositiveQuantityWasteWillReduceRecordedStock')
+                    : t('operations.useAPositiveQuantityToAddStockOrANegativeQuantityToRemoveItThisIsAChangeNotAReplacementBalance')}
                 </p>
-                <Field label="Reason">
+                <Field label={t('operations.reason')}>
                   <Input
                     name="reason"
                     required
                     maxLength={500}
-                    placeholder="Opening stock, count correction, spoiled ingredient…"
+                    placeholder={t('operations.openingStockCountCorrectionSpoiledIngredient')}
                   />
                 </Field>
                 <Button type="submit" className="w-full">
-                  {movementKind === 'WASTE' ? 'Save waste' : 'Save adjustment'}
+                  {movementKind === 'WASTE' ? t('operations.saveWaste') : t('operations.saveAdjustment')}
                 </Button>
               </fieldset>
             </form>
@@ -704,7 +704,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               }}
             >
               <fieldset disabled={locked} className="space-y-4">
-                <Field label="Name">
+                <Field label={t('operations.name')}>
                   <Input name="name" required maxLength={160} defaultValue={editor?.name ?? ''} />
                 </Field>
                 {view === 'Items' ? (
@@ -713,26 +713,24 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       <Field label="SKU">
                         <Input name="sku" required maxLength={80} />
                       </Field>
-                      <Field label="Item type">
+                      <Field label={t('operations.itemType')}>
                         <select name="kind">
-                          <option value="INGREDIENT">Ingredient</option>
-                          <option value="STOCK_ITEM">Other stock item</option>
+                          <option value="INGREDIENT">{t('operations.ingredient')}</option>
+                          <option value="STOCK_ITEM">{t('operations.otherStockItem')}</option>
                         </select>
                       </Field>
-                      <Field label="Stock unit">{selectUnit('kg')}</Field>
+                      <Field label={t('operations.stockUnit')}>{selectUnit('kg')}</Field>
                       <p className="text-xs text-muted-foreground">
-                        Choose the unit used to display this item's stock. It stays fixed to protect
-                        history.
+                        {t('operations.chooseTheUnitUsedToDisplayThisItemSStockItStaysFixedToProtectHistory')}
                       </p>
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      SKU and stock unit are fixed. Create a separate item if you need a different
-                      stock identity.
+                      {t('operations.skuAndStockUnitAreFixedCreateASeparateItemIfYouNeedADifferentStockIdentity')}
                     </p>
                   )
                 ) : (
-                  <Field label="Description">
+                  <Field label={t('operations.description')}>
                     <Input
                       name="description"
                       maxLength={1000}
@@ -743,15 +741,15 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                 {editor ? (
                   <label className="flex min-h-11 items-center gap-3">
                     <input type="checkbox" name="active" defaultChecked={editor.active} />
-                    Active
+                    {t('operations.active')}
                   </label>
                 ) : null}
-                <Button className="w-full">Save details</Button>
+                <Button className="w-full">{t('operations.saveDetails')}</Button>
                 {editor ? (
                   <details>
-                    <summary className="text-destructive">Archive this record</summary>
+                    <summary className="text-destructive">{t('operations.archiveThisRecord')}</summary>
                     <p className="my-2 text-sm text-muted-foreground">
-                      Keeps all history. Active recipe references must be removed first.
+                      {t('operations.keepsAllHistoryActiveRecipeReferencesMustBeRemovedFirst')}
                     </p>
                     <Button
                       type="button"
@@ -763,7 +761,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                         )
                       }
                     >
-                      Confirm archive
+                      {t('operations.confirmArchive')}
                     </Button>
                   </details>
                 ) : null}
@@ -783,8 +781,8 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               <fieldset disabled={locked} className="space-y-4">
                 {threshold === 'new' ? (
                   <>
-                    <Field label="Warehouse">{selectWarehouse('warehouseId', warehouseId)}</Field>
-                    <Field label="Inventory item">{selectItem('itemId')}</Field>
+                    <Field label={t('operations.warehouse')}>{selectWarehouse('warehouseId', warehouseId)}</Field>
+                    <Field label={t('operations.inventoryItem')}>{selectItem('itemId')}</Field>
                   </>
                 ) : (
                   <>
@@ -795,7 +793,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     </p>
                   </>
                 )}
-                <Field label="Low-stock threshold">
+                <Field label={t('operations.lowStockThreshold')}>
                   <Input
                     name="lowStockThreshold"
                     required
@@ -803,10 +801,10 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     defaultValue={threshold === 'new' ? '0' : threshold.lowStockThreshold}
                   />
                 </Field>
-                <Field label="Quantity unit">
+                <Field label={t('operations.quantityUnit')}>
                   {selectUnit(threshold === 'new' ? 'kg' : threshold.unitCode)}
                 </Field>
-                <Button className="w-full">Save low-stock alert</Button>
+                <Button className="w-full">{t('operations.saveLowStockAlert')}</Button>
               </fieldset>
             </form>
           ) : null}
@@ -823,10 +821,10 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               }}
             >
               <fieldset disabled={locked} className="space-y-4">
-                <Field label="Product">
+                <Field label={t('operations.product')}>
                   {recipe === 'new' ? (
                     <select required name="productId">
-                      <option value="">Choose a product</option>
+                      <option value="">{t('operations.chooseAProduct')}</option>
                       {products
                         .filter((p) => p.active)
                         .map((p) => (
@@ -842,19 +840,18 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     </>
                   )}
                 </Field>
-                <Field label="Consumption warehouse">
+                <Field label={t('operations.consumptionWarehouse')}>
                   {selectWarehouse('warehouseId', recipe === 'new' ? '' : recipe.warehouseId)}
                 </Field>
                 <p className="text-sm text-muted-foreground">
-                  Ingredient quantities for one product. Each save preserves the previous recipe
-                  version.
+                  {t('operations.ingredientQuantitiesForOneProductEachSavePreservesThePreviousRecipeVersion')}
                 </p>
                 {recipeLines.map((line, index) => (
                   <div key={line.key} className="space-y-3 rounded-lg border p-3">
-                    <Field label={`Ingredient ${index + 1}`}>
+                    <Field label={t('operations.ingredientNumber', { number: index + 1 })}>
                       <select
                         required
-                        aria-label={`Ingredient ${index + 1}`}
+                        aria-label={t('operations.ingredientNumber', { number: index + 1 })}
                         value={line.itemId}
                         onChange={(e) =>
                           setRecipeLines((lines) =>
@@ -871,7 +868,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                           )
                         }
                       >
-                        <option value="">Choose an ingredient</option>
+                        <option value="">{t('operations.chooseAnIngredient')}</option>
                         {items
                           .filter((i) => i.active)
                           .map((i) => (
@@ -882,7 +879,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                       </select>
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label={`Recipe quantity ${index + 1}`}>
+                      <Field label={t('operations.recipeQuantityNumber', { number: index + 1 })}>
                         <Input
                           required
                           inputMode="decimal"
@@ -896,7 +893,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                           }
                         />
                       </Field>
-                      <Field label={`Recipe unit ${index + 1}`}>
+                      <Field label={t('operations.recipeUnitNumber', { number: index + 1 })}>
                         <select
                           value={line.unitCode}
                           onChange={(e) =>
@@ -910,7 +907,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                           }
                         >
                           {units.map((u) => (
-                            <option key={u}>{u}</option>
+                            <option key={u} value={u}>{u}</option>
                           ))}
                         </select>
                       </Field>
@@ -923,7 +920,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                         setRecipeLines((lines) => lines.filter((l) => l.key !== line.key))
                       }
                     >
-                      Remove ingredient {index + 1}
+                      {t('operations.removeIngredient')} {index + 1}
                     </Button>
                   </div>
                 ))}
@@ -938,7 +935,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     ])
                   }
                 >
-                  Add ingredient row
+                  {t('operations.addIngredientRow')}
                 </Button>
                 <label className="flex min-h-11 items-center gap-3">
                   <input
@@ -946,9 +943,9 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
                     name="active"
                     defaultChecked={recipe === 'new' || recipe.active}
                   />
-                  Active recipe
+                  {t('operations.activeRecipe')}
                 </label>
-                <Button className="w-full">Save recipe</Button>
+                <Button className="w-full">{t('operations.saveRecipe')}</Button>
               </fieldset>
             </form>
           ) : null}
@@ -957,7 +954,7 @@ export function InventoryWorkspace({ user }: { user: SessionUser }) {
               {recipeHistory.map((r) => (
                 <section key={r.version} className="rounded-lg border p-4">
                   <h3 className="font-semibold">
-                    Version {r.version} · {r.warehouseName}
+                    {t('operations.version2')} {r.version} · {r.warehouseName}
                   </h3>
                   {r.items.map((i) => (
                     <p key={i.itemId} className="mt-2 text-sm">

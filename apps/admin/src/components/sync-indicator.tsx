@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionUser, SyncHealth, SyncStatus } from '@restaurant/shared-types';
 import { api } from '../lib/api';
+import { serverMessage, useI18n } from '../lib/i18n';
 import {
   classifyFailure,
   connectivityLabel,
@@ -31,6 +32,7 @@ interface Display {
   reachable: boolean;
 }
 export function SyncIndicator({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
   const canRead = user.permissions.includes('sync.read');
   const [display, setDisplay] = useState<Display>({
     health: 'disabled',
@@ -99,20 +101,24 @@ export function SyncIndicator({ user }: { user: SessionUser }) {
   }, [probe]);
 
   const state = connectivityState(display.reachable, online);
-  const detail = canRead ? ` · ${syncLabel(display.health, display.pending)}` : '';
+  const syncText = display.health === 'pending'
+    ? t(display.pending === 1 ? 'report.cloudPendingOne' : 'report.cloudPending', { count: display.pending })
+    : serverMessage(syncLabel(display.health, display.pending), locale);
+  const connectionText = serverMessage(connectivityLabel(state), locale);
+  const detail = canRead ? ` · ${syncText}` : '';
   return (
     <p
       className="sync-indicator"
       role="status"
-      aria-label={`${connectivityLabel(state)}${detail}`}
-      title={`${connectivityLabel(state)}${detail}`}
+      aria-label={`${connectionText}${detail}`}
+      title={`${connectionText}${detail}`}
     >
       <span className="sync-dot" data-tone={connectivityTone(state)} aria-hidden="true" />
-      <span>{connectivityLabel(state)}</span>
+      <span>{connectionText}</span>
       {canRead ? (
         <>
           <span className="sync-dot" data-tone={syncTone(display.health)} aria-hidden="true" />
-          <span>{syncLabel(display.health, display.pending)}</span>
+          <span>{syncText}</span>
         </>
       ) : null}
     </p>

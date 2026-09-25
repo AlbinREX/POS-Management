@@ -1,0 +1,261 @@
+/**
+ * Albanian renderings of the messages the API returns.
+ *
+ * The API deliberately keeps its own messages in English: the same wording is written
+ * to audit records and server logs, where one stable language is what makes that
+ * history readable and searchable later. Translating at the point of display keeps the
+ * stored record intact while still showing staff their own language.
+ *
+ * Lookup is exact and by value. Anything not listed falls through unchanged, so a new
+ * or unmapped server message still reaches the operator rather than disappearing.
+ */
+import type { Locale } from './locale';
+import { MESSAGES } from './messages';
+
+const SQ: Record<string, string> = {
+  'Too many requests': 'Ka shumë kërkesa. Prit pak dhe provo përsëri.',
+  'Request origin rejected': 'Kërkesa u refuzua për shkak të burimit të saj.',
+  'Request body is too large': 'Kërkesa përmban tepër të dhëna.',
+  'Invalid JSON body': 'Formati i të dhënave të kërkesës është i pavlefshëm.',
+  'Internal server error': 'Ndodhi një gabim në server. Provo përsëri.',
+  'Modifiers produce a negative unit price': 'Shtesat e zgjedhura e bëjnë çmimin e njësisë negativ.',
+  'Order amount exceeds supported range': 'Shuma e porosisë e tejkalon kufirin e lejuar.',
+  'Discount exceeds order subtotal': 'Zbritja e tejkalon nëntotalin e porosisë.',
+  'Invalid decimal money': 'Format i pavlefshëm i shumës monetare.',
+  'Money exceeds supported range': 'Shuma monetare e tejkalon kufirin e lejuar.',
+  'Invalid unit selection': 'Sasi e pavlefshme e artikujve të zgjedhur.',
+  'Invalid line total': 'Total i pavlefshëm i artikullit.',
+  'Tendered cash is less than payment': 'Paratë e pranuara janë më pak se shuma për pagesë.',
+  'Sandbox provider is unreachable': 'Ofruesi testues nuk është i arritshëm.',
+  'Sandbox provider rejected the sale': 'Ofruesi testues e refuzoi shitjen.',
+  'Protected owner role requires an operator-controlled migration': 'Roli i mbrojtur i pronarit kërkon migrim të kontrolluar nga operatori.',
+  'Cannot edit a role assigned to yourself or another branch; create a dedicated role': 'Nuk mund ta ndryshosh rolin tënd ose një rol të degës tjetër. Krijo një rol të veçantë.',
+  'Database unavailable': 'Databaza nuk është në dispozicion.',
+  'Disable or revise active recipes before deactivating this record': 'Çaktivizo ose ndrysho recetat aktive para se ta çaktivizosh këtë regjistrim.',
+  'This status transition is not available in the layout foundation': 'Ky ndryshim i gjendjes nuk është i disponueshëm në planin e sallës.',
+  'Modifier selection does not satisfy the product configuration': 'Shtesat e zgjedhura nuk përputhen me konfigurimin e produktit.',
+  'Submitted orders are immutable; kitchen amendments are not available': 'Porositë e dërguara nuk mund të ndryshohen. Ndryshimet pas dërgimit në kuzhinë nuk janë të disponueshme.',
+  'Only a nonempty zero-total waiting order can settle without payment': 'Vetëm porosia me artikuj, me total zero dhe në pritje të pagesës mund të përfundohet pa pagesë.',
+  'Cancel an unsettled payment in full, or refund a settled payment': 'Anulo tërësisht pagesën e papërfunduar ose rimburso pagesën e përfunduar.',
+  'Use original method: cash needs a shift; card needs external reversal confirmation; a company account needs neither': 'Përdor mënyrën fillestare: paratë në dorë kërkojnë ndërrim arke, kartela kërkon konfirmim të jashtëm të kthimit, ndërsa llogaria e kompanisë nuk kërkon asnjërën.',
+  'The local server is unavailable. Try again.': 'Serveri lokal nuk është në dispozicion. Provo përsëri.',
+  'No fiscal provider transport is implemented. EnterNet F-LINK integration requires the provider specification.': 'Lidhja me ofruesin fiskal ende nuk është implementuar. Integrimi EnterNet F-LINK kërkon specifikimet e ofruesit.',
+  'Cloud delivery transport is not implemented in this phase': 'Dërgimi në cloud ende nuk është implementuar.',
+  'Invalid input': 'Të dhëna të pavlefshme',
+  'Invalid request': 'Kërkesë e pavlefshme',
+  'Use 0.00 for zero': 'Përdor 0.00 për zeron',
+  'Duplicate IDs': 'Identifikues të përsëritur',
+  'Minimum exceeds maximum': 'Minimumi e tejkalon maksimumin',
+  "Authentication required": "Kërkohet vërtetimi i identitetit",
+  "Invalid session": "Sesion i pavlefshëm",
+  "Invalid credentials or unavailable branch": "Kredenciale të pasakta ose degë e padisponueshme",
+  "Current password is incorrect": "Fjalëkalimi aktual nuk është i saktë",
+  "Password changed concurrently; sign in again": "Fjalëkalimi u ndryshua në ndërkohë; hyr sërish",
+  "Permission denied": "Nuk keni leje për këtë veprim",
+  "Session is not bound to a terminal": "Sesioni nuk është i lidhur me një terminal",
+  "Cannot change your own access or protected owner access": "Nuk mund të ndryshosh qasjen tënde ose atë të pronarit të mbrojtur",
+  "Cannot grant permissions you do not possess": "Nuk mund të japësh leje që nuk i ke vetë",
+  "Cannot grant these roles": "Këto role nuk mund të jepen",
+  "Required order permission is missing": "Mungon leja e nevojshme për porositë",
+  "Required payment permission is missing": "Mungon leja e nevojshme për pagesat",
+  "Required inventory movement permission is missing": "Mungon leja e nevojshme për lëvizjet e stokut",
+  "User not found": "Përdoruesi nuk u gjet",
+  "Role not found": "Roli nuk u gjet",
+  "Branch not found": "Dega nuk u gjet",
+  "Terminal not found": "Terminali nuk u gjet",
+  "Command ID was already used": "Ky identifikues komande është përdorur më parë",
+  "Company command ID was already used": "Identifikuesi i komandës së kompanisë është përdorur më parë",
+  "Inventory command ID was already used": "Identifikuesi i komandës së stokut është përdorur më parë",
+  "Kitchen command ID was already used": "Identifikuesi i komandës së kuzhinës është përdorur më parë",
+  "Payment command ID was already used": "Identifikuesi i komandës së pagesës është përdorur më parë",
+  "Purchasing command ID was already used": "Identifikuesi i komandës së blerjes është përdorur më parë",
+  "This record changed. Reload before saving.": "Ky regjistrim ndryshoi. Ringarko para se të ruash.",
+  "Order changed. Reload before saving.": "Porosia ndryshoi. Ringarko para se të ruash.",
+  "The layout changed. Reload before saving.": "Plani i sallës ndryshoi. Ringarko para se të ruash.",
+  "Shift changed. Reload before saving": "Ndërrimi ndryshoi. Ringarko para se të ruash",
+  "Archived records cannot be changed": "Regjistrimet e arkivuara nuk mund të ndryshohen",
+  "Archived layout records cannot be changed": "Regjistrimet e arkivuara të planit nuk mund të ndryshohen",
+  "Reload this company": "Ringarko këtë kompani",
+  "Reload this contract": "Ringarko këtë kontratë",
+  "Reload this employee": "Ringarko këtë punëtor",
+  "Reload this purchase order": "Ringarko këtë porosi blerjeje",
+  "Reload this supplier": "Ringarko këtë furnitor",
+  "Reload the current inventory item": "Ringarko artikullin aktual të stokut",
+  "Reload the current recipe version": "Ringarko versionin aktual të recetës",
+  "Reload the current stock threshold": "Ringarko pragun aktual të stokut",
+  "Reload the current warehouse": "Ringarko depon aktuale",
+  "Reload an unsettled order waiting for payment": "Ringarko një porosi të pambyllur që pret pagesë",
+  "Order not found": "Porosia nuk u gjet",
+  "Order was already submitted": "Porosia është dërguar tashmë",
+  "Order item limit reached": "U arrit kufiri i artikujve të porosisë",
+  "Order no longer accepts kitchen changes": "Porosia nuk pranon më ndryshime nga kuzhina",
+  "Cannot submit an empty order": "Nuk mund të dërgohet një porosi e zbrazët",
+  "Invalid or empty order transition": "Kalim i pavlefshëm ose i zbrazët i porosisë",
+  "Only the current open order can be submitted": "Mund të dërgohet vetëm porosia aktuale e hapur",
+  "Reopen the order before editing": "Rihap porosinë para se ta ndryshosh",
+  "This order is locked": "Kjo porosi është e bllokuar",
+  "Active item not found on this order": "Artikulli aktiv nuk u gjet në këtë porosi",
+  "Active order item not found": "Artikulli aktiv i porosisë nuk u gjet",
+  "Every order item needs active kitchen station routing": "Çdo artikull i porosisë duhet të ketë një stacion aktiv kuzhine",
+  "Cancel outstanding payments before cancelling this order": "Anulo pagesat e papërfunduara para se ta anulosh këtë porosi",
+  "Payment history freezes this order": "Historiku i pagesave e ngrin këtë porosi",
+  "Eligible waiter not found": "Kamerieri i përshtatshëm nuk u gjet",
+  "Catalog record not found": "Regjistrimi i katalogut nuk u gjet",
+  "Catalog type does not match route": "Lloji i katalogut nuk përputhet me rrugën",
+  "Product not found": "Produkti nuk u gjet",
+  "Active product not found": "Produkti aktiv nuk u gjet",
+  "Category is unavailable": "Kategoria nuk është e disponueshme",
+  "Product category is unavailable": "Kategoria e produktit nuk është e disponueshme",
+  "Move or archive products before disabling this category": "Zhvendos ose arkivo produktet para se ta çaktivizosh këtë kategori",
+  "Modifier group is archived": "Grupi i shtesave është arkivuar",
+  "Modifier group is unavailable": "Grupi i shtesave nuk është i disponueshëm",
+  "Product modifier group is unavailable": "Grupi i shtesave të produktit nuk është i disponueshëm",
+  "A modifier cannot move to another group": "Një shtesë nuk mund të kalojë në grup tjetër",
+  "Archive the group modifiers first": "Arkivo më parë shtesat e grupit",
+  "Detach this modifier group from products first": "Shkëput më parë këtë grup shtesash nga produktet",
+  "Detach this station from products first": "Shkëput më parë këtë stacion nga produktet",
+  "This modifier is required by active products": "Kjo shtesë kërkohet nga produkte aktive",
+  "Selected modifier is not available for this product": "Shtesa e zgjedhur nuk është e disponueshme për këtë produkt",
+  "Required modifier group has insufficient active choices": "Grupi i detyrueshëm i shtesave nuk ka mjaftueshëm zgjedhje aktive",
+  "Required selections exceed active choices": "Zgjedhjet e detyrueshme i tejkalojnë opsionet aktive",
+  "Area not found": "Hapësira nuk u gjet",
+  "Area is archived": "Hapësira është arkivuar",
+  "Area is inactive": "Hapësira është joaktive",
+  "Area is unavailable": "Hapësira nuk është e disponueshme",
+  "Area size would clip an existing table": "Madhësia e hapësirës do të priste një tavolinë ekzistuese",
+  "Archive or move all tables before archiving the area": "Arkivo ose zhvendos të gjitha tavolinat para se të arkivosh hapësirën",
+  "Disable all tables before deactivating this area": "Çaktivizo të gjitha tavolinat para se ta çaktivizosh këtë hapësirë",
+  "Table not found": "Tavolina nuk u gjet",
+  "Table is unavailable": "Tavolina nuk është e disponueshme",
+  "Table must fit inside its area": "Tavolina duhet të hyjë brenda hapësirës së vet",
+  "Table overlaps another table": "Tavolina mbivendoset me një tavolinë tjetër",
+  "Free the table before moving, resizing or archiving it": "Liro tavolinën para se ta zhvendosësh, ta ripërmasosh ose ta arkivosh",
+  "Kitchen ticket not found": "Fletëporosia e kuzhinës nuk u gjet",
+  "Kitchen station is unavailable": "Stacioni i kuzhinës nuk është i disponueshëm",
+  "Ticket changed or transition is invalid": "Fletëporosia ndryshoi ose kalimi është i pavlefshëm",
+  "Payment not found": "Pagesa nuk u gjet",
+  "Payment exceeds remaining balance or is zero": "Pagesa e tejkalon bilancin e mbetur ose është zero",
+  "Payment history limit reached": "U arrit kufiri i historikut të pagesave",
+  "Bill split mode is immutable": "Mënyra e ndarjes së faturës nuk mund të ndryshohet",
+  "Item split supports at most 2000 units per order": "Ndarja sipas artikujve mbështet maksimum 2000 njësi për porosi",
+  "Selected item units are already paid": "Njësitë e zgjedhura janë paguar tashmë",
+  "Reversal exceeds original payment or history limit": "Kthimi e tejkalon pagesën origjinale ose kufirin e historikut",
+  "Cash shift not found": "Ndërrimi i arkës nuk u gjet",
+  "Cash shift currency does not match order": "Valuta e ndërrimit të arkës nuk përputhet me porosinë",
+  "Shift currency does not match payment": "Valuta e ndërrimit nuk përputhet me pagesën",
+  "Insufficient expected cash in drawer": "Para të pamjaftueshme të pritura në arkë",
+  "Explain the cash count difference": "Shpjego ndryshimin në numërimin e parave",
+  "Use your own open shift on an active POS terminal": "Përdor ndërrimin tënd të hapur në një terminal aktiv të arkës",
+  "Available POS terminal not found": "Nuk u gjet terminal i lirë i arkës",
+  "Inventory item not found": "Artikulli i stokut nuk u gjet",
+  "Active stock item not found": "Artikulli aktiv i stokut nuk u gjet",
+  "Active warehouse or item not found in this branch": "Depoja ose artikulli aktiv nuk u gjet në këtë degë",
+  "Active supplier or warehouse not found": "Furnitori ose depoja aktive nuk u gjet",
+  "Warehouse not found": "Depoja nuk u gjet",
+  "Warehouse is inactive": "Depoja është joaktive",
+  "Receiving warehouse is inactive": "Depoja pranuese është joaktive",
+  "Receiving item is inactive": "Artikulli pranues është joaktiv",
+  "Recipe not found": "Receta nuk u gjet",
+  "Recipe version not found": "Versioni i recetës nuk u gjet",
+  "Active recipe has no ingredients": "Receta aktive nuk ka përbërës",
+  "Incompatible inventory units": "Njësi të papajtueshme të stokut",
+  "Unit conversion would require rounding": "Konvertimi i njësive do të kërkonte rrumbullakim",
+  "Inventory quantity exceeds supported range": "Sasia e stokut e tejkalon intervalin e mbështetur",
+  "Use an exact decimal quantity with up to six places": "Përdor një sasi të saktë dhjetore me deri në gjashtë shifra",
+  "Supplier not found": "Furnitori nuk u gjet",
+  "Supplier is inactive": "Furnitori është joaktiv",
+  "Supplier payment not found": "Pagesa e furnitorit nuk u gjet",
+  "Supplier payment already reversed": "Pagesa e furnitorit është kthyer tashmë",
+  "Supplier payment exceeds this receipt balance": "Pagesa e furnitorit e tejkalon bilancin e kësaj fature",
+  "Purchase order not found": "Porosia e blerjes nuk u gjet",
+  "Purchase item not found": "Artikulli i blerjes nuk u gjet",
+  "Purchase order is not awaiting goods": "Porosia e blerjes nuk është në pritje të mallit",
+  "Purchase contains inactive items": "Blerja përmban artikuj joaktivë",
+  "Purchase amount exceeds supported range": "Shuma e blerjes e tejkalon intervalin e mbështetur",
+  "Purchase total exceeds supported range": "Totali i blerjes e tejkalon intervalin e mbështetur",
+  "Invalid purchase quantity, price or tax": "Sasi, çmim ose taksë e pavlefshme e blerjes",
+  "Only drafts can be ordered": "Vetëm draftet mund të porositen",
+  "Only drafts may be edited": "Vetëm draftet mund të ndryshohen",
+  "Received purchases cannot be cancelled": "Blerjet e pranuara nuk mund të anulohen",
+  "Received quantity exceeds remaining order quantity": "Sasia e pranuar e tejkalon sasinë e mbetur të porosisë",
+  "Goods receipt not found": "Fatura e pranimit nuk u gjet",
+  "Complete or cancel open purchase orders before archiving": "Përfundo ose anulo porositë e hapura të blerjes para arkivimit",
+  "Company not found": "Kompania nuk u gjet",
+  "Active company not found": "Kompania aktive nuk u gjet",
+  "Company is archived": "Kompania është arkivuar",
+  "Company has no active contract": "Kompania nuk ka kontratë aktive",
+  "Company already has an active contract": "Kompania ka tashmë një kontratë aktive",
+  "Company credit limit exceeded": "U tejkalua limiti i kredisë së kompanisë",
+  "Company amount exceeds supported range": "Shuma e kompanisë e tejkalon intervalin e mbështetur",
+  "Company employee not found": "Punëtori i kompanisë nuk u gjet",
+  "Company payment not found": "Pagesa e kompanisë nuk u gjet",
+  "Company payment already reversed": "Pagesa e kompanisë është kthyer tashmë",
+  "Company payment exceeds the outstanding balance": "Pagesa e kompanisë e tejkalon bilancin e papaguar",
+  "Contract not found": "Kontrata nuk u gjet",
+  "Contract company is immutable": "Kompania e kontratës nuk mund të ndryshohet",
+  "Contract already has this status": "Kontrata e ka tashmë këtë status",
+  "Only draft contracts may be edited": "Vetëm kontratat në draft mund të ndryshohen",
+  "Invalid contract total or discount percentage": "Total ose përqindje zbritjeje e pavlefshme e kontratës",
+  "Unsupported contract status transition": "Kalim i pambështetur i statusit të kontratës",
+  "Terminate open contracts before archiving": "Përfundo kontratat e hapura para arkivimit",
+  "Settle the account balance before archiving": "Mbyll bilancin e llogarisë para arkivimit",
+  "Employee company is immutable": "Kompania e punëtorit nuk mund të ndryshohet",
+  "Employee is not authorized for this company": "Punëtori nuk është i autorizuar për këtë kompani",
+  "Statement not found": "Pasqyra nuk u gjet",
+  "Statement for this period already exists": "Pasqyra për këtë periudhë ekziston tashmë",
+  "No account activity in this period": "Nuk ka aktivitet të llogarisë në këtë periudhë",
+  "A handoff attempt is already in progress": "Një tentativë dorëzimi është në vazhdim",
+  "Only a settled order can be handed off": "Vetëm një porosi e mbyllur mund të dorëzohet",
+  "No settled sale for this order": "Nuk ka shitje të mbyllur për këtë porosi",
+  "This sale was already handed off": "Kjo shitje është dorëzuar tashmë",
+  "Sale data changed since the first handoff attempt": "Të dhënat e shitjes ndryshuan pas tentativës së parë të dorëzimit",
+  "Settlement and order do not correspond": "Mbyllja dhe porosia nuk përputhen",
+  "Dates must be YYYY-MM-DD": "Datat duhet të jenë në formatin VVVV-MM-DD",
+  "Invalid date": "Datë e pavlefshme",
+  "Range end must not precede its start": "Fundi i intervalit nuk duhet të jetë para fillimit",
+  "Report total exceeds the supported range": "Totali i raportit e tejkalon intervalin e mbështetur",
+  "Branch timezone is not a valid IANA zone": "Zona kohore e degës nuk është një zonë e vlefshme IANA",
+};
+
+// Build once. The catalogue also contains the client's raw fallback messages and
+// notices, so all displayed errors use the same language without changing API data.
+const catalogue = new Map<string, string>(Object.values(MESSAGES).map(({ en, sq }) => [en, sq]));
+const templates = Object.values(MESSAGES)
+  .filter(({ en }) => en.includes('{') && en.replace(/\{\w+\}/g, '').length >= 12)
+  .map(({ en, sq }) => {
+    const names: string[] = [];
+    const escaped = en.split(/(\{\w+\})/g).map((part) => {
+      if (/^\{\w+\}$/.test(part)) {
+        names.push(part.slice(1, -1));
+        return '(.+?)';
+      }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('');
+    return { pattern: new RegExp(`^${escaped}$`), names, sq };
+  });
+
+/** Render-only translation. Unknown messages remain intact for diagnosis. */
+export function serverMessage(message: string, locale: Locale): string {
+  if (locale === 'en') return message;
+  const exact = SQ[message] ?? catalogue.get(message);
+  if (exact) return exact;
+  for (const { pattern, names, sq } of templates) {
+    const match = pattern.exec(message);
+    if (match) return sq.replace(/\{(\w+)\}/g, (token, name: string) => {
+      const index = names.indexOf(name);
+      return index < 0 ? token : match[index + 1] ?? token;
+    });
+  }
+  // Zod errors may be joined and prefixed with a field path. Keep the path (an
+  // internal identifier) intact while translating its human-readable explanation.
+  if (message.includes('; ')) return message.split('; ').map((part) => serverMessage(part, locale)).join('; ');
+  const field = /^([\w.[\]]+): (.+)$/.exec(message);
+  if (field) return `${field[1]}: ${serverMessage(field[2]!, locale)}`;
+  const minimum = /^Too small: expected (string|number|array) to have >=?(\d+) (characters|items)$/.exec(message);
+  if (minimum) return `Kërkohen së paku ${minimum[2]} ${minimum[3] === 'characters' ? 'karaktere' : 'artikuj'}.`;
+  const maximum = /^Too big: expected (string|number|array) to have <=?(\d+) (characters|items)$/.exec(message);
+  if (maximum) return `Lejohen deri në ${maximum[2]} ${maximum[3] === 'characters' ? 'karaktere' : 'artikuj'}.`;
+  if (/^Invalid (string|input|option|format|email address|URL|UUID)/.test(message)) return 'Vlerë e pavlefshme. Kontrollo formatin dhe fushat e kërkuara.';
+  if (/^Too (small|big): expected (number|int)/.test(message)) return 'Vlera është jashtë kufijve të lejuar.';
+  return message;
+}

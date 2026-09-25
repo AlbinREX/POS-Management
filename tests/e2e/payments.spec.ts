@@ -1,4 +1,4 @@
-import { test, expect, request as apiRequest } from '@playwright/test';
+import { test, expect, request as apiRequest } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

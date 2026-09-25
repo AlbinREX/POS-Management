@@ -1,4 +1,5 @@
 'use client';
+import { useI18n, serverMessage, formatDateTime, formatDate, type Translate } from '../lib/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   SessionUser,
@@ -22,7 +23,15 @@ import {
 type Page<T> = { items: T[]; hasMore: boolean };
 type Pending = { path: string; method: string; body: Record<string, unknown> };
 type View = 'Orders' | 'Suppliers' | 'Receipts' | 'Account';
-const label = (v: string) => v.toLowerCase().replaceAll('_', ' ');
+const translatedLabel = (v: string, t: Translate) => {
+  const keys = {
+    DRAFT: 'operations.statusDraft', ORDERED: 'operations.ordered', PARTIALLY_RECEIVED: 'operations.statusPartiallyReceived', RECEIVED: 'operations.received', CANCELLED: 'operations.statusCancelled',
+    RECEIPT: 'operations.entryReceipt', CHARGE: 'operations.entryCharge', PAYMENT: 'operations.entryPayment', PAYMENT_REVERSAL: 'operations.entryPaymentReversal',
+    CASH: 'operations.cash', CARD: 'operations.card', BANK_TRANSFER: 'operations.bankTransfer', OTHER: 'operations.other',
+    created: 'operations.actionCreated', updated: 'operations.actionUpdated', confirmed: 'operations.actionConfirmed', received: 'operations.received', cancelled: 'operations.statusCancelled',
+  } as const;
+  return v in keys ? t(keys[v as keyof typeof keys]) : v.toLowerCase().replaceAll('_', ' ');
+};
 async function all<T>(path: string) {
   const rows: T[] = [];
   for (let page = 1; ; page++) {
@@ -38,18 +47,19 @@ function Totals({
 }: {
   record: { subtotal: string; tax: string; total: string; currency: string };
 }) {
+  const { t } = useI18n();
   return (
     <dl className="purchase-totals">
       <div>
-        <dt>Subtotal</dt>
+        <dt>{t('operations.subtotal')}</dt>
         <dd>{record.subtotal}</dd>
       </div>
       <div>
-        <dt>Tax</dt>
+        <dt>{t('operations.tax')}</dt>
         <dd>{record.tax}</dd>
       </div>
       <div>
-        <dt>Total</dt>
+        <dt>{t('operations.total')}</dt>
         <dd>
           {record.total} {record.currency}
         </dd>
@@ -58,6 +68,8 @@ function Totals({
   );
 }
 export function PurchasingWorkspace({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const can = (p: SessionUser['permissions'][number]) => user.permissions.includes(p),
     purchaseRead = can('purchase.read'),
     supplierRead = can('supplier.read');
@@ -276,19 +288,19 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
     ...(supplierRead ? ['Suppliers' as const, 'Account' as const] : []),
   ];
   return (
-    <section className="space-y-5" aria-label="Purchasing workspace">
+    <section className="space-y-5" aria-label={t('operations.purchasingWorkspace')}>
       <div className="inventory-banner">
         <div>
-          <p className="pos-eyebrow">FROM SUPPLIER TO SHELF</p>
-          <h2 className="mt-2 text-xl font-semibold">Keep your kitchen supplied.</h2>
+          <p className="pos-eyebrow">{t('operations.fromSupplierToShelf')}</p>
+          <h2 className="mt-2 text-xl font-semibold">{t('operations.keepYourKitchenSupplied')}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Plan purchases, receive deliveries and track every supplier balance.
+            {t('operations.planPurchasesReceiveDeliveriesAndTrackEverySupplierBalance')}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {can('purchase.manage') ? (
             <Button disabled={locked} onClick={() => setEditor({ kind: 'draft', value: null })}>
-              New purchase order
+              {t('operations.newPurchaseOrder')}
             </Button>
           ) : null}
           {can('supplier.manage') ? (
@@ -297,12 +309,12 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               disabled={locked}
               onClick={() => setEditor({ kind: 'supplier', value: null })}
             >
-              Add supplier
+              {t('operations.addSupplier')}
             </Button>
           ) : null}
         </div>
       </div>
-      <div role="group" aria-label="Purchasing views" className="flex gap-2 overflow-x-auto pb-1">
+      <div role="group" aria-label={t('operations.purchasingViews')} className="flex gap-2 overflow-x-auto pb-1">
         {views.map((v) => (
           <Button
             key={v}
@@ -310,35 +322,35 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
             onClick={() => changeView(v)}
           >
             {v === 'Orders'
-              ? 'Purchase orders'
+              ? t('operations.purchaseOrders')
               : v === 'Receipts'
-                ? 'Goods receipts'
+                ? t('operations.goodsReceipts')
                 : v === 'Account'
-                  ? 'Supplier balances'
-                  : v}
+                  ? t('operations.supplierBalances')
+                  : t('operations.suppliers')}
           </Button>
         ))}
       </div>
       {error ? (
         <p role="alert" className="rounded-xl border border-destructive p-3 text-sm">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
-          {notice}
+          {serverMessage(notice, locale)}
         </p>
       ) : null}
       {pending ? (
         <div className="purchase-notice">
-          <p>A previous save needs confirmation before another change.</p>
+          <p>{t('operations.aPreviousSaveNeedsConfirmationBeforeAnotherChange')}</p>
           <Button disabled={busy || !pending.path} onClick={() => void execute(pending)}>
-            Retry purchasing command
+            {t('operations.retryPurchasingCommand')}
           </Button>
         </div>
       ) : null}
       <div className="purchase-filters">
-        <Field name="Search purchasing">
+        <Field name={t('operations.searchPurchasing')}>
           <Input
             value={search}
             onChange={(e) => {
@@ -349,7 +361,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           />
         </Field>
         {view !== 'Suppliers' ? (
-          <Field name="Filter supplier">
+          <Field name={t('operations.filterSupplier')}>
             <select
               value={supplierFilter}
               onChange={(e) => {
@@ -357,7 +369,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 setPage(1);
               }}
             >
-              <option value="">{view === 'Account' ? 'Choose a supplier' : 'All suppliers'}</option>
+              <option value="">{view === 'Account' ? t('operations.chooseASupplier') : t('operations.allSuppliers')}</option>
               {choices.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -372,11 +384,11 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               checked={archived}
               onChange={(e) => setArchived(e.target.checked)}
             />
-            Include archived suppliers
+            {t('operations.includeArchivedSuppliers')}
           </label>
         )}
         {view === 'Orders' ? (
-          <Field name="Purchase status">
+          <Field name={t('operations.purchaseStatus')}>
             <select
               value={status}
               onChange={(e) => {
@@ -384,7 +396,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 setPage(1);
               }}
             >
-              <option value="">All statuses</option>
+              <option value="">{t('operations.allStatuses')}</option>
               {(
                 [
                   'DRAFT',
@@ -402,12 +414,12 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           </Field>
         ) : null}
         <Button variant="outline" onClick={() => void reload()} disabled={busy}>
-          Refresh purchasing
+          {t('operations.refreshPurchasing')}
         </Button>
       </div>
       {stale ? (
         <p className="text-sm text-muted-foreground">
-          Refreshing from the local server. Changes are locked until current data is available.
+          {t('operations.refreshingFromTheLocalServerChangesAreLockedUntilCurrentDataIsAvailable')}
         </p>
       ) : null}
       {view === 'Orders' ? (
@@ -416,10 +428,10 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
             <article
               key={o.id}
               className="inventory-stock-card space-y-4"
-              aria-label={`Purchase ${o.number}`}
+              aria-label={t('operations.purchaseNumber', { number: o.number })}
             >
               <div className="flex justify-between gap-3">
-                <span className="text-sm text-muted-foreground">PO #{o.number}</span>
+                <span className="text-sm text-muted-foreground">{t('operations.po')}{o.number}</span>
                 <span
                   className={`stock-badge ${['DRAFT', 'PARTIALLY_RECEIVED'].includes(o.status) ? 'stock-low' : ''}`}
                 >
@@ -430,20 +442,20 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 <h3 className="text-lg font-semibold">{o.supplierName}</h3>
                 <p className="text-sm text-muted-foreground">{o.warehouseName}</p>
               </div>
-              <p className="text-sm">{o.reference || 'No external reference'}</p>
+              <p className="text-sm">{o.reference || t('operations.noExternalReference')}</p>
               <div className="flex flex-wrap justify-between gap-3 items-center">
                 <strong className="text-xl">
                   {o.total} {o.currency}
                 </strong>
                 <Button variant="outline" onClick={() => void openOrder(o.id)}>
-                  View purchase #{o.number}
+                  {t('operations.viewPurchase')}{o.number}
                 </Button>
               </div>
             </article>
           ))}
           {!orders.length ? (
             <p className="purchase-empty">
-              No purchase orders here. Create a draft to plan your next delivery.
+              {t('operations.noPurchaseOrdersHereCreateADraftToPlanYourNextDelivery')}
             </p>
           ) : null}
         </div>
@@ -455,11 +467,11 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               <div className="flex justify-between gap-2">
                 <h3 className="text-lg font-semibold">{s.name}</h3>
                 <span className={`stock-badge ${s.active ? '' : 'stock-low'}`}>
-                  {s.deletedAt ? 'Archived' : s.active ? 'Active' : 'Inactive'}
+                  {s.deletedAt ? t('operations.archived') : s.active ? t('operations.active') : t('operations.inactive2')}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {s.businessNumber || 'Business number not set'}
+                {s.businessNumber || t('operations.businessNumberNotSet')}
               </p>
               <p className="text-sm">
                 {s.contactPerson} {s.phone}
@@ -473,7 +485,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                     setSupplierFilter(s.id);
                   }}
                 >
-                  View balance
+                  {t('operations.viewBalance')}
                 </Button>
                 {purchaseRead ? (
                   <Button
@@ -483,7 +495,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                       setSupplierFilter(s.id);
                     }}
                   >
-                    Purchase history
+                    {t('operations.purchaseHistory')}
                   </Button>
                 ) : null}
                 {can('supplier.manage') && !s.deletedAt ? (
@@ -493,14 +505,14 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                       disabled={locked}
                       onClick={() => setEditor({ kind: 'supplier', value: s })}
                     >
-                      Edit supplier
+                      {t('operations.editSupplier')}
                     </Button>
                     <Button
                       variant="ghost"
                       disabled={locked}
                       onClick={() => setEditor({ kind: 'archive', value: s })}
                     >
-                      Archive supplier
+                      {t('operations.archiveSupplier')}
                     </Button>
                   </>
                 ) : null}
@@ -508,7 +520,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
             </article>
           ))}
           {!suppliers.length ? (
-            <p className="purchase-empty">No suppliers found. Add the businesses you buy from.</p>
+            <p className="purchase-empty">{t('operations.noSuppliersFoundAddTheBusinessesYouBuyFrom')}</p>
           ) : null}
         </div>
       ) : null}
@@ -517,27 +529,27 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           {receipts.map((r) => (
             <article key={r.id} className="inventory-stock-card space-y-3">
               <div className="flex justify-between gap-3">
-                <span className="text-sm text-muted-foreground">PO #{r.purchaseNumber}</span>
-                <span className="stock-badge">Received</span>
+                <span className="text-sm text-muted-foreground">{t('operations.po')}{r.purchaseNumber}</span>
+                <span className="stock-badge">{t('operations.received')}</span>
               </div>
               <h3 className="text-lg font-semibold">{r.reference}</h3>
               <p>{r.supplierName}</p>
               <p className="text-sm text-muted-foreground">
-                Invoice: {r.invoiceNumber ?? 'Not provided'}
+                {t('operations.invoice')} {r.invoiceNumber ?? t('operations.notProvided')}
               </p>
               <p className="text-sm">
-                Outstanding:{' '}
+                {t('operations.outstanding')}{' '}
                 <strong>
                   {r.outstanding} {r.currency}
                 </strong>
               </p>
               <Button variant="outline" onClick={() => void openReceipt(r.id)}>
-                View receipt {r.reference}
+                {t('operations.viewReceipt')} {r.reference}
               </Button>
             </article>
           ))}
           {!receipts.length ? (
-            <p className="purchase-empty">Goods receipts appear after a delivery is posted.</p>
+            <p className="purchase-empty">{t('operations.goodsReceiptsAppearAfterADeliveryIsPosted')}</p>
           ) : null}
         </div>
       ) : null}
@@ -546,31 +558,30 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           <div className="space-y-5">
             <div className="purchase-grid">
               <div className="inventory-stock-card">
-                <p className="text-sm text-muted-foreground">Received value</p>
+                <p className="text-sm text-muted-foreground">{t('operations.receivedValue')}</p>
                 <strong className="text-2xl">
                   {account.receivedValue} {account.currency}
                 </strong>
               </div>
               <div className="inventory-stock-card">
-                <p className="text-sm text-muted-foreground">Outstanding balance</p>
+                <p className="text-sm text-muted-foreground">{t('operations.outstandingBalance')}</p>
                 <strong data-testid="supplier-balance" className="text-2xl">
                   {account.outstanding} {account.currency}
                 </strong>
               </div>
               <div className="inventory-stock-card">
-                <p className="text-sm text-muted-foreground">Deliveries received</p>
+                <p className="text-sm text-muted-foreground">{t('operations.deliveriesReceived')}</p>
                 <strong className="text-2xl">{account.receiptCount}</strong>
                 <p className="text-sm text-muted-foreground">
-                  Last:{' '}
+                  {t('operations.last')}{' '}
                   {account.lastReceiptAt
-                    ? new Date(account.lastReceiptAt).toLocaleDateString()
-                    : 'None'}
+                    ? formatDate(account.lastReceiptAt, locale)
+                    : t('operations.none')}
                 </p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
-              Balance covers recorded receipts and external supplier payments. Purchase orders
-              awaiting delivery do not add a charge.
+              {t('operations.balanceCoversRecordedReceiptsAndExternalSupplierPaymentsPurchaseOrdersAwaitingDeliveryDoNotAddACharge')}
             </p>
             <div className="space-y-3">
               {account.items.map((e) => (
@@ -581,9 +592,9 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                     <p className="text-sm text-muted-foreground">
                       {e.reference} {e.method ? label(e.method) : ''}
                     </p>
-                    <p className="text-sm">{e.reason}</p>
+                    <p className="text-sm">{serverMessage(e.reason, locale)}</p>
                     <small className="text-muted-foreground">
-                      {e.userName} · {new Date(e.createdAt).toLocaleString()}
+                      {e.userName} · {formatDateTime(e.createdAt, locale)}
                     </small>
                   </div>
                   <div className="space-y-2">
@@ -593,7 +604,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                     <div className="flex flex-wrap gap-2">
                       {purchaseRead ? (
                         <Button variant="outline" onClick={() => void openReceipt(e.receiptId)}>
-                          Open receipt
+                          {t('operations.openReceipt')}
                         </Button>
                       ) : null}
                       {e.kind === 'PAYMENT' && !e.reversed && can('supplier.payment.reverse') ? (
@@ -602,11 +613,11 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                           disabled={locked}
                           onClick={() => setEditor({ kind: 'reverse', id: e.id })}
                         >
-                          Reverse payment record
+                          {t('operations.reversePaymentRecord')}
                         </Button>
                       ) : null}
                       {e.reversed ? (
-                        <span className="text-sm text-muted-foreground">Reversed</span>
+                        <span className="text-sm text-muted-foreground">{t('operations.reversed')}</span>
                       ) : null}
                     </div>
                   </div>
@@ -616,31 +627,31 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           </div>
         ) : (
           <p className="purchase-empty">
-            Choose a supplier to see receipts, payments and the outstanding balance.
+            {t('operations.chooseASupplierToSeeReceiptsPaymentsAndTheOutstandingBalance')}
           </p>
         )
       ) : null}
       <div className="flex gap-3 items-center">
         <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-          Previous purchasing page
+          {t('operations.previousPurchasingPage')}
         </Button>
         <span>{page}</span>
         <Button variant="outline" disabled={!more} onClick={() => setPage((p) => p + 1)}>
-          Next purchasing page
+          {t('operations.nextPurchasingPage')}
         </Button>
       </div>
 
       {selectedOrder ? (
-        <section className="purchase-detail space-y-5" aria-label="Purchase detail">
+        <section className="purchase-detail space-y-5" aria-label={t('operations.purchaseDetail')}>
           <div className="flex flex-wrap justify-between gap-3">
             <div>
-              <p className="pos-eyebrow">PURCHASE ORDER</p>
+              <p className="pos-eyebrow">{t('operations.purchaseOrder')}</p>
               <h2 className="mt-2 text-2xl font-semibold">
-                PO #{selectedOrder.number} · {selectedOrder.supplierName}
+                {t('operations.po')}{selectedOrder.number} · {selectedOrder.supplierName}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {selectedOrder.warehouseName} ·{' '}
-                <span data-testid="purchase-detail-status">{label(selectedOrder.status)}</span>
+                <span data-testid="purchase-detail-status" data-status={selectedOrder.status}>{label(selectedOrder.status)}</span>
               </p>
             </div>
             <Button
@@ -650,7 +661,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 setHistory(null);
               }}
             >
-              Close purchase
+              {t('operations.closePurchase')}
             </Button>
           </div>
           <p>{selectedOrder.notes}</p>
@@ -660,11 +671,10 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 <div>
                   <h3 className="font-semibold">{i.itemName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {i.sku} · {i.unitPrice} / {i.unitCode} · tax {i.taxRate}%
+                    {i.sku} · {i.unitPrice} / {i.unitCode} {t('operations.tax2')} {i.taxRate}%
                   </p>
                   <p className="mt-1 text-sm">
-                    Ordered {qty(i.quantity)} {i.unitCode} · received {qty(i.receivedQuantity)} ·
-                    remaining {qty(i.remainingQuantity)}
+                    {t('operations.ordered')} {qty(i.quantity)} {i.unitCode} {t('operations.received2')} {qty(i.receivedQuantity)} {t('operations.remaining')} {qty(i.remainingQuantity)}
                   </p>
                 </div>
                 <strong>
@@ -683,14 +693,14 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                     submit(`orders/${selectedOrder.id}/order`, { version: selectedOrder.version })
                   }
                 >
-                  Confirm purchase order
+                  {t('operations.confirmPurchaseOrder')}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={locked}
                   onClick={() => setEditor({ kind: 'draft', value: selectedOrder })}
                 >
-                  Edit draft
+                  {t('operations.editDraft')}
                 </Button>
               </>
             ) : null}
@@ -700,7 +710,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 disabled={locked}
                 onClick={() => setEditor({ kind: 'receive', value: selectedOrder })}
               >
-                Receive goods
+                {t('operations.receiveGoods')}
               </Button>
             ) : null}
             {['DRAFT', 'ORDERED'].includes(selectedOrder.status) && can('purchase.manage') ? (
@@ -709,7 +719,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 disabled={locked}
                 onClick={() => setEditor({ kind: 'cancel', value: selectedOrder })}
               >
-                Cancel purchase
+                {t('operations.cancelPurchase')}
               </Button>
             ) : null}
             <Button
@@ -720,14 +730,14 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 setSupplierFilter(s.supplierId);
               }}
             >
-              Supplier receipts
+              {t('operations.supplierReceipts')}
             </Button>
             <Button
               variant="ghost"
               onClick={() => void loadHistory()}
               disabled={!!history && !history.hasMore}
             >
-              {history ? 'More purchase history' : 'Show purchase history'}
+              {history ? t('operations.morePurchaseHistory') : t('operations.showPurchaseHistory')}
             </Button>
           </div>
           {history ? (
@@ -736,7 +746,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 <details key={e.id} className="rounded-lg border p-3 text-sm">
                   <summary>
                     {label(e.action.replace('purchase.', ''))} ·{' '}
-                    {new Date(e.createdAt).toLocaleString()}
+                    {formatDateTime(e.createdAt, locale)}
                   </summary>
                   <PurchaseHistorySummary value={e.response} />
                 </details>
@@ -746,31 +756,31 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
         </section>
       ) : null}
       {selectedReceipt ? (
-        <section className="purchase-detail space-y-5" aria-label="Receipt detail">
+        <section className="purchase-detail space-y-5" aria-label={t('operations.receiptDetail')}>
           <div className="flex flex-wrap justify-between gap-3">
             <div>
-              <p className="pos-eyebrow">GOODS RECEIVED</p>
+              <p className="pos-eyebrow">{t('operations.goodsReceived')}</p>
               <h2 className="mt-2 text-2xl font-semibold">{selectedReceipt.reference}</h2>
               <p className="mt-2 text-muted-foreground">
                 {selectedReceipt.supplierName} · {selectedReceipt.warehouseName}
               </p>
             </div>
             <Button variant="ghost" onClick={() => setSelectedReceipt(null)}>
-              Close receipt
+              {t('operations.closeReceipt')}
             </Button>
           </div>
           <div className="purchase-grid">
             <p>
-              Invoice: <strong>{selectedReceipt.invoiceNumber ?? 'Not provided'}</strong>
+              {t('operations.invoice')} <strong>{selectedReceipt.invoiceNumber ?? t('operations.notProvided')}</strong>
               <br />
               <small>{selectedReceipt.invoiceDate ?? ''}</small>
             </p>
             <p>
-              Received by {selectedReceipt.receivedBy}
+              {t('operations.receivedBy')} {selectedReceipt.receivedBy}
               <br />
-              <small>{new Date(selectedReceipt.createdAt).toLocaleString()}</small>
+              <small>{formatDateTime(selectedReceipt.createdAt, locale)}</small>
             </p>
-            <p>Due date: {selectedReceipt.dueDate ?? 'Not set'}</p>
+            <p>{t('operations.dueDate')} {selectedReceipt.dueDate ?? t('operations.notSet')}</p>
           </div>
           {selectedReceipt.documentReference ? (
             <a
@@ -779,7 +789,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               target="_blank"
               rel="noreferrer"
             >
-              View supplier document
+              {t('operations.viewSupplierDocument')}
             </a>
           ) : null}
           <p>{selectedReceipt.notes}</p>
@@ -788,8 +798,8 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
               <div>
                 <h3 className="font-semibold">{i.itemName}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Received {qty(i.quantity)} {i.unitCode} · added {qty(i.stockQuantity)}{' '}
-                  {i.stockUnit} to stock
+                  {t('operations.received')} {qty(i.quantity)} {i.unitCode} {t('operations.added')} {qty(i.stockQuantity)}{' '}
+                  {i.stockUnit} {t('operations.toStock')}
                 </p>
               </div>
               <strong>
@@ -800,7 +810,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           <Totals record={selectedReceipt} />
           <div className="flex flex-wrap justify-between items-center gap-3">
             <p className="text-lg">
-              Outstanding:{' '}
+              {t('operations.outstanding')}{' '}
               <strong data-testid="receipt-balance">
                 {selectedReceipt.outstanding} {selectedReceipt.currency}
               </strong>
@@ -810,19 +820,18 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
                 disabled={locked}
                 onClick={() => setEditor({ kind: 'payment', value: selectedReceipt })}
               >
-                Record supplier payment
+                {t('operations.recordSupplierPayment')}
               </Button>
             ) : null}
             <Button
               variant="outline"
               onClick={() => void openOrder(selectedReceipt.purchaseOrderId)}
             >
-              Open source purchase
+              {t('operations.openSourcePurchase')}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Posted receipts are immutable. Supplier payments record an external transaction and do
-            not operate your POS cash drawer.
+            {t('operations.postedReceiptsAreImmutableSupplierPaymentsRecordAnExternalTransactionAndDoNotOperateYourPosCashDrawer')}
           </p>
         </section>
       ) : null}
@@ -834,7 +843,7 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
           suppliers={choices}
           locked={locked}
           busy={busy}
-          error={error}
+          error={serverMessage(error, locale)}
           onClose={() => setEditor(null)}
           submit={submit}
         />
@@ -844,6 +853,8 @@ export function PurchasingWorkspace({ user }: { user: SessionUser }) {
 }
 
 function PurchaseHistorySummary({ value }: { value: unknown }) {
+  const { t } = useI18n();
+  const label = (value: string) => translatedLabel(value, t);
   const r = value as {
     reference?: string;
     notes?: string;
@@ -857,19 +868,19 @@ function PurchaseHistorySummary({ value }: { value: unknown }) {
   };
   return (
     <div className="mt-3 space-y-2">
-      {r.reference ? <p>Reference: {r.reference}</p> : null}
+      {r.reference ? <p>{t('operations.reference')} {r.reference}</p> : null}
       {r.total ? (
         <p>
-          Total: {r.total} {r.currency}
+          {t('operations.total2')} {r.total} {r.currency}
         </p>
       ) : null}
       {r.amount ? (
         <p>
-          Amount: {r.amount} {r.method ? label(r.method) : ''}
+          {t('operations.amount')} {r.amount} {r.method ? label(r.method) : ''}
         </p>
       ) : null}
       {r.notes ? <p>{r.notes}</p> : null}
-      {r.cancellationReason || r.reason ? <p>Reason: {r.cancellationReason ?? r.reason}</p> : null}
+      {r.cancellationReason || r.reason ? <p>{t('operations.reason2')} {r.cancellationReason ?? r.reason}</p> : null}
       {r.items ? (
         <ul className="space-y-1">
           {r.items.map((i, index) => (

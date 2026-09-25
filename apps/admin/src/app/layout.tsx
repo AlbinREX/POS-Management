@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { DEFAULT_LOCALE, LocaleProvider } from '../lib/i18n';
 export const metadata: Metadata = {
   title: 'FastFood Riza · POS',
-  description: 'FastFood Riza restaurant workspace',
-  manifest: '/manifest.webmanifest',
   applicationName: 'FastFood Riza',
   icons: {
     icon: [
@@ -14,7 +13,6 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Riza Waiter',
     statusBarStyle: 'black-translucent',
   },
 };
@@ -27,9 +25,14 @@ export const viewport: Viewport = {
   themeColor: '#111214',
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Albanian is the served default; LocaleProvider updates this attribute as soon as a
+  // stored or query-selected language resolves on the client, so assistive technology
+  // and browser translation follow whatever the operator actually chose.
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang={DEFAULT_LOCALE}>
+      <body>
+        <LocaleProvider>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

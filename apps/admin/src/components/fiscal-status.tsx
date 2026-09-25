@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { FiscalHandoffState, FiscalOrderStatus, SessionUser } from '@restaurant/shared-types';
 import { Button } from '@restaurant/ui/button';
 import { api, ApiFailure } from '../lib/api';
+import { serverMessage, useI18n } from '../lib/i18n';
 
 /**
  * Compact fiscal handoff state for one order.
@@ -27,6 +28,7 @@ const TONE: Record<FiscalHandoffState, 'ok' | 'warn' | 'bad'> = {
 };
 
 export function FiscalStatus({ user, orderId }: { user: SessionUser; orderId: string }) {
+  const { t, locale } = useI18n();
   const canRead = user.permissions.includes('fiscal.read');
   const canRetry = user.permissions.includes('fiscal.retry');
   const [status, setStatus] = useState<FiscalOrderStatus | null>(null);
@@ -63,9 +65,9 @@ export function FiscalStatus({ user, orderId }: { user: SessionUser; orderId: st
   };
   const unresolved = status.state !== 'CONFIRMED' && status.state !== 'SENT';
   return (
-    <p className="fiscal-status" role="status" aria-label={LABEL[status.state]}>
+    <p className="fiscal-status" role="status" aria-label={serverMessage(LABEL[status.state], locale)}>
       <span className="fiscal-dot" data-tone={TONE[status.state]} aria-hidden="true" />
-      <span>{LABEL[status.state]}</span>
+      <span>{serverMessage(LABEL[status.state], locale)}</span>
       {status.providerReference ? <span>· {status.providerReference}</span> : null}
       {canRetry && unresolved ? (
         <Button
@@ -75,10 +77,10 @@ export function FiscalStatus({ user, orderId }: { user: SessionUser; orderId: st
           disabled={busy}
           onClick={() => void retry()}
         >
-          Retry
+          {t('action.retry')}
         </Button>
       ) : null}
-      {error ? <span className="fiscal-error">{error}</span> : null}
+      {error ? <span className="fiscal-error">{serverMessage(error, locale)}</span> : null}
     </p>
   );
 }

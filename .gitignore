@@ -14,3 +14,6 @@ packages/database/src/generated/
 *.log
 infrastructure/nginx/certs/*
 !infrastructure/nginx/certs/.gitkeep
+
+# Generated from apps/admin/src/sw/sw.template.js at build time.
+apps/admin/public/sw.js

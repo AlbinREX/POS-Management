@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('configure all catalog types, edit a product, inspect audit and archive through the admin', async ({
   page,

@@ -19,6 +19,8 @@ import type {
 import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { api, apiBlob, ApiFailure } from '../lib/api';
+import { useI18n, serverMessage, formatDateTime, type MessageKey, type Translate } from '../lib/i18n';
+import { REPORT_LABEL_KEYS, REPORT_ENUM_KEYS } from '../lib/i18n/report-messages';
 
 type View =
   | 'Overview'
@@ -51,22 +53,25 @@ const views: View[] = [
   'Companies',
   'Fiscal',
 ];
-const presets: { key: ReportPreset; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'week', label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'custom', label: 'Custom' },
+const presets: { key: ReportPreset; label: MessageKey }[] = [
+  { key: 'today', label: 'report.today' },
+  { key: 'yesterday', label: 'report.yesterday' },
+  { key: 'week', label: 'report.thisWeek' },
+  { key: 'month', label: 'report.thisMonth' },
+  { key: 'custom', label: 'report.custom' },
 ];
-const label = (v: string) => v.toLowerCase().replaceAll('_', ' ');
+const enumLabel = (v: string, t: Translate) => {
+  const key = REPORT_ENUM_KEYS[v as keyof typeof REPORT_ENUM_KEYS];
+  return key ? t(key) : v;
+};
 const today = () => new Date().toISOString().slice(0, 10);
-const cell = (v: unknown) =>
+const cell = (v: unknown, t: Translate) =>
   v === null || v === undefined || v === ''
     ? '—'
     : typeof v === 'boolean'
       ? v
-        ? 'Yes'
-        : 'No'
+        ? t('report.yes')
+        : t('report.no')
       : String(v);
 const col = (key: string, header: string, numeric = false): Column => ({ key, header, numeric });
 
@@ -79,13 +84,14 @@ function Bars({
   title: string;
   rows: { label: string; value: string; count: number }[];
 }) {
+  const { t } = useI18n();
   const max = Math.max(0, ...rows.map((r) => Number(r.value)));
   if (!rows.some((r) => r.count > 0))
-    return <p className="purchase-empty">No settled sales in this range.</p>;
+    return <p className="purchase-empty">{t('report.noSettledSalesInThisRange')}</p>;
   return (
     <ol className="report-bars" aria-label={title}>
       {rows.map((r) => (
-        <li key={r.label} title={`${r.label}: ${r.value} (${r.count} orders)`}>
+        <li key={r.label} title={`${r.label}: ${r.value} (${t('report.orderCount', { count: r.count })})`}>
           <span
             className="report-bar"
             style={{
@@ -111,6 +117,7 @@ function Table({
   empty: string;
   onRow?: (row: Record<string, unknown>) => void;
 }) {
+  const { t, locale } = useI18n();
   if (!rows.length) return <p className="purchase-empty">{empty}</p>;
   const records = rows as Record<string, unknown>[];
   return (
@@ -136,7 +143,11 @@ function Table({
             >
               {columns.map((c) => (
                 <td key={c.key} className={c.numeric ? 'report-num' : ''}>
-                  {cell(row[c.key])}
+                  {['type', 'status', 'contractStatus', 'state', 'kind'].includes(c.key)
+                    ? enumLabel(String(row[c.key] ?? '—'), t)
+                    : c.key === 'lastError' ? serverMessage(String(row[c.key] ?? '—'), locale)
+                    : ['openedAt', 'closedAt', 'settledAt', 'createdAt'].includes(c.key) ? formatDateTime(row[c.key] as string | null, locale) || '—'
+                    : cell(row[c.key], t)}
                 </td>
               ))}
             </tr>
@@ -147,6 +158,8 @@ function Table({
   );
 }
 export function DashboardWorkspace({ user }: { user: SessionUser }) {
+  const { t, locale } = useI18n();
+  const label = (value: string) => enumLabel(value, t);
   const [view, setView] = useState<View>('Overview');
   const [preset, setPreset] = useState<ReportPreset>('today');
   const [from, setFrom] = useState(today());
@@ -250,8 +263,8 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
     purchasing = reports.Purchasing,
     companies = reports.Companies;
   return (
-    <section className="report-workspace" aria-label="Owner dashboard">
-      <div role="group" aria-label="Report range" className="purchase-filters">
+    <section className="report-workspace" aria-label={t('report.ownerDashboard')}>
+      <div role="group" aria-label={t('report.reportRange')} className="purchase-filters">
         {presets.map((p) => (
           <Button
             key={p.key}
@@ -262,25 +275,21 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
               setPreset(p.key);
             }}
           >
-            {p.label}
+            {t(p.label)}
           </Button>
         ))}
         {preset === 'custom' ? (
           <>
-            <label>
-              From
-              <Input
+            <label>{t('report.from')}<Input
                 type="date"
-                aria-label="From date"
+                aria-label={t('report.fromDate')}
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
               />
             </label>
-            <label>
-              To
-              <Input
+            <label>{t('report.to')}<Input
                 type="date"
-                aria-label="To date"
+                aria-label={t('report.toDate')}
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               />
@@ -292,22 +301,16 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                 setPage(1);
                 setApplied({ from, to });
               }}
-            >
-              Apply
-            </Button>
+            >{t('report.apply')}</Button>
           </>
         ) : null}
-        <Button type="button" variant="outline" disabled={loading} onClick={() => void load()}>
-          Refresh
-        </Button>
+        <Button type="button" variant="outline" disabled={loading} onClick={() => void load()}>{t('report.refresh')}</Button>
         <Button
           type="button"
           variant="outline"
           disabled={loading || !overview}
           onClick={() => void exportCsv()}
-        >
-          Export CSV
-        </Button>
+        >{t('report.exportCsv')}</Button>
       </div>
       <p className="report-range">
         {overview
@@ -316,14 +319,12 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
       </p>
       {error ? (
         <p className="purchase-notice" role="alert">
-          {error}
+          {serverMessage(error, locale)}
         </p>
       ) : null}
-      {notice ? <p className="purchase-notice">{notice}</p> : null}
+      {notice ? <p className="purchase-notice">{serverMessage(notice, locale)}</p> : null}
       {loading ? (
-        <p role="status" aria-busy="true" className="report-loading">
-          Loading reports…
-        </p>
+        <p role="status" aria-busy="true" className="report-loading">{t('report.loadingReports')}</p>
       ) : null}
       {sales && overview ? (
         <div className="report-kpis">
@@ -332,62 +333,62 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
               type="button"
               className="report-kpi"
               data-ops={ops.severity}
-              aria-label={`Operations: ${ops.severity}`}
+              aria-label={`${t('report.operations')}: ${serverMessage(ops.severity === 'ok' ? 'Healthy' : ops.severity, locale)}`}
               disabled
             >
-              <span>Operations</span>
-              <strong>{ops.severity === 'ok' ? 'Healthy' : ops.severity}</strong>
+              <span>{t('report.operations')}</span>
+              <strong>{serverMessage(ops.severity === 'ok' ? 'Healthy' : ops.severity, locale)}</strong>
               <small>
                 {ops.checks
                   .filter((c) => c.severity !== 'ok')
-                  .map((c) => c.summary)
-                  .join(' ') || 'Database, backup, sync and storage are healthy.'}
+                  .map((c) => serverMessage(c.summary, locale))
+                  .join(' ') || t('report.databaseBackupSyncAndStorageAreHealthy')}
               </small>
             </button>
           ) : null}
           {kpi(
-            'Sales',
+            t('report.sales'),
             money(sales.salesAfterDiscount),
             'Orders',
-            `${sales.orderCount} settled orders`,
+            t('report.settledCount', { count: sales.orderCount }),
           )}
-          {kpi('Net sales ex-tax', money(sales.netSales), 'Orders', `tax ${money(sales.tax)}`)}
-          {kpi('Average order', money(sales.averageOrderValue), 'Orders')}
-          {kpi('Discounts', money(sales.discounts), 'Orders', `gross ${money(sales.grossSales)}`)}
+          {kpi(t('report.netSalesExTax'), money(sales.netSales), 'Orders', t('report.taxHint', { amount: money(sales.tax) }))}
+          {kpi(t('report.averageOrder'), money(sales.averageOrderValue), 'Orders')}
+          {kpi(t('report.discounts'), money(sales.discounts), 'Orders', t('report.grossHint', { amount: money(sales.grossSales) }))}
           {kpi(
-            'Refunds',
+            t('report.refunds'),
             money(sales.refunds),
             'Cash',
-            `cancellations ${money(sales.cancellations)}`,
+            t('report.cancelledHint', { amount: money(sales.cancellations) }),
           )}
           {kpi(
-            'Net receipts',
+            t('report.netReceipts'),
             money(sales.netReceipts),
             'Cash',
-            `collected ${money(sales.collected)}`,
+            t('report.collectedHint', { amount: money(sales.collected) }),
           )}
-          {kpi('Dine-in', `${sales.dineIn.count}`, 'Orders', money(sales.dineIn.total))}
-          {kpi('Takeaway', `${sales.takeaway.count}`, 'Orders', money(sales.takeaway.total))}
+          {kpi(t('report.dineIn'), `${sales.dineIn.count}`, 'Orders', money(sales.dineIn.total))}
+          {kpi(t('report.takeaway'), `${sales.takeaway.count}`, 'Orders', money(sales.takeaway.total))}
           {sales.byMethod.map((m) =>
             kpi(
               label(m.method),
               money(m.net),
               'Cash',
-              `${m.count} payments · refunded ${m.refunded}`,
+              t('report.paymentCount', { count: m.count, amount: m.refunded }),
             ),
           )}
-          {kpi('Open shifts', `${overview.openShifts}`, 'Cash')}
+          {kpi(t('report.openShifts'), `${overview.openShifts}`, 'Cash')}
           {kpi(
-            'Low stock',
+            t('report.lowStock'),
             `${overview.lowStock}`,
             'Inventory',
-            `${overview.negativeStock} negative · ${overview.positions} positions`,
+            t('report.stockCount', { negative: overview.negativeStock, positions: overview.positions }),
           )}
-          {kpi('Company exposure', money(overview.companyExposure), 'Companies')}
-          {kpi('Supplier outstanding', money(overview.supplierOutstanding), 'Purchasing')}
+          {kpi(t('report.companyExposure'), money(overview.companyExposure), 'Companies')}
+          {kpi(t('report.supplierOutstanding'), money(overview.supplierOutstanding), 'Purchasing')}
         </div>
       ) : null}
-      <div role="group" aria-label="Report views" className="purchase-filters">
+      <div role="group" aria-label={t('report.reportViews')} className="purchase-filters">
         {views.map((item) => (
           <Button
             key={item}
@@ -395,26 +396,22 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
             variant={view === item ? 'default' : 'outline'}
             onClick={() => open(item)}
           >
-            {item}
+            {t(REPORT_LABEL_KEYS[item])}
           </Button>
         ))}
       </div>
-      <section aria-label={`${view} report`} className="purchase-detail report-detail">
+      <section aria-label={t('report.viewTitle', { view: t(REPORT_LABEL_KEYS[view]) })} className="purchase-detail report-detail">
         {view === 'Overview' ? (
           <>
-            <h2>Overview</h2>
-            <p className="text-sm text-muted-foreground">
-              Sales are recognized at settlement time in the branch timezone. Payment mix is by
-              tender time and refunds appear on the day they were recorded. Select a card to open
-              its report.
-            </p>
+            <h2>{t('report.overview')}</h2>
+            <p className="text-sm text-muted-foreground">{t('report.salesAreRecognizedAtSettlementTimeInTheBranchTimezonePaymentMixIsByTenderTimeAndRefundsAppearOnTheDayTheyWereRecordedSelectACardToOpenItsReport')}</p>
           </>
         ) : null}
         {view === 'Orders' && orders ? (
           <>
-            <h2>Sales by day</h2>
+            <h2>{t('report.salesByDay')}</h2>
             <Bars
-              title="Sales by day"
+              title={t('report.salesByDay')}
               rows={orders.byDay.map((d) => ({
                 label: d.date.slice(5),
                 value: d.total,
@@ -422,30 +419,30 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
               }))}
             />
             <Table
-              title="Daily sales"
+              title={t('report.dailySales')}
               columns={[
-                col('date', 'Date'),
-                col('orderCount', 'Orders', true),
-                col('grossSales', 'Gross', true),
-                col('discounts', 'Discounts', true),
-                col('tax', 'Tax', true),
-                col('total', 'Total', true),
-                col('netSales', 'Net ex-tax', true),
+                col('date', t('report.date')),
+                col('orderCount', t('report.orders'), true),
+                col('grossSales', t('report.gross'), true),
+                col('discounts', t('report.discounts'), true),
+                col('tax', t('report.tax'), true),
+                col('total', t('report.total'), true),
+                col('netSales', t('report.netExTax'), true),
               ]}
               rows={orders.byDay}
-              empty="No days in range."
+              empty={t('report.noDaysInRange')}
               onRow={(row) => drillDay(String(row.date))}
             />
-            <h2>Sales by hour</h2>
+            <h2>{t('report.salesByHour')}</h2>
             <Bars
-              title="Sales by hour"
+              title={t('report.salesByHour')}
               rows={orders.byHour.map((h) => ({
                 label: String(h.hour).padStart(2, '0'),
                 value: h.total,
                 count: h.orderCount,
               }))}
             />
-            <h2>Orders by status and type</h2>
+            <h2>{t('report.ordersByStatusAndType')}</h2>
             <dl className="purchase-totals report-totals">
               {orders.byStatus.map((s) => (
                 <div key={s.status}>
@@ -462,34 +459,34 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                 </div>
               ))}
               <div>
-                <dt>Voided items</dt>
+                <dt>{t('report.voidedItems')}</dt>
                 <dd>{orders.voidedItems}</dd>
               </div>
             </dl>
-            <h2>Top orders</h2>
+            <h2>{t('report.topOrders')}</h2>
             <Table
-              title="Top orders"
+              title={t('report.topOrders')}
               columns={[
-                col('orderNumber', 'Order'),
-                col('type', 'Type'),
-                col('tableName', 'Table'),
-                col('waiterName', 'Waiter'),
-                col('total', 'Total', true),
-                col('settledAt', 'Settled'),
+                col('orderNumber', t('report.order')),
+                col('type', t('report.type')),
+                col('tableName', t('report.table')),
+                col('waiterName', t('report.waiter')),
+                col('total', t('report.total'), true),
+                col('settledAt', t('report.settled')),
               ]}
               rows={orders.topOrders}
-              empty="No settled orders in this range."
+              empty={t('report.noSettledOrdersInThisRange')}
             />
-            <h2>Table usage</h2>
+            <h2>{t('report.tableUsage')}</h2>
             <Table
-              title="Table usage"
+              title={t('report.tableUsage')}
               columns={[
-                col('tableName', 'Table'),
-                col('orders', 'Orders', true),
-                col('total', 'Total', true),
+                col('tableName', t('report.table')),
+                col('orders', t('report.orders'), true),
+                col('total', t('report.total'), true),
               ]}
               rows={orders.tableUsage.map((t) => ({ ...t, id: t.tableId }))}
-              empty="No dine-in settlements in this range."
+              empty={t('report.noDineInSettlementsInThisRange')}
             />
           </>
         ) : null}
@@ -497,170 +494,166 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
           <>
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Products sold</dt>
+                <dt>{t('report.productsSold')}</dt>
                 <dd>{products.productCount}</dd>
               </div>
               <div>
-                <dt>Units</dt>
+                <dt>{t('report.units')}</dt>
                 <dd>{products.quantity}</dd>
               </div>
               <div>
-                <dt>Product sales</dt>
+                <dt>{t('report.productSales')}</dt>
                 <dd>{money(products.sales)}</dd>
               </div>
             </dl>
-            <h2>Top sellers</h2>
+            <h2>{t('report.topSellers')}</h2>
             <Table
-              title="Top sellers"
+              title={t('report.topSellers')}
               columns={[
-                col('productName', 'Product'),
-                col('categoryName', 'Category'),
-                col('quantity', 'Qty', true),
-                col('lines', 'Lines', true),
-                col('sales', 'Sales', true),
+                col('productName', t('report.product')),
+                col('categoryName', t('report.category')),
+                col('quantity', t('report.qty'), true),
+                col('lines', t('report.lines'), true),
+                col('sales', t('report.sales'), true),
               ]}
               rows={products.top.map((r) => ({ ...r, id: r.productId + r.productName }))}
-              empty="No product sales in this range."
+              empty={t('report.noProductSalesInThisRange')}
             />
-            <h2>Low performers</h2>
+            <h2>{t('report.lowPerformers')}</h2>
             <Table
-              title="Low performers"
+              title={t('report.lowPerformers')}
               columns={[
-                col('productName', 'Product'),
-                col('categoryName', 'Category'),
-                col('quantity', 'Qty', true),
-                col('sales', 'Sales', true),
+                col('productName', t('report.product')),
+                col('categoryName', t('report.category')),
+                col('quantity', t('report.qty'), true),
+                col('sales', t('report.sales'), true),
               ]}
               rows={products.low.map((r) => ({ ...r, id: r.productId + r.productName }))}
-              empty="No product sales in this range."
+              empty={t('report.noProductSalesInThisRange')}
             />
-            <h2>By category</h2>
+            <h2>{t('report.byCategory')}</h2>
             <Table
-              title="Sales by category"
+              title={t('report.salesByCategory')}
               columns={[
-                col('categoryName', 'Category'),
-                col('quantity', 'Qty', true),
-                col('sales', 'Sales', true),
+                col('categoryName', t('report.category')),
+                col('quantity', t('report.qty'), true),
+                col('sales', t('report.sales'), true),
               ]}
               rows={products.byCategory.map((c) => ({ ...c, id: c.categoryName }))}
-              empty="No category sales in this range."
+              empty={t('report.noCategorySalesInThisRange')}
             />
-            <h2>Modifier usage</h2>
+            <h2>{t('report.modifierUsage')}</h2>
             <Table
-              title="Modifier usage"
+              title={t('report.modifierUsage')}
               columns={[
-                col('groupName', 'Group'),
-                col('name', 'Modifier'),
-                col('lines', 'Lines', true),
+                col('groupName', t('report.group')),
+                col('name', t('report.modifier')),
+                col('lines', t('report.lines'), true),
               ]}
               rows={products.modifiers.map((m) => ({ ...m, id: m.groupName + m.name }))}
-              empty="No modifiers were sold in this range."
+              empty={t('report.noModifiersWereSoldInThisRange')}
             />
           </>
         ) : null}
         {view === 'Staff' && staff ? (
           <>
-            <h2>Waiters</h2>
+            <h2>{t('report.waiters')}</h2>
             <Table
-              title="Waiter sales"
+              title={t('report.waiterSales')}
               columns={[
-                col('name', 'Waiter'),
-                col('orders', 'Orders', true),
-                col('sales', 'Sales', true),
-                col('averageTicket', 'Average ticket', true),
-                col('dineIn', 'Dine-in', true),
-                col('takeaway', 'Takeaway', true),
+                col('name', t('report.waiter')),
+                col('orders', t('report.orders'), true),
+                col('sales', t('report.sales'), true),
+                col('averageTicket', t('report.averageTicket'), true),
+                col('dineIn', t('report.dineIn'), true),
+                col('takeaway', t('report.takeaway'), true),
               ]}
               rows={staff.waiters.map((w) => ({ ...w, id: w.userId ?? 'unassigned' }))}
-              empty="No settled orders in this range."
+              empty={t('report.noSettledOrdersInThisRange')}
             />
-            <h2>Cashiers</h2>
+            <h2>{t('report.cashiers')}</h2>
             <Table
-              title="Cashier settlements"
+              title={t('report.cashierSettlements')}
               columns={[
-                col('name', 'Cashier'),
-                col('orders', 'Settlements', true),
-                col('sales', 'Settled', true),
-                col('averageTicket', 'Average', true),
+                col('name', t('report.cashier')),
+                col('orders', t('report.settlements'), true),
+                col('sales', t('report.settled'), true),
+                col('averageTicket', t('report.average'), true),
               ]}
               rows={staff.cashiers.map((c) => ({ ...c, id: c.userId ?? 'unknown' }))}
-              empty="No settlements in this range."
+              empty={t('report.noSettlementsInThisRange')}
             />
-            <p className="text-sm text-muted-foreground">
-              Only figures the ledger records are shown: orders attributed to a waiter and
-              settlements performed by a cashier.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('report.onlyFiguresTheLedgerRecordsAreShownOrdersAttributedToAWaiterAndSettlementsPerformedByACashier')}</p>
           </>
         ) : null}
         {view === 'Cash' && cash ? (
           <>
-            <h2>Payments by method</h2>
+            <h2>{t('report.paymentsByMethod')}</h2>
             <Table
-              title="Payments by method"
+              title={t('report.paymentsByMethod')}
               columns={[
-                col('method', 'Method'),
-                col('count', 'Payments', true),
-                col('collected', 'Collected', true),
-                col('cancelled', 'Cancelled', true),
-                col('refunded', 'Refunded', true),
-                col('net', 'Net', true),
+                col('method', t('report.method')),
+                col('count', t('report.payments'), true),
+                col('collected', t('report.collected'), true),
+                col('cancelled', t('report.cancelled'), true),
+                col('refunded', t('report.refunded'), true),
+                col('net', t('report.net'), true),
               ]}
               rows={cash.byMethod.map((m) => ({ ...m, id: m.method, method: label(m.method) }))}
-              empty="No payments in this range."
+              empty={t('report.noPaymentsInThisRange')}
             />
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Shifts</dt>
+                <dt>{t('report.shifts')}</dt>
                 <dd>
-                  {cash.totals.shifts} · {cash.totals.openShifts} open
-                </dd>
+                  {cash.totals.shifts} · {cash.totals.openShifts}{t('report.open')}</dd>
               </div>
               <div>
-                <dt>Opening float</dt>
+                <dt>{t('report.openingFloat')}</dt>
                 <dd>{money(cash.totals.openingFloat)}</dd>
               </div>
               <div>
-                <dt>Cash in / out</dt>
+                <dt>{t('report.cashInOut')}</dt>
                 <dd>
                   {cash.totals.cashIn} / {cash.totals.cashOut}
                 </dd>
               </div>
               <div>
-                <dt>Expected</dt>
+                <dt>{t('report.expected')}</dt>
                 <dd>{money(cash.totals.expected)}</dd>
               </div>
               <div>
-                <dt>Counted</dt>
+                <dt>{t('report.counted')}</dt>
                 <dd>{money(cash.totals.counted)}</dd>
               </div>
               <div>
-                <dt>Discrepancies</dt>
+                <dt>{t('report.discrepancies')}</dt>
                 <dd>
                   {cash.totals.discrepancies} · {money(cash.totals.difference)}
                 </dd>
               </div>
             </dl>
-            <h2>Shifts</h2>
+            <h2>{t('report.shifts')}</h2>
             <Table
-              title="Cash shifts"
+              title={t('report.cashShifts')}
               columns={[
-                col('cashierName', 'Cashier'),
-                col('terminalName', 'Terminal'),
-                col('status', 'Status'),
-                col('openedAt', 'Opened'),
-                col('closedAt', 'Closed'),
-                col('openingAmount', 'Opening', true),
-                col('cashIn', 'Cash in', true),
-                col('cashOut', 'Cash out', true),
-                col('cashPayments', 'Cash sales', true),
-                col('cashReversals', 'Reversals', true),
-                col('expectedAmount', 'Expected', true),
-                col('closingAmount', 'Counted', true),
-                col('difference', 'Difference', true),
-                col('closingReason', 'Reason'),
+                col('cashierName', t('report.cashier')),
+                col('terminalName', t('report.terminal')),
+                col('status', t('report.status')),
+                col('openedAt', t('report.opened')),
+                col('closedAt', t('report.closed')),
+                col('openingAmount', t('report.opening'), true),
+                col('cashIn', t('report.cashIn'), true),
+                col('cashOut', t('report.cashOut'), true),
+                col('cashPayments', t('report.cashSales'), true),
+                col('cashReversals', t('report.reversals'), true),
+                col('expectedAmount', t('report.expected'), true),
+                col('closingAmount', t('report.counted'), true),
+                col('difference', t('report.difference'), true),
+                col('closingReason', t('report.reason')),
               ]}
               rows={cash.shifts}
-              empty="No cash shifts overlap this range."
+              empty={t('report.noCashShiftsOverlapThisRange')}
             />
           </>
         ) : null}
@@ -668,15 +661,15 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
           <>
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Positions</dt>
+                <dt>{t('report.positions')}</dt>
                 <dd>{inventory.positions}</dd>
               </div>
               <div>
-                <dt>Low stock</dt>
+                <dt>{t('report.lowStock')}</dt>
                 <dd>{inventory.lowStock}</dd>
               </div>
               <div>
-                <dt>Negative stock</dt>
+                <dt>{t('report.negativeStock')}</dt>
                 <dd>{inventory.negativeStock}</dd>
               </div>
               {inventory.movements.map((m) => (
@@ -686,21 +679,21 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                 </div>
               ))}
             </dl>
-            <h2>Current stock</h2>
+            <h2>{t('report.currentStock')}</h2>
             <Table
-              title="Current stock"
+              title={t('report.currentStock')}
               columns={[
-                col('itemName', 'Item'),
-                col('sku', 'SKU'),
-                col('warehouseName', 'Warehouse'),
-                col('quantity', 'Quantity', true),
-                col('unitCode', 'Unit'),
-                col('lowStockThreshold', 'Alert at', true),
-                col('lowStock', 'Low'),
-                col('negative', 'Negative'),
+                col('itemName', t('report.item')),
+                col('sku', t('report.sku')),
+                col('warehouseName', t('report.warehouse')),
+                col('quantity', t('report.quantity'), true),
+                col('unitCode', t('report.unit')),
+                col('lowStockThreshold', t('report.alertAt'), true),
+                col('lowStock', t('report.low')),
+                col('negative', t('report.negative')),
               ]}
               rows={inventory.stock.items.map((r) => ({ ...r, id: r.positionId }))}
-              empty="No stock positions match."
+              empty={t('report.noStockPositionsMatch')}
             />
             <div className="purchase-filters">
               <Button
@@ -708,36 +701,32 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                 variant="outline"
                 disabled={page <= 1 || loading}
                 onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">Page {inventory.stock.page}</span>
+              >{t('report.previous')}</Button>
+              <span className="text-sm text-muted-foreground">{t('report.page')}{inventory.stock.page}</span>
               <Button
                 type="button"
                 variant="outline"
                 disabled={!inventory.stock.hasMore || loading}
                 onClick={() => setPage(page + 1)}
-              >
-                Next
-              </Button>
+              >{t('report.next')}</Button>
             </div>
-            <h2>Movements in range</h2>
+            <h2>{t('report.movementsInRange')}</h2>
             <Table
-              title="Stock movements by item"
+              title={t('report.stockMovementsByItem')}
               columns={[
-                col('kind', 'Kind'),
-                col('itemName', 'Item'),
-                col('warehouseName', 'Warehouse'),
-                col('count', 'Entries', true),
-                col('quantity', 'Quantity', true),
-                col('unitCode', 'Unit'),
+                col('kind', t('report.kind')),
+                col('itemName', t('report.item')),
+                col('warehouseName', t('report.warehouse')),
+                col('count', t('report.entries'), true),
+                col('quantity', t('report.quantity'), true),
+                col('unitCode', t('report.unit')),
               ]}
               rows={inventory.byItem.map((m) => ({
                 ...m,
                 id: m.positionId + m.kind,
                 kind: label(m.kind),
               }))}
-              empty="No stock movements in this range."
+              empty={t('report.noStockMovementsInThisRange')}
             />
           </>
         ) : null}
@@ -745,55 +734,55 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
           <>
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Receipts in range</dt>
+                <dt>{t('report.receiptsInRange')}</dt>
                 <dd>{purchasing.receiptsInRange}</dd>
               </div>
               <div>
-                <dt>Received value</dt>
+                <dt>{t('report.receivedValue')}</dt>
                 <dd>{money(purchasing.receivedInRange)}</dd>
               </div>
               <div>
-                <dt>Payments recorded (ledger)</dt>
+                <dt>{t('report.paymentsRecordedLedger')}</dt>
                 <dd>{money(purchasing.paidInRange)}</dd>
               </div>
               <div>
-                <dt>Outstanding</dt>
+                <dt>{t('report.outstanding')}</dt>
                 <dd>{money(purchasing.outstanding)}</dd>
               </div>
               {purchasing.ordersByStatus.map((o) => (
                 <div key={o.status}>
-                  <dt>PO {label(o.status)}</dt>
+                  <dt>{t('report.po')}{label(o.status)}</dt>
                   <dd>{o.count}</dd>
                 </div>
               ))}
             </dl>
-            <h2>Suppliers</h2>
+            <h2>{t('report.suppliers')}</h2>
             <Table
-              title="Supplier balances"
+              title={t('report.supplierBalances')}
               columns={[
-                col('supplierName', 'Supplier'),
-                col('receipts', 'Receipts', true),
-                col('receivedValue', 'Received', true),
-                col('payments', 'Payments (ledger)', true),
-                col('outstanding', 'Outstanding', true),
-                col('receivedInRange', 'Received in range', true),
+                col('supplierName', t('report.supplier')),
+                col('receipts', t('report.receipts'), true),
+                col('receivedValue', t('report.received'), true),
+                col('payments', t('report.paymentsLedger'), true),
+                col('outstanding', t('report.outstanding'), true),
+                col('receivedInRange', t('report.receivedInRange'), true),
               ]}
               rows={purchasing.suppliers.map((s) => ({ ...s, id: s.supplierId }))}
-              empty="No suppliers are configured."
+              empty={t('report.noSuppliersAreConfigured')}
             />
-            <h2>Recent receipts</h2>
+            <h2>{t('report.recentReceipts')}</h2>
             <Table
-              title="Recent receipts"
+              title={t('report.recentReceipts')}
               columns={[
-                col('supplierName', 'Supplier'),
-                col('reference', 'Reference'),
-                col('invoiceNumber', 'Invoice'),
-                col('total', 'Total', true),
-                col('outstanding', 'Outstanding', true),
-                col('createdAt', 'Received'),
+                col('supplierName', t('report.supplier')),
+                col('reference', t('report.reference')),
+                col('invoiceNumber', t('report.invoice')),
+                col('total', t('report.total'), true),
+                col('outstanding', t('report.outstanding'), true),
+                col('createdAt', t('report.received')),
               ]}
               rows={purchasing.recentReceipts}
-              empty="No goods were received in this range."
+              empty={t('report.noGoodsWereReceivedInThisRange')}
             />
           </>
         ) : null}
@@ -801,86 +790,79 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
           <>
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Companies</dt>
+                <dt>{t('report.companies')}</dt>
                 <dd>{companies.totals.companies}</dd>
               </div>
               <div>
-                <dt>Charged in range</dt>
+                <dt>{t('report.chargedInRange')}</dt>
                 <dd>{money(companies.totals.chargedInRange)}</dd>
               </div>
               <div>
-                <dt>Credit limits</dt>
+                <dt>{t('report.creditLimits')}</dt>
                 <dd>{money(companies.totals.creditLimit)}</dd>
               </div>
               <div>
-                <dt>Available</dt>
+                <dt>{t('report.available')}</dt>
                 <dd>{money(companies.totals.available)}</dd>
               </div>
               <div>
-                <dt>Overdue</dt>
+                <dt>{t('report.overdue')}</dt>
                 <dd>{money(companies.totals.overdue)}</dd>
               </div>
               <div>
-                <dt>Exposure</dt>
+                <dt>{t('report.exposure')}</dt>
                 <dd>{money(companies.totals.exposure)}</dd>
               </div>
             </dl>
-            <h2>Accounts</h2>
+            <h2>{t('report.accounts')}</h2>
             <Table
-              title="Company accounts"
+              title={t('report.companyAccounts')}
               columns={[
-                col('companyName', 'Company'),
-                col('contractStatus', 'Contract'),
-                col('creditLimit', 'Limit', true),
-                col('charged', 'Charged', true),
-                col('paid', 'Paid (ledger)', true),
-                col('balance', 'Balance', true),
-                col('available', 'Available', true),
-                col('chargedInRange', 'Charged in range', true),
-                col('ordersInRange', 'Orders', true),
-                col('overdue', 'Overdue', true),
+                col('companyName', t('report.company')),
+                col('contractStatus', t('report.contract')),
+                col('creditLimit', t('report.limit'), true),
+                col('charged', t('report.charged'), true),
+                col('paid', t('report.paidLedger'), true),
+                col('balance', t('report.balance'), true),
+                col('available', t('report.available'), true),
+                col('chargedInRange', t('report.chargedInRange'), true),
+                col('ordersInRange', t('report.orders'), true),
+                col('overdue', t('report.overdue'), true),
               ]}
               rows={companies.companies.map((c) => ({ ...c, id: c.companyId }))}
-              empty="No company accounts are configured."
+              empty={t('report.noCompanyAccountsAreConfigured')}
             />
-            <h2>Statements</h2>
+            <h2>{t('report.statements')}</h2>
             <Table
-              title="Company statements"
+              title={t('report.companyStatements')}
               columns={[
-                col('companyName', 'Company'),
-                col('number', 'Statement'),
-                col('periodStart', 'From'),
-                col('periodEnd', 'To'),
-                col('dueDate', 'Due'),
-                col('closingBalance', 'Closing', true),
-                col('overdue', 'Overdue'),
+                col('companyName', t('report.company')),
+                col('number', t('report.statement')),
+                col('periodStart', t('report.from')),
+                col('periodEnd', t('report.to')),
+                col('dueDate', t('report.due')),
+                col('closingBalance', t('report.closing'), true),
+                col('overdue', t('report.overdue')),
               ]}
               rows={companies.statements}
-              empty="No statements were issued in this range and none are overdue."
+              empty={t('report.noStatementsWereIssuedInThisRangeAndNoneAreOverdue')}
             />
           </>
         ) : null}
         {view === 'Fiscal' ? (
           <>
-            <h2>Fiscal handoff</h2>
-            <p className="fiscal-note">
-              FastFood Riza does not fiscalize. EnterNet operates the fiscal device and F-LINK
-              software; this view shows only whether a finalized sale has been handed off to them. A
-              failed handoff never changes a paid sale.
-            </p>
+            <h2>{t('report.fiscalHandoff')}</h2>
+            <p className="fiscal-note">{t('report.fastfoodRizaDoesNotFiscalizeEnternetOperatesTheFiscalDeviceAndFLinkSoftwareThisViewShowsOnlyWhetherAFinalizedSaleHasBeenHandedOffToThemAFailedHandoffNeverChangesAPaidSale')}</p>
             {fiscal?.transportPending ? (
-              <p className="purchase-notice">
-                No fiscal provider transport is configured. Sales remain recorded and unresolved
-                here until the EnterNet F-LINK integration specification is supplied.
-              </p>
+              <p className="purchase-notice">{t('report.noFiscalProviderTransportIsConfiguredSalesRemainRecordedAndUnresolvedHereUntilTheEnternetFLinkIntegrationSpecificationIsSupplied')}</p>
             ) : null}
             <dl className="purchase-totals report-totals">
               <div>
-                <dt>Provider</dt>
-                <dd>{fiscal?.provider ?? 'Not configured'}</dd>
+                <dt>{t('report.provider')}</dt>
+                <dd>{fiscal?.provider && fiscal.provider !== 'unconfigured' ? fiscal.provider : t('report.notConfigured')}</dd>
               </div>
               <div>
-                <dt>Unresolved</dt>
+                <dt>{t('report.unresolved')}</dt>
                 <dd>{fiscal?.unresolved ?? 0}</dd>
               </div>
               {fiscal
@@ -893,19 +875,19 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                 : null}
             </dl>
             <Table
-              title="Fiscal handoffs"
+              title={t('report.fiscalHandoffs')}
               columns={[
-                col('orderNumber', 'Order'),
-                col('state', 'State'),
-                col('provider', 'Provider'),
-                col('attempts', 'Attempts', true),
-                col('total', 'Total', true),
-                col('settledAt', 'Settled'),
-                col('providerReference', 'Provider reference'),
-                col('lastError', 'Last error'),
+                col('orderNumber', t('report.order')),
+                col('state', t('report.state')),
+                col('provider', t('report.provider')),
+                col('attempts', t('report.attempts'), true),
+                col('total', t('report.total'), true),
+                col('settledAt', t('report.settled')),
+                col('providerReference', t('report.providerReference')),
+                col('lastError', t('report.lastError')),
               ]}
               rows={handoffs.map((h) => ({ ...h, state: label(h.state) }))}
-              empty="No sales have been registered for fiscal handoff."
+              empty={t('report.noSalesHaveBeenRegisteredForFiscalHandoff')}
             />
             {user.permissions.includes('fiscal.retry') ? (
               <div className="purchase-filters">
@@ -927,8 +909,7 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
                             void load();
                           });
                       }}
-                    >
-                      Retry order {h.orderNumber}
+                    >{t('report.retryOrder')}{h.orderNumber}
                     </Button>
                   ))}
               </div>
@@ -936,7 +917,7 @@ export function DashboardWorkspace({ user }: { user: SessionUser }) {
           </>
         ) : null}
         {view !== 'Overview' && view !== 'Fiscal' && !reports[view] && !loading && !error ? (
-          <p className="purchase-empty">No report data.</p>
+          <p className="purchase-empty">{t('report.noReportData')}</p>
         ) : null}
       </section>
     </section>

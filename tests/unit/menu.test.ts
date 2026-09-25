@@ -48,6 +48,36 @@ describe('Menu boundaries', () => {
     ])
       expect(menuInputSchema.safeParse({ ...product, ...extra }).success).toBe(false);
   });
+  it('accepts bundled app image paths and absolute catalog URLs', () => {
+    // Images shipped with the app are referenced by root-relative path so they keep
+    // working on localhost, a LAN address and any other deployment; an absolute URL
+    // still works for a catalogue hosted elsewhere on the restaurant network.
+    for (const imageUrl of [
+      '/food/riza-burger.webp',
+      '/food/cola.webp',
+      'http://192.168.1.50/catalog/burger.jpg',
+      'https://cdn.example.test/burger.png',
+      'HTTP://UPPER.example/a.png',
+    ]) {
+      const parsed = menuInputSchema.safeParse({ ...product, imageUrl });
+      expect(parsed.success, imageUrl).toBe(true);
+    }
+  });
+  it('still rejects image values that are not a same-origin path or http(s) URL', () => {
+    // Widening storage must not widen what can be injected into an <img src>.
+    for (const imageUrl of [
+      'javascript:alert(1)',
+      'JaVaScRiPt:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      '//evil.example/x.jpg',
+      '../../etc/passwd',
+      'food/relative.webp',
+      'http:///nohost.png',
+      '/',
+    ])
+      expect(menuInputSchema.safeParse({ ...product, imageUrl }).success, imageUrl).toBe(false);
+  });
   it('validates modifier choice constraints', () => {
     for (const [minSelections, maxSelections] of [
       [2, 1],
