@@ -1,5 +1,7 @@
 import { expect, test } from './fixtures';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { MESSAGES } from '../../apps/admin/src/lib/i18n/messages';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -149,4 +151,57 @@ test('waiter installs the mobile surface, opens a table order, sends it and hand
   });
   expect(errors).toEqual([]);
   expect(order.tableId).toBe(table.id);
+});
+
+test('waiter tabs translate their labels but keep their identity and icons', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // Expected icons come from NavIcon's own table, so this cannot drift from the component.
+  const icons = readFileSync('apps/admin/src/components/riza-ui.tsx', 'utf8').split('\n');
+  const iconPath = (name: string) => {
+    const line = icons.find((row) => row.trim().startsWith(`${name}: '`));
+    return line!.slice(line!.indexOf("'") + 1, line!.lastIndexOf("'"));
+  };
+  const views = [
+    ['sales.tables', 'Layout'],
+    ['sales.waiterOrders', 'Orders'],
+    ['sales.waiterTakeaway', 'POS'],
+  ] as const;
+
+  await page.goto('/waiter');
+  await page.getByLabel('Organization', { exact: true }).fill('verification');
+  await page.getByLabel('Branch code').fill('main');
+  await page.getByLabel('Email', { exact: true }).fill(process.env.SEED_OWNER_EMAIL!);
+  await page.getByLabel('Password', { exact: true }).fill(process.env.SEED_OWNER_PASSWORD!);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+
+  const waiterNav = (locale: 'sq' | 'en') =>
+    page.getByRole('navigation', { name: MESSAGES['sales.waiterViews'][locale] });
+  for (const locale of ['sq', 'en'] as const) {
+    await page.getByTestId(`language-${locale}`).click();
+    const tabs = waiterNav(locale).getByRole('button');
+    // Labels follow the language; each icon follows the tab, never the label.
+    await expect(tabs).toHaveText(views.map(([key]) => MESSAGES[key][locale]));
+    for (const [index, [, icon]] of views.entries())
+      await expect(tabs.nth(index).locator('path')).toHaveAttribute('d', iconPath(icon));
+  }
+
+  // Switching language must not remount the tabs or change which one is selected.
+  await page.getByTestId('language-sq').click();
+  const orders = waiterNav('sq').getByRole('button', {
+    name: MESSAGES['sales.waiterOrders'].sq,
+    exact: true,
+  });
+  await orders.click();
+  await expect(orders).toHaveAttribute('aria-current', 'true');
+  const node = await orders.elementHandle();
+  await page.getByTestId('language-en').click();
+  await expect(
+    waiterNav('en').getByRole('button', { name: MESSAGES['sales.waiterOrders'].en, exact: true }),
+  ).toHaveAttribute('aria-current', 'true');
+  expect(await node!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await node!.evaluate((element) => element.textContent)).toBe(
+    MESSAGES['sales.waiterOrders'].en,
+  );
+  expect(errors).toEqual([]);
 });

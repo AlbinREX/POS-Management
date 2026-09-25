@@ -10,7 +10,7 @@ import type {
 } from '@restaurant/shared-types';
 import { Button } from '@restaurant/ui/button';
 import { api, ApiFailure } from '../lib/api';
-import { useI18n, serverMessage } from '../lib/i18n';
+import { useI18n, serverMessage, type MessageKey } from '../lib/i18n';
 import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
 import { NavIcon } from './riza-ui';
 import { OrdersWorkspace } from './orders-workspace';
@@ -34,6 +34,14 @@ const colors: Record<TableStatus, string> = {
 };
 const OPEN_STATUSES = ['DRAFT', 'OPEN', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'WAITING_PAYMENT'];
 type View = 'Tables' | 'Orders' | 'Takeaway';
+// A View is an identifier: it drives state, the React key and the icon. Only its label
+// is translated, so switching language never changes which tab is which.
+const VIEW_LABELS: Record<View, MessageKey> = {
+  Tables: 'sales.tables',
+  Orders: 'sales.waiterOrders',
+  Takeaway: 'sales.waiterTakeaway',
+};
+const VIEW_ICONS: Record<View, string> = { Tables: 'Layout', Orders: 'Orders', Takeaway: 'POS' };
 const message = (e: unknown) =>
   e instanceof ApiFailure
     ? e.message
@@ -224,7 +232,7 @@ export function WaiterApp({ user }: { user: SessionUser }) {
       <nav aria-label={t('sales.waiterViews')} className="waiter-tabs">
         {views.map((item) => (
           <button
-            key={item === 'Tables' ? t('sales.tables') : item === 'Orders' ? t('sales.waiterOrders') : t('sales.waiterTakeaway')}
+            key={item}
             type="button"
             aria-current={view === item}
             onClick={() => {
@@ -232,8 +240,8 @@ export function WaiterApp({ user }: { user: SessionUser }) {
               setView(item);
             }}
           >
-            <NavIcon name={item === 'Tables' ? 'Layout' : item === 'Orders' ? t('sales.waiterOrders') : 'POS'} />
-            {item}
+            <NavIcon name={VIEW_ICONS[item]} />
+            {t(VIEW_LABELS[item])}
           </button>
         ))}
       </nav>
