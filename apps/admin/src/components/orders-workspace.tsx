@@ -12,6 +12,7 @@ import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { OptionalDetails, ProductImage } from './riza-ui';
 import { PriceTag } from './menu-shared';
+import { posProductOrder } from '../lib/menu-order';
 import { api, ApiFailure } from '../lib/api';
 import { useI18n, formatDateTime, serverMessage } from '../lib/i18n';
 import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
@@ -112,14 +113,8 @@ export function OrdersWorkspace({
       setOrders(list.items);
       setHasMore(list.hasMore);
       setOrder(detail);
-      // The POS follows the configured order: categories first, then products within them.
-      const rank = new Map(menuCategories.map((c, index) => [c.id, index]));
-      const place = (p: MenuRecord) => rank.get(p.categoryId ?? '') ?? Number.MAX_SAFE_INTEGER;
-      setProducts(
-        menuProducts
-          .filter((p) => p.active)
-          .sort((a, b) => place(a) - place(b) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
-      );
+      // Categories in order, then featured products first within each, then sortOrder.
+      setProducts(posProductOrder(menuProducts.filter((p) => p.active), menuCategories));
       setGroups(menuGroups.filter((g) => g.active));
       setModifiers(menuModifiers.filter((m) => m.active));
       setTables(layoutTables.filter((t) => t.active && t.status === 'FREE'));

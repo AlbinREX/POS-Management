@@ -159,6 +159,28 @@ test('manage products, photos, sold-out, offers and order, and see them on the P
   const strip = await categoryStrip.getByRole('button').allInnerTexts();
   expect(strip.indexOf(first)).toBeLessThan(strip.indexOf(second));
 
+  // Featured, set from the Albanian editor: stored as the same boolean in any language,
+  // and shown first within its own category on the POS without changing its price.
+  const late = await product(`${prefix} Double Burger`, 'DOUBLE', burgers.id, '4.50');
+  await page.getByTestId('language-sq').click();
+  await page.getByTestId('nav-menu').click();
+  await menuNav('sq').getByRole('button', { name: MESSAGES['catalog.products'].sq, exact: true }).click();
+  await page.getByRole('button', { name: MESSAGES['catalog.editNamed'].sq.replace('{name}', late.name), exact: true }).click();
+  const sqDrawer = page.getByRole('dialog', { name: MESSAGES['catalog.editProduct'].sq });
+  await sqDrawer.getByRole('checkbox', { name: new RegExp(`^${MESSAGES['catalog.featured'].sq}`) }).check();
+  await sqDrawer.getByRole('button', { name: MESSAGES['catalog.saveChanges'].sq, exact: true }).click();
+  await expect(sqDrawer).toHaveCount(0);
+  const stored = await (await page.request.get('/api/menu/products/' + late.id, { headers })).json();
+  expect([stored.featured, stored.sellingPrice]).toEqual([true, '4.50']);
+  await page.getByTestId('language-en').click();
+  await page.getByRole('button', { name: 'POS', exact: true }).click();
+  await page.getByRole('group', { name: 'Product categories' }).getByRole('button', { name: `${prefix} Burger`, exact: true }).click();
+  const names = page.locator('.product-grid .product-card h3');
+  await expect(names.first()).toHaveText(late.name);
+  const shown = await names.allInnerTexts();
+  expect(shown.indexOf(late.name)).toBeLessThan(shown.indexOf(burger));
+  await expect(page.getByRole('article', { name: `Product ${late.name}` }).getByText('4.50')).toBeVisible();
+
   // Leave no live promotion behind for other specs that share this database.
   const offers = await (await page.request.get('/api/offers', { headers })).json();
   const deal = offers.find((o: { name: string }) => o.name === `${prefix} deal`);

@@ -1685,3 +1685,13 @@ details > summary::marker {
 .product-card .price-tag.has-offer {
   flex-wrap: nowrap;
 }
+.featured-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  border: 1px solid #f4c45155;
+}

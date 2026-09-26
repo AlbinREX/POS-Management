@@ -7,8 +7,9 @@ Settings → Menu has three main tabs: **Products**, **Categories** and **Offers
 - **Editing** happens in a side drawer. Nothing is written until **Save changes**; Cancel or Escape discards the edit.
 - **Sold out** (`Product.soldOut`) means temporarily unavailable. The product stays listed in management and on the POS, marked *Sold out*, but the server refuses to add it to an order.
 - **Inactive** (`active = false`) hides the product from the POS menu. Both states keep history; products are archived, never deleted.
+- **Featured** (`Product.featured`) is a display preference only. A featured product is shown first within its own category on the POS, then the usual `sortOrder` applies. It never moves a product into another category, and never affects price, offers, order history or reporting. Sold-out and inactive work exactly as they do for any other product.
 - **Display order** is explicit (`sortOrder`). Categories, and the products within one category, are reordered by dragging or with Move up / Move down, then **Save order**. The POS shows categories in that order, then products in theirs. Reordering is version-checked, so it never overwrites a newer edit.
-- **Audit** records a full before/after on every save. Price, image, category, activation and sold-out changes each also get their own entry (`menu.products.price_changed`, `…image_changed`, `…category_changed`, `…activated` / `…deactivated`, `…sold_out` / `…back_in_stock`). Audit rows hold values and paths, never image data.
+- **Audit** records a full before/after on every save. Price, image, category, activation and sold-out changes each also get their own entry (`menu.products.price_changed`, `…image_changed`, `…category_changed`, `…activated` / `…deactivated`, `…sold_out` / `…back_in_stock`, `…featured` / `…unfeatured`). Audit rows hold values and paths, never image data.
 
 ## Images
 

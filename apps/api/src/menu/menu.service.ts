@@ -52,6 +52,7 @@ function record(kind: MenuKind, row: Raw): MenuRecord {
       taxMode: row.taxMode,
       imageUrl: row.imageUrl,
       soldOut: row.soldOut,
+      featured: row.featured,
       modifierGroupIds: row.modifierGroups.map((link) => link.groupId),
       kitchenStationIds: row.kitchenStations.map((link) => link.stationId),
     });
@@ -348,6 +349,7 @@ export class MenuService {
               taxMode: input.taxMode,
               imageUrl: input.imageUrl,
               soldOut: input.soldOut ?? before?.soldOut ?? false,
+              featured: input.featured ?? before?.featured ?? false,
             };
             savedId = (
               id
@@ -432,6 +434,8 @@ export class MenuService {
       await entry(after.active ? 'menu.products.activated' : 'menu.products.deactivated', 'active');
     if (before.soldOut !== after.soldOut)
       await entry(after.soldOut ? 'menu.products.sold_out' : 'menu.products.back_in_stock', 'soldOut');
+    if (before.featured !== after.featured)
+      await entry(after.featured ? 'menu.products.featured' : 'menu.products.unfeatured', 'featured');
   }
   /**
    * Save a complete display order for the branch's categories, or for the products of

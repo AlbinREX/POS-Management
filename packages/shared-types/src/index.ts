@@ -315,6 +315,8 @@ export interface MenuRecord {
   taxMode?: 'INCLUSIVE' | 'EXCLUSIVE';
   imageUrl?: string | null;
   soldOut?: boolean;
+  /** Shown first within its own category on the POS. Display only. */
+  featured?: boolean;
   /** The offer that would price this product if ordered now; absent outside product reads. */
   activeOffer?: ProductOffer | null;
   modifierGroupIds?: string[];

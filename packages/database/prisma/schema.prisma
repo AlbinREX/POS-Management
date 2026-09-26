@@ -469,6 +469,8 @@ model Product {
   imageUrl        String?                 @db.VarChar(2048)
   /// Temporarily unavailable: still listed, but cannot be ordered. Distinct from active.
   soldOut         Boolean                 @default(false)
+  /// Display preference only: pinned first within its own category on the POS.
+  featured        Boolean                 @default(false)
   offers          OfferProduct[]
   category        Category                @relation(fields: [categoryId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
   modifierGroups  ProductModifierGroup[]

@@ -11,6 +11,8 @@ import {
 } from '@restaurant/validation';
 import { renderMenuImage, sniffImage } from '../../apps/api/src/media/media.service';
 import { offerStatus } from '../../apps/api/src/menu/offers.service';
+import { posProductOrder } from '../../apps/admin/src/lib/menu-order';
+import type { MenuRecord } from '@restaurant/shared-types';
 
 const fixed = (offerPrice: string) => ({ kind: 'FIXED_PRICE' as const, offerPrice, percentOff: null });
 const percent = (percentOff: string) => ({ kind: 'PERCENT_OFF' as const, offerPrice: null, percentOff });
@@ -141,5 +143,59 @@ describe('menu image uploads', () => {
     await expect(renderMenuImage(await image('png', 120))).rejects.toThrow('at least 200');
     await expect(renderMenuImage(await image('png', 8200, 300))).rejects.toThrow('at most 8000');
     await expect(renderMenuImage(Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]))).rejects.toThrow('5 MB');
+  });
+});
+
+describe('featured products are pinned within their own category, and only for display', () => {
+  const category = (id: string, sortOrder: number) =>
+    ({ id, kind: 'categories', name: id, sortOrder }) as MenuRecord;
+  const product = (name: string, categoryId: string, sortOrder: number, featured = false) =>
+    ({ id: name, kind: 'products', name, categoryId, sortOrder, featured, sellingPrice: '3.50' }) as MenuRecord;
+  const burger = category('burger', 10);
+  const drinks = category('drinks', 20);
+  it('puts featured products before the rest of the same category, never into another', () => {
+    const order = posProductOrder(
+      [
+        product('Cola', 'drinks', 10, true),
+        product('Classic', 'burger', 10),
+        product('Riza', 'burger', 30, true),
+        product('Double', 'burger', 20),
+      ],
+      [burger, drinks],
+    ).map((p) => p.name);
+    // Featured Cola stays in drinks: it does not jump ahead of the burger category.
+    expect(order).toEqual(['Riza', 'Classic', 'Double', 'Cola']);
+  });
+  it('keeps sortOrder within the featured and the non-featured groups', () => {
+    const order = posProductOrder(
+      [
+        product('C', 'burger', 30, true),
+        product('A', 'burger', 10, true),
+        product('D', 'burger', 40),
+        product('B', 'burger', 20),
+      ],
+      [burger],
+    ).map((p) => p.name);
+    expect(order).toEqual(['A', 'C', 'B', 'D']);
+  });
+  it('changes no price and leaves the input untouched', () => {
+    const input = [product('Classic', 'burger', 10), product('Riza', 'burger', 20, true)];
+    const order = posProductOrder(input, [burger]);
+    expect(order.map((p) => p.sellingPrice)).toEqual(['3.50', '3.50']);
+    expect(input.map((p) => p.name)).toEqual(['Classic', 'Riza']);
+  });
+  it('is optional on save, so an edit that omits it keeps the stored value', () => {
+    const base = {
+      kind: 'products',
+      name: 'Riza Burger',
+      sku: 'RIZA',
+      categoryId: '8b6f2f4e-9e7b-4c6a-9d1e-2f3a4b5c6d7e',
+      sellingPrice: '3.50',
+      taxRate: '0.00',
+      taxMode: 'INCLUSIVE',
+    };
+    expect(productSchema.parse(base).featured).toBeUndefined();
+    expect(productSchema.parse({ ...base, featured: true }).featured).toBe(true);
+    expect(productSchema.safeParse({ ...base, featured: 'true' }).success).toBe(false);
   });
 });

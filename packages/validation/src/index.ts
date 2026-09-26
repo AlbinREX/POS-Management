@@ -116,6 +116,8 @@ export const productSchema = z
     // Optional so an update that does not mention it keeps the current value: a client
     // unaware of sold-out must never clear it as a side effect of editing a price.
     soldOut: z.boolean().optional(),
+    // Display preference only, optional for the same reason as sold-out.
+    featured: z.boolean().optional(),
     modifierGroupIds: uniqueIds.default([]),
     kitchenStationIds: uniqueIds.default([]),
   })

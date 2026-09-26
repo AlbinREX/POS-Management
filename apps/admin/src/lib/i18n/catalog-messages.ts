@@ -879,5 +879,17 @@ export const CATALOG_MESSAGES = {
   "catalog.posOfferLine": {
     "sq": "Ofertë: {name}",
     "en": "Offer: {name}"
+  },
+  "catalog.featured": {
+    "sq": "I theksuar",
+    "en": "Featured"
+  },
+  "catalog.featuredHint": {
+    "sq": "Shfaqet para produkteve të tjera të kategorisë së vet në arkë. Nuk ndryshon çmimin.",
+    "en": "Shown before the other products of its category on the POS. Does not change the price."
+  },
+  "catalog.badgeFeatured": {
+    "sq": "I theksuar",
+    "en": "Featured"
   }
 } as const;

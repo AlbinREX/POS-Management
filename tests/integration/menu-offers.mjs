@@ -322,6 +322,34 @@ export async function runMenuOffersIntegration(app) {
       assert.ok((await call('get', 'offers?archived=true').expect(200)).body.some((o) => o.id === rizaOffer.id));
       await call('get', 'offers/' + randomUUID()).expect(404);
     });
+    await test('featured is a display preference: audited, kept on edit, and never a price', async () => {
+      let pinned = await product('MO Featured Burger', 'MO-FEATURED', burgers.id, '4.20');
+      assert.equal(pinned.featured, false);
+      pinned = await update(pinned, productData(pinned, { featured: true }));
+      assert.equal(pinned.featured, true);
+      // An edit that does not mention it keeps it.
+      pinned = await update(pinned, productData(pinned, { description: 'House favourite' }));
+      assert.equal(pinned.featured, true);
+      assert.equal(pinned.sellingPrice, '4.20');
+      // Featured changes nothing about what is charged, with or without an offer.
+      const plain = (await addItem(await order(), pinned.id)).items[0];
+      assert.deepEqual([plain.unitPrice, plain.listPrice, plain.offerId], ['4.20', '4.20', null]);
+      const deal = await offer({ name: 'MO featured deal', productIds: [pinned.id], kind: 'FIXED_PRICE', offerPrice: '3.90' });
+      const offered = (await addItem(await order(), pinned.id)).items[0];
+      assert.deepEqual([offered.unitPrice, offered.offerId], ['3.90', deal.id]);
+      // Sold-out and inactive keep their meaning for a featured product.
+      pinned = await update(pinned, productData(pinned, { soldOut: true }));
+      assert.equal((await addItem(await order(), pinned.id, 409)).message, 'This product is sold out');
+      pinned = await update(pinned, productData(pinned, { soldOut: false, active: false }));
+      await addItem(await order(), pinned.id, 404);
+      assert.equal(pinned.featured, true);
+      pinned = await update(pinned, productData(pinned, { active: true, featured: false }));
+      const actions = await audits(pinned.id);
+      assert.ok(actions.includes('menu.products.featured'));
+      assert.ok(actions.includes('menu.products.unfeatured'));
+      const entry = await db.auditLog.findFirstOrThrow({ where: { entityId: pinned.id, action: 'menu.products.featured' } });
+      assert.deepEqual([entry.beforeData, entry.afterData], [{ featured: false }, { featured: true }]);
+    });
     console.log(`Menu offers integration suite passed: ${count} checks.`);
   } finally {
     await db.$disconnect();

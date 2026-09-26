@@ -203,6 +203,7 @@ export function ProductsPanel({ canManage }: { canManage: boolean }) {
                       </span>
                     ) : null}
                     {row.soldOut ? <span className="sold-out-badge">{t('catalog.badgeSoldOut')}</span> : null}
+                    {row.featured ? <span className="featured-badge">{t('catalog.badgeFeatured')}</span> : null}
                   </p>
                   {row.description ? (
                     <p className="text-sm text-muted-foreground">{row.description}</p>
@@ -257,6 +258,7 @@ interface Draft {
   sortOrder: string;
   active: boolean;
   soldOut: boolean;
+  featured: boolean;
   modifierGroupIds: string[];
   kitchenStationIds: string[];
 }
@@ -291,6 +293,7 @@ function ProductEditor({
     sortOrder: String(row?.sortOrder ?? 0),
     active: row?.active ?? true,
     soldOut: row?.soldOut ?? false,
+    featured: row?.featured ?? false,
     modifierGroupIds: row?.modifierGroupIds ?? [],
     kitchenStationIds: row?.kitchenStationIds ?? [],
   });
@@ -320,6 +323,7 @@ function ProductEditor({
       sortOrder: Number(draft.sortOrder),
       active: draft.active,
       soldOut: draft.soldOut,
+      featured: draft.featured,
       sku: draft.sku.trim(),
       barcode: draft.barcode.trim() || null,
       categoryId: draft.categoryId,
@@ -475,6 +479,13 @@ function ProductEditor({
                 <span>
                   {t('catalog.soldOut')}
                   <small className="block text-muted-foreground">{t('catalog.soldOutHint')}</small>
+                </span>
+              </label>
+              <label className="flex min-h-11 items-center gap-3 text-sm">
+                <input type="checkbox" checked={draft.featured} onChange={(e) => set('featured', e.target.checked)} />
+                <span>
+                  {t('catalog.featured')}
+                  <small className="block text-muted-foreground">{t('catalog.featuredHint')}</small>
                 </span>
               </label>
             </div>
