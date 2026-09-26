@@ -30,6 +30,10 @@ import { FoundationService } from './foundation/foundation.service';
 import { HealthController } from './health.controller';
 import { MenuController } from './menu/menu.controller';
 import { MenuService } from './menu/menu.service';
+import { OffersController } from './menu/offers.controller';
+import { OffersService } from './menu/offers.service';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
 import { LayoutController } from './layout/layout.controller';
 import { LayoutService } from './layout/layout.service';
 @Module({
@@ -48,6 +52,8 @@ import { LayoutService } from './layout/layout.service';
     FoundationController,
     HealthController,
     MenuController,
+    OffersController,
+    MediaController,
     LayoutController,
   ],
   providers: [
@@ -66,6 +72,8 @@ import { LayoutService } from './layout/layout.service';
     AuthService,
     FoundationService,
     MenuService,
+    OffersService,
+    MediaService,
     LayoutService,
     { provide: APP_GUARD, useClass: AuthorizationGuard },
   ],

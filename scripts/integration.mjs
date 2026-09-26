@@ -57,6 +57,8 @@ Object.assign(process.env, {
   APP_ORIGIN: browserOrigin,
   PORT: '4000',
   TRUST_PROXY: '0',
+  // Menu image uploads for this run, kept beside the isolated cluster for debugging.
+  MEDIA_ROOT: resolve('.local', `test-media-${suffix}`),
   SEED_ORGANIZATION_SLUG: 'verification',
   SEED_ORGANIZATION_NAME: 'Verification organization',
   SEED_BRANCH_CODE: 'main',
@@ -123,6 +125,10 @@ try {
   app = await createApp();
   const { runMenuIntegration } = await import('../tests/integration/menu.mjs');
   await runMenuIntegration(app);
+  await app.close();
+  app = await createApp();
+  const { runMenuOffersIntegration } = await import('../tests/integration/menu-offers.mjs');
+  await runMenuOffersIntegration(app);
   await app.close();
   app = await createApp();
   const { runLayoutIntegration } = await import('../tests/integration/layout.mjs');

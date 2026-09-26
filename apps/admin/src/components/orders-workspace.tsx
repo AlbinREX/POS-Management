@@ -11,6 +11,7 @@ import type {
 import { Button } from '@restaurant/ui/button';
 import { Input } from '@restaurant/ui/input';
 import { OptionalDetails, ProductImage } from './riza-ui';
+import { PriceTag } from './menu-shared';
 import { api, ApiFailure } from '../lib/api';
 import { useI18n, formatDateTime, serverMessage } from '../lib/i18n';
 import { SALES_VALUE_KEYS } from '../lib/i18n/sales-messages';
@@ -111,7 +112,14 @@ export function OrdersWorkspace({
       setOrders(list.items);
       setHasMore(list.hasMore);
       setOrder(detail);
-      setProducts(menuProducts.filter((p) => p.active));
+      // The POS follows the configured order: categories first, then products within them.
+      const rank = new Map(menuCategories.map((c, index) => [c.id, index]));
+      const place = (p: MenuRecord) => rank.get(p.categoryId ?? '') ?? Number.MAX_SAFE_INTEGER;
+      setProducts(
+        menuProducts
+          .filter((p) => p.active)
+          .sort((a, b) => place(a) - place(b) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+      );
       setGroups(menuGroups.filter((g) => g.active));
       setModifiers(menuModifiers.filter((m) => m.active));
       setTables(layoutTables.filter((t) => t.active && t.status === 'FREE'));
@@ -246,8 +254,9 @@ export function OrdersWorkspace({
                     p.id === productId,
                 )
                 .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} · {p.sellingPrice}
+                  <option key={p.id} value={p.id} disabled={p.soldOut}>
+                    {p.name} · {p.activeOffer?.price ?? p.sellingPrice}
+                    {p.soldOut ? ` · ${t('catalog.posSoldOut')}` : ''}
                   </option>
                 ))}
             </select>
@@ -553,10 +562,18 @@ export function OrdersWorkspace({
                           p.sku?.toLowerCase().includes(search.toLowerCase())),
                     )
                     .map((p) => (
-                      <article className="product-card" key={p.id} aria-label={t('sales.productName', { name: p.name })}>
+                      <article
+                        className={`product-card${p.soldOut ? ' is-sold-out' : ''}${p.activeOffer ? ' has-offer' : ''}`}
+                        key={p.id}
+                        aria-label={t('sales.productName', { name: p.name })}
+                      >
+                        {p.soldOut ? <span className="sold-out-badge">{t('catalog.posSoldOut')}</span> : null}
+                        {p.activeOffer ? (
+                          <span className="offer-badge card-badge">{t('catalog.badgeOffer')}</span>
+                        ) : null}
                         <button
                           className="product-select"
-                          disabled={locked || !editable}
+                          disabled={locked || !editable || p.soldOut}
                           onClick={() => {
                             setProductId(p.id);
                             setCustomizing(true);
@@ -570,9 +587,12 @@ export function OrdersWorkspace({
                           </div>
                         </button>
                         <div className="product-footer">
-                          <strong>
-                            {p.sellingPrice} <small>{order?.currency ?? ''}</small>
-                          </strong>
+                          <PriceTag
+                            price={p.sellingPrice ?? ''}
+                            offer={p.activeOffer}
+                            currency={order?.currency ?? ''}
+                            badge={false}
+                          />
                           <div
                             className="quantity-stepper"
                             aria-label={t('sales.draftQuantity', { name: p.name })}
@@ -607,7 +627,7 @@ export function OrdersWorkspace({
                         <Button
                           variant="secondary"
                           className="product-customize"
-                          disabled={locked || !editable}
+                          disabled={locked || !editable || p.soldOut}
                           onClick={() => {
                             setProductId(p.id);
                             setCustomizing(true);
@@ -715,6 +735,13 @@ export function OrdersWorkspace({
                         {item.total} {order.currency}
                       </strong>
                     </div>
+                    {item.offerName ? (
+                      // The offer is frozen on the line: its name and the price it replaced.
+                      <p className="text-sm">
+                        <span className="offer-badge">{t('catalog.posOfferLine', { name: item.offerName })}</span>{' '}
+                        {item.listPrice ? <s>{item.listPrice}</s> : null}
+                      </p>
+                    ) : null}
                     <p className="text-sm">
                       {pos ? t('sales.unitPrice') : t('sales.snapshotPrice')} {item.unitPrice} · {item.taxRate}%{' '}
                       {locale === 'en' ? item.taxMode.toLowerCase() : valueLabel(item.taxMode)} {t('sales.tax')}

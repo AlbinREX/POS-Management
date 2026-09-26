@@ -60,6 +60,11 @@ COPY --from=build --chown=node:node /app/packages/validation/dist /app/packages/
 USER node
 
 FROM runtime AS api
+# The media volume mounts here. Creating it owned by the runtime user means a new, empty
+# named volume inherits that ownership, so the API can write uploads without root.
+USER root
+RUN mkdir -p /var/lib/restaurant/media && chown node:node /var/lib/restaurant/media
+USER node
 COPY --from=build --chown=node:node /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=build --chown=node:node /app/apps/api/dist /app/apps/api/dist
 EXPOSE 4000

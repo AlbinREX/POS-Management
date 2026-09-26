@@ -314,6 +314,9 @@ export interface MenuRecord {
   taxRate?: string;
   taxMode?: 'INCLUSIVE' | 'EXCLUSIVE';
   imageUrl?: string | null;
+  soldOut?: boolean;
+  /** The offer that would price this product if ordered now; absent outside product reads. */
+  activeOffer?: ProductOffer | null;
   modifierGroupIds?: string[];
   kitchenStationIds?: string[];
   minSelections?: number;
@@ -325,6 +328,43 @@ export interface MenuPage {
   items: MenuRecord[];
   page: number;
   hasMore: boolean;
+}
+
+export type OfferKind = 'FIXED_PRICE' | 'PERCENT_OFF';
+/** Derived at read time from active, archive state and the window; never stored. */
+export type OfferStatus = 'LIVE' | 'SCHEDULED' | 'EXPIRED' | 'INACTIVE' | 'ARCHIVED';
+export interface ProductOffer {
+  id: string;
+  name: string;
+  kind: OfferKind;
+  /** The unit price the offer produces for this product, before modifiers. */
+  price: string;
+  endsAt: string;
+}
+export interface OfferRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  kind: OfferKind;
+  offerPrice: string | null;
+  percentOff: string | null;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  status: OfferStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  products: { id: string; name: string; basePrice: string; offerPrice: string }[];
+}
+/** A stored menu image. The path is what a product or offer references. */
+export interface MenuMediaUpload {
+  path: string;
+  width: number;
+  height: number;
+  bytes: number;
 }
 
 export const TABLE_STATUSES = [
@@ -420,6 +460,11 @@ export interface OrderItemRecord {
   total: string;
   voidedAt: string | null;
   voidReason: string | null;
+  /** Base price when ordered; null on lines priced before offers existed. */
+  listPrice: string | null;
+  /** The offer that set unitPrice, frozen with its name at the moment of ordering. */
+  offerId: string | null;
+  offerName: string | null;
   modifiers: { modifierId: string; groupName: string; name: string; priceAdjustment: string }[];
 }
 export interface OrderRecord {

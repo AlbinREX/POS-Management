@@ -21,8 +21,9 @@ test('configure all catalog types, edit a product, inspect audit and archive thr
     await page.getByRole('button', { name: `Add ${singular}`, exact: true }).click();
     await page.getByLabel('Name', { exact: true }).fill(`${prefix} ${suffix}`);
   }
-  async function save() {
-    await page.getByRole('button', { name: 'Save entry', exact: true }).click();
+  // Products are edited in their own drawer, whose submit reads 'Save changes'.
+  async function save(label = 'Save entry') {
+    await page.getByRole('button', { name: label, exact: true }).click();
     await expect(page.getByRole('form', { name: 'Catalog editor' })).toHaveCount(0);
     await expect(page.getByText('Catalog saved.', { exact: true })).toBeVisible();
   }
@@ -51,12 +52,12 @@ test('configure all catalog types, edit a product, inspect audit and archive thr
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await save();
+  await save('Save changes');
   await page.getByRole('button', { name: `Edit ${prefix} product`, exact: true }).click();
   await expect(page.getByLabel(`${prefix} group`, { exact: true })).toBeChecked();
   await expect(page.getByLabel(`${prefix} station`, { exact: true })).toBeChecked();
   await page.getByLabel('Selling price (branch currency)').fill('6.00');
-  await save();
+  await save('Save changes');
   await expect(page.getByText(/Price 6.00/)).toBeVisible();
   await page.getByRole('button', { name: 'Audit history', exact: true }).click();
   await expect(

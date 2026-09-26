@@ -82,6 +82,27 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   }
   return parse<T>(response);
 }
+// Upload sibling of api(): the file is sent as the raw request body. The server decides
+// the format from the bytes, so the browser's guess at a content type is only a hint.
+export async function apiUpload<T>(path: string, file: Blob): Promise<T> {
+  const request = () =>
+    fetch(`/api/${path}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${accessToken ?? ''}`,
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+  let response = await request();
+  if (response.status === 401) {
+    await refresh();
+    response = await request();
+  }
+  return parse<T>(response);
+}
 // Binary sibling of api() for CSV exports: same bearer token and refresh-retry, but the
 // body is returned as a Blob with the server's filename instead of being parsed as JSON.
 export async function apiBlob(path: string): Promise<{ blob: Blob; filename: string }> {

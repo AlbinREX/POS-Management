@@ -15,6 +15,7 @@ import {
   menuInputSchema,
   menuKindSchema,
   menuListSchema,
+  menuReorderSchema,
   menuUpdateSchema,
 } from '@restaurant/validation';
 import { type ApiRequest, RequirePermissions } from '../auth/authorization';
@@ -57,6 +58,16 @@ export class MenuController {
     if (input.data.kind !== menuKindSchema.parse(kind))
       throw new BadRequestException('Catalog type does not match route');
     return this.service.save(r.principal, input.data, id, input.version);
+  }
+  @Post(':kind/reorder') @RequirePermissions('menu.read', 'menu.manage') reorder(
+    @Req() r: ApiRequest,
+    @Param('kind') kind: string,
+    @Body() body: unknown,
+  ) {
+    const parsed = menuKindSchema.parse(kind);
+    if (parsed !== 'categories' && parsed !== 'products')
+      throw new BadRequestException('Only categories and products can be reordered');
+    return this.service.reorder(r.principal, parsed, menuReorderSchema.parse(body));
   }
   @Post(':kind/:id/archive') @RequirePermissions('menu.read', 'menu.manage') archive(
     @Req() r: ApiRequest,

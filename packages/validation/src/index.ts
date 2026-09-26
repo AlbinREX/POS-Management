@@ -4,7 +4,10 @@ export * from './sync';
 export * from './fiscal';
 export * from './purchasing';
 export * from './inventory';
+export * from './media';
+export * from './offers';
 import { z } from 'zod';
+import { imageUrlSchema } from './media';
 import { PERMISSIONS } from '@restaurant/shared-types';
 export const id = z.uuid();
 export const password = z.string().min(12).max(128);
@@ -109,21 +112,10 @@ export const productSchema = z
     sellingPrice: decimalAmountSchema,
     taxRate: taxRateSchema,
     taxMode: z.enum(['INCLUSIVE', 'EXCLUSIVE']),
-    imageUrl: z
-      .string()
-      .trim()
-      .max(2048)
-      .refine(
-        // An absolute http(s) URL can point at a restaurant's own LAN host, and a
-        // root-relative path lets images bundled with the app stay portable across
-        // localhost, a LAN address and any deployment without rewriting stored rows.
-        // Protocol-relative ("//host") and scheme-bearing values such as javascript:
-        // or data: remain rejected, so this widens storage without widening risk.
-        (url) => /^https?:\/\/[^/]/i.test(url) || /^\/[^/]/.test(url),
-        'Use an HTTP or HTTPS image URL, or an app path such as /food/burger.webp',
-      )
-      .nullable()
-      .default(null),
+    imageUrl: imageUrlSchema,
+    // Optional so an update that does not mention it keeps the current value: a client
+    // unaware of sold-out must never clear it as a side effect of editing a price.
+    soldOut: z.boolean().optional(),
     modifierGroupIds: uniqueIds.default([]),
     kitchenStationIds: uniqueIds.default([]),
   })

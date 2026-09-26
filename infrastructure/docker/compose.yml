@@ -10,6 +10,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../../backups:/backups
+      # Read-only: the backup script archives menu images from here beside the database
+      # dump. Only the API ever writes to this volume.
+      - menu_media:/media:ro
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
@@ -35,11 +38,15 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
       TRUST_PROXY: '1'
       PORT: '4000'
+      MEDIA_ROOT: /var/lib/restaurant/media
     volumes:
       # Read-only so the API can report backup age and outcome without being able to
       # alter, delete or create an archive. Backups are written only by the operator
       # script through the database container.
       - ../../backups:/backups:ro
+      # Uploaded menu images. A named volume outlives container restarts, image rebuilds
+      # and host reboots; it is archived by scripts/backup.ps1.
+      - menu_media:/var/lib/restaurant/media
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -87,6 +94,7 @@ services:
     networks: [backend, edge]
 volumes:
   postgres_data:
+  menu_media:
 networks:
   backend:
     internal: true

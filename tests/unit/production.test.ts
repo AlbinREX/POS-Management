@@ -24,6 +24,7 @@ function env(overrides: Record<string, string | undefined> = {}) {
     APP_ORIGIN: 'https://pos.restaurant.invalid',
     PORT: '4000',
     TRUST_PROXY: '1',
+    MEDIA_ROOT: '/var/lib/restaurant/media',
     ...overrides,
   });
 }
@@ -68,6 +69,16 @@ describe('production configuration guards', () => {
     env({ APP_ORIGIN: 'https://localhost' });
     const getConfig = await load();
     expect(() => getConfig()).toThrow(/must not be loopback/i);
+  });
+  it('refuses production without an absolute, persistent media directory', async () => {
+    // Menu images written inside the container would vanish on the next rebuild.
+    env({ MEDIA_ROOT: 'media' });
+    let getConfig = await load();
+    expect(() => getConfig()).toThrow(/MEDIA_ROOT/);
+    env();
+    delete process.env.MEDIA_ROOT;
+    getConfig = await load();
+    expect(() => getConfig()).toThrow(/MEDIA_ROOT/);
   });
   it('still refuses a non-HTTPS production origin', async () => {
     env({ APP_ORIGIN: 'http://pos.restaurant.invalid' });

@@ -2,10 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { json, type Request, type Response, type NextFunction } from 'express';
+import { json, raw, type Request, type Response, type NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { AppModule } from './app.module';
+import { MEDIA_LIMIT_BYTES } from './media/media.service';
 import { ErrorFilter, logger } from './security';
 import { getConfig } from './config';
 import type { ApiRequest } from './auth/authorization';
@@ -92,6 +93,9 @@ export async function createApp() {
     }
     next();
   });
+  // Menu image uploads arrive as the raw file, on this one route only. The declared
+  // content type is not trusted: the media service identifies the format from the bytes.
+  app.use('/api/media/menu', raw({ type: () => true, limit: MEDIA_LIMIT_BYTES }));
   app.use(json({ limit: '32kb' }));
   app.use((error: unknown, req: ApiRequest, res: Response, next: NextFunction) => {
     if (
@@ -100,10 +104,15 @@ export async function createApp() {
       ['entity.parse.failed', 'entity.too.large'].includes(String(error.type))
     ) {
       const tooLarge = error.type === 'entity.too.large';
+      const image = req.path.startsWith('/api/media/');
       res.status(tooLarge ? 413 : 400).json({
         statusCode: tooLarge ? 413 : 400,
         code: tooLarge ? 'BODY_TOO_LARGE' : 'INVALID_JSON',
-        message: tooLarge ? 'Request body is too large' : 'Invalid JSON body',
+        message: tooLarge
+          ? image
+            ? 'Images must be 5 MB or smaller'
+            : 'Request body is too large'
+          : 'Invalid JSON body',
         requestId: req.requestId,
       });
       return;
