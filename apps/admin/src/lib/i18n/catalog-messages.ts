@@ -725,24 +725,20 @@ export const CATALOG_MESSAGES = {
     "en": "Save changes"
   },
   "catalog.productImage": {
-    "sq": "Fotoja e produktit",
-    "en": "Product image"
+    "sq": "Foto e produktit",
+    "en": "Product photo"
   },
   "catalog.uploadImage": {
-    "sq": "Ngarko foton",
-    "en": "Upload image"
+    "sq": "Shto foto",
+    "en": "Add photo"
   },
   "catalog.replaceImage": {
     "sq": "Ndrysho foton",
-    "en": "Replace image"
+    "en": "Replace photo"
   },
   "catalog.removeImage": {
     "sq": "Largo foton",
-    "en": "Remove image"
-  },
-  "catalog.uploading": {
-    "sq": "Duke ngarkuar…",
-    "en": "Uploading…"
+    "en": "Remove photo"
   },
   "catalog.imageRules": {
     "sq": "PNG, JPEG ose WebP deri në 5 MB dhe të paktën 200 × 200 piksel. Ruhet si katror 1024 × 1024.",
@@ -891,5 +887,41 @@ export const CATALOG_MESSAGES = {
   "catalog.badgeFeatured": {
     "sq": "I theksuar",
     "en": "Featured"
+  },
+  "catalog.browseDevice": {
+    "sq": "Shfleto fotot në pajisje",
+    "en": "Browse photos on this device"
+  },
+  "catalog.chooseNormally": {
+    "sq": "Zgjidh foto normalisht",
+    "en": "Choose photo normally"
+  },
+  "catalog.selectedPhoto": {
+    "sq": "Fotoja e zgjedhur",
+    "en": "Selected photo"
+  },
+  "catalog.clearSelection": {
+    "sq": "Anulo zgjedhjen",
+    "en": "Clear selection"
+  },
+  "catalog.readyToSave": {
+    "sq": "Gati për ruajtje",
+    "en": "Ready to save"
+  },
+  "catalog.photoRemovalPending": {
+    "sq": "Fotoja do të largohet kur të shtypësh Ruaj ndryshimet.",
+    "en": "The photo will be removed when you press Save changes."
+  },
+  "catalog.browseAgentHint": {
+    "sq": "Shfletimi hap dosjen e fotove të menysë në këtë kompjuter.",
+    "en": "Browsing opens the menu photo folder on this PC."
+  },
+  "catalog.browseBrowserHint": {
+    "sq": "Shfletimi hap dritaren e Windows-it te dosja nga ku zgjodhe foton e fundit të menysë. Herën e parë, shko te dosja e fotove të menysë.",
+    "en": "Browsing opens the Windows file window at the folder you last chose a menu photo from. The first time, go to the menu photo folder."
+  },
+  "catalog.browseUnavailable": {
+    "sq": "Shfletimi i dosjes së fotove kërkon agjentin lokal të pajisjeve. Zgjidh foton normalisht.",
+    "en": "Browsing the photo folder needs the local Device Agent. Choose the photo normally instead."
   }
 } as const;

@@ -5,6 +5,14 @@ import type { MenuKind, MenuMediaUpload, MenuPage, ProductOffer } from '@restaur
 import { Button } from '@restaurant/ui/button';
 import { api, apiUpload, ApiFailure } from '../lib/api';
 import { MESSAGES, serverMessage, useI18n } from '../lib/i18n';
+import {
+  browseDevicePhoto,
+  browseSource,
+  PHOTO_ACCEPT,
+  photoProblem,
+  previewOf,
+  type BrowseSource,
+} from '../lib/photo-picker';
 import { ProductImage } from './riza-ui';
 
 export const selectClass = 'min-h-11 w-full rounded-md border bg-background px-3 text-sm';
@@ -24,15 +32,19 @@ export async function loadAll<T>(kind: MenuKind, archived = false): Promise<T[]>
 
 /**
  * A side panel for editing. Nothing inside it reaches the server until its form is
- * explicitly submitted; Escape and Cancel simply close it.
+ * explicitly submitted; Escape and Cancel simply close it. While a save is in progress
+ * (`busy`) Escape is ignored, like the disabled Cancel button: closing then would hide a
+ * save that still completes.
  */
 export function Drawer({
   label,
   onClose,
+  busy = false,
   children,
 }: {
   label: string;
   onClose: () => void;
+  busy?: boolean;
   children: ReactNode;
 }) {
   const panel = useRef<HTMLElement>(null);
@@ -50,11 +62,11 @@ export function Drawer({
   }, []);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !busy) onClose();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+  }, [onClose, busy]);
   return (
     <div className="menu-drawer-layer">
       <div className="menu-drawer-backdrop" aria-hidden="true" />
@@ -97,63 +109,138 @@ export function PriceTag({
 }
 
 /**
- * Choose, replace or remove an image. Choosing uploads and validates the file at once so
- * the preview is exactly what the server stored, but no product or offer changes until
- * the surrounding form is saved; an abandoned upload is cleaned up by the server later.
+ * The photo a form will save. `current` is a stored path (or none, when removed); `selected`
+ * is a file chosen on this PC and previewed locally, not yet uploaded.
  */
-export function ImageField({
+export type PhotoDraft =
+  | { kind: 'current'; path: string | null }
+  /** `uploaded` is set once the file is stored, so a save retried after a failure reuses it. */
+  | { kind: 'selected'; file: File; preview: string; uploaded?: string };
+export const currentPhoto = (path: string | null | undefined): PhotoDraft => ({
+  kind: 'current',
+  path: path ?? null,
+});
+/**
+ * Resolve a draft to the path to save, uploading a selected file only now, when the form
+ * is explicitly saved. If the upload fails this throws before anything is saved, so the
+ * product or offer keeps its previous photo.
+ */
+export async function commitPhoto(draft: PhotoDraft): Promise<string | null> {
+  if (draft.kind === 'current') return draft.path?.trim() || null;
+  return draft.uploaded ?? (await apiUpload<MenuMediaUpload>('media/menu', draft.file)).path;
+}
+/** The draft to keep after an upload: still a selection until the save itself succeeds. */
+export const uploadedPhoto = (draft: PhotoDraft, path: string | null): PhotoDraft =>
+  draft.kind === 'selected' && path ? { ...draft, uploaded: path } : draft;
+/** A stand-in for validating the form: a chosen file has no path until it is uploaded. */
+export const photoForValidation = (draft: PhotoDraft) =>
+  draft.kind === 'current' ? draft.path?.trim() || null : null;
+
+/**
+ * Choose, replace or remove a photo. Nothing is uploaded or saved here: a chosen file is
+ * only previewed until the surrounding form's Save changes, and Cancel discards it.
+ */
+export function PhotoField({
   label,
   name,
-  value,
-  onChange,
+  saved,
+  draft,
+  onDraft,
+  disabled = false,
 }: {
   label: string;
   name: string;
-  value: string | null;
-  onChange: (path: string | null) => void;
+  /** The photo currently stored, to show what Clear selection returns to. */
+  saved: string | null;
+  draft: PhotoDraft;
+  onDraft: (draft: PhotoDraft) => void;
+  disabled?: boolean;
 }) {
   const { t, locale } = useI18n();
   const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function choose(file: File | undefined) {
+  const [source, setSource] = useState<BrowseSource>(null);
+  // Read after mount: the picker depends on this browser and on any registered agent.
+  useEffect(() => setSource(browseSource(window)), []);
+  async function choose(file: File | null | undefined) {
+    if (input.current) input.current.value = '';
     if (!file) return;
-    setBusy(true);
+    const problem = photoProblem(file);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setError('');
     try {
-      onChange((await apiUpload<MenuMediaUpload>('media/menu', file)).path);
-    } catch (e) {
-      setError(failure(e));
-    } finally {
-      setBusy(false);
-      if (input.current) input.current.value = '';
+      onDraft({ kind: 'selected', file, preview: await previewOf(file) });
+    } catch {
+      setError('This image is damaged or incomplete');
     }
   }
+  async function browse() {
+    setError('');
+    try {
+      await choose(await browseDevicePhoto(window));
+    } catch (e) {
+      setError(failure(e));
+    }
+  }
+  const shown = draft.kind === 'selected' ? draft.preview : draft.path;
+  const has = Boolean(shown);
   return (
-    <fieldset className="menu-image-field">
+    <fieldset className="menu-image-field" disabled={disabled}>
       <legend>{label}</legend>
       <div className="menu-image-preview">
-        <ProductImage name={name || label} src={value} />
+        <ProductImage name={name || label} src={shown} />
       </div>
+      {draft.kind === 'selected' ? (
+        <div className="menu-photo-selected" role="status">
+          <p className="text-sm">
+            {t('catalog.selectedPhoto')}: <strong className="break-all">{draft.file.name}</strong>
+          </p>
+          <p className="text-sm">
+            <span className="ready-badge">{t('catalog.readyToSave')}</span>{' '}
+            <span className="text-muted-foreground">{t('catalog.imagePending')}</span>
+          </p>
+        </div>
+      ) : saved && !draft.path ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          {t('catalog.photoRemovalPending')}
+        </p>
+      ) : null}
       <div className="menu-image-actions">
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept={PHOTO_ACCEPT}
           className="sr-only"
-          aria-label={value ? t('catalog.replaceImage') : t('catalog.uploadImage')}
+          aria-label={has ? t('catalog.replaceImage') : t('catalog.uploadImage')}
           onChange={(e) => void choose(e.target.files?.[0])}
-          disabled={busy}
         />
-        <Button type="button" variant="outline" disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? t('catalog.uploading') : value ? t('catalog.replaceImage') : t('catalog.uploadImage')}
+        <Button type="button" variant="outline" disabled={!source} onClick={() => void browse()}>
+          {t('catalog.browseDevice')}
         </Button>
-        {value ? (
-          <Button type="button" variant="ghost" disabled={busy} onClick={() => onChange(null)}>
+        <Button type="button" variant="outline" onClick={() => input.current?.click()}>
+          {t('catalog.chooseNormally')}
+        </Button>
+        {draft.kind === 'selected' ? (
+          <Button type="button" variant="ghost" onClick={() => onDraft(currentPhoto(saved))}>
+            {t('catalog.clearSelection')}
+          </Button>
+        ) : null}
+        {has ? (
+          <Button type="button" variant="ghost" onClick={() => onDraft(currentPhoto(null))}>
             {t('catalog.removeImage')}
           </Button>
         ) : null}
       </div>
+      <p className="text-sm text-muted-foreground">
+        {source === 'agent'
+          ? t('catalog.browseAgentHint')
+          : source === 'browser'
+            ? t('catalog.browseBrowserHint')
+            : t('catalog.browseUnavailable')}
+      </p>
       <p className="text-sm text-muted-foreground">{t('catalog.imageRules')}</p>
       {error ? (
         <p role="alert" className="text-sm text-destructive">

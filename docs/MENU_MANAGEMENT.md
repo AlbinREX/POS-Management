@@ -21,7 +21,23 @@ Products keep using the single `imageUrl` field; offers have an optional one of 
 4. **Save changes** stores the path (`/api/media/menu/<uuid>.webp`) on the product.
 5. Only after that save commits is the previous image deleted, and only if no product or offer anywhere still uses it. A shared Postgres advisory lock orders reference checks against deletion, so a product can never point at a removed file.
 
-Uploads that are never saved (a cancelled edit) are removed after 24 hours. Files are served publicly with `Cache-Control: immutable`: menu photos are not secret, and the POS renders them with plain `<img>` tags.
+### Choosing a photo on this PC
+
+In the product (or offer) editor, the **Product photo** section shows the current photo and three actions: **Browse photos on this device**, **Choose photo normally** and **Remove photo**.
+
+- **Choosing a photo only previews it.** The editor shows the local preview, the file name and *Ready to save*. **Clear selection** returns to the saved photo.
+- **Save changes** uploads the file through the API above, then saves the product with the returned path.
+  - If the upload fails, nothing is saved and the previous photo stays.
+  - If the upload succeeds but the save is refused, the choice stays pending (still clearable), and a retry reuses the upload instead of sending the file again.
+  - **Cancel** or **Escape** discards the choice without uploading anything. While a save is running, Escape is ignored, just as Cancel is disabled.
+- **The local folder is only a source.** A file carries just its name, never its location, so `imageUrl` only ever holds an uploaded `/api/media/menu/...` path (or a bundled or http(s) image). The schema also rejects local filesystem paths such as `C:\...` or `/C:/...`.
+- **Choose photo normally** is the browser's standard file chooser and works everywhere.
+- **Browse photos on this device** uses a native picker:
+  - **Device Agent, when present.** `apps/admin/src/lib/photo-picker.ts` exposes `registerNativePhotoPicker(picker)`. The local Device Agent (PR #12) can register a picker that opens its own configured photo folder, for example `...\apps\admin\public\food`. The picker takes no arguments, so the browser can never name a path, and it resolves to one PNG, JPEG or WebP file of at most 5 MB, or null when cancelled. The agent side must keep its existing rules: loopback only, token, command allowlist, no directory listing, no arbitrary file reads. It should add a single command, such as `photo.pick`, that opens the dialog in the configured folder and returns only the chosen file. The admin page's CSP must allow the agent's loopback origin.
+  - **Browser, without the agent.** The browser's own native dialog (`showOpenFilePicker`) is used, restricted to PNG, JPEG and WebP. It remembers the folder last used for menu photos, so after the first time it reopens there. A browser cannot be told to open an absolute folder, so the very first time the operator navigates to the photo folder once.
+  - **Neither available.** Plain HTTP on a LAN address, or a browser without the API, disables the button with a hint; *Choose photo normally* still works.
+
+Uploads that are never saved (a failed save after a successful upload) are removed after 24 hours. Files are served publicly with `Cache-Control: immutable`: menu photos are not secret, and the POS renders them with plain `<img>` tags.
 
 ### Storage, backup and restore
 

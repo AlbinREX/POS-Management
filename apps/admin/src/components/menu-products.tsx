@@ -8,7 +8,20 @@ import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api } from '../lib/api';
 import { serverMessage, useI18n } from '../lib/i18n';
-import { Drawer, failure, ImageField, loadAll, PriceTag, ReorderList, selectClass } from './menu-shared';
+import {
+  commitPhoto,
+  currentPhoto,
+  photoForValidation,
+  uploadedPhoto,
+  Drawer,
+  failure,
+  loadAll,
+  PhotoField,
+  PriceTag,
+  ReorderList,
+  selectClass,
+  type PhotoDraft,
+} from './menu-shared';
 import { ProductImage } from './riza-ui';
 
 type Status = 'all' | 'active' | 'inactive';
@@ -254,7 +267,6 @@ interface Draft {
   taxMode: string;
   sku: string;
   barcode: string;
-  imageUrl: string | null;
   sortOrder: string;
   active: boolean;
   soldOut: boolean;
@@ -289,7 +301,6 @@ function ProductEditor({
     taxMode: row?.taxMode ?? '',
     sku: row?.sku ?? '',
     barcode: row?.barcode ?? '',
-    imageUrl: row?.imageUrl ?? null,
     sortOrder: String(row?.sortOrder ?? 0),
     active: row?.active ?? true,
     soldOut: row?.soldOut ?? false,
@@ -297,6 +308,8 @@ function ProductEditor({
     modifierGroupIds: row?.modifierGroupIds ?? [],
     kitchenStationIds: row?.kitchenStationIds ?? [],
   });
+  // The photo is kept apart from the text fields: a chosen file is only uploaded on save.
+  const [photo, setPhoto] = useState<PhotoDraft>(currentPhoto(row?.imageUrl));
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
   const toggle = (key: 'modifierGroupIds' | 'kitchenStationIds', id: string, on: boolean) =>
@@ -330,7 +343,7 @@ function ProductEditor({
       sellingPrice: draft.sellingPrice.trim(),
       taxRate: draft.taxRate.trim(),
       taxMode: draft.taxMode,
-      imageUrl: draft.imageUrl?.trim() || null,
+      imageUrl: photoForValidation(photo),
       modifierGroupIds: draft.modifierGroupIds,
       kitchenStationIds: draft.kitchenStationIds,
     });
@@ -341,10 +354,16 @@ function ProductEditor({
     setPending(true);
     setError('');
     try {
+      // Upload first: if it fails nothing is saved and the previous photo stays. The draft
+      // stays a selection, remembering the upload, until the save itself succeeds, so a
+      // retry never uploads twice and Clear selection still returns to the saved photo.
+      const imageUrl = await commitPhoto(photo);
+      setPhoto(uploadedPhoto(photo, imageUrl));
+      const data = { ...parsed.data, imageUrl };
       await api(
         `menu/products${row ? `/${row.id}` : ''}`,
         row ? 'PUT' : 'POST',
-        row ? { version: row.version, data: parsed.data } : parsed.data,
+        row ? { version: row.version, data } : data,
       );
       onSaved();
     } catch (e) {
@@ -402,7 +421,7 @@ function ProductEditor({
   );
   const previewPrice = /^\d+\.\d{2}$/.test(draft.sellingPrice.trim()) ? draft.sellingPrice.trim() : '—';
   return (
-    <Drawer label={row ? t('catalog.editProduct') : t('catalog.newProduct')} onClose={onCancel}>
+    <Drawer label={row ? t('catalog.editProduct') : t('catalog.newProduct')} onClose={onCancel} busy={pending}>
       <form onSubmit={(e) => void submit(e)} className="space-y-5" aria-label={t('catalog.editor')}>
         <h3 className="text-lg font-semibold">
           {row ? t('catalog.editNamed', { name: row.name }) : t('catalog.newProduct')}
@@ -416,11 +435,12 @@ function ProductEditor({
           <p role="status">{t('catalog.loadingOptions')}</p>
         ) : (
           <fieldset disabled={pending} className="space-y-5">
-            <ImageField
+            <PhotoField
               label={t('catalog.productImage')}
               name={draft.name}
-              value={draft.imageUrl}
-              onChange={(path) => set('imageUrl', path)}
+              saved={row?.imageUrl ?? null}
+              draft={photo}
+              onDraft={setPhoto}
             />
             {field('name', t('catalog.name'), { required: true })}
             {field('description', t('catalog.description'), { maxLength: 2000 })}
@@ -496,9 +516,9 @@ function ProductEditor({
               <div className="space-y-2 pt-3">
                 <Input
                   aria-label={t('catalog.imageUrl')}
-                  value={draft.imageUrl ?? ''}
+                  value={photo.kind === 'current' ? (photo.path ?? '') : ''}
                   maxLength={2048}
-                  onChange={(e) => set('imageUrl', e.target.value || null)}
+                  onChange={(e) => setPhoto(currentPhoto(e.target.value || null))}
                 />
                 <p className="text-sm text-muted-foreground">{t('catalog.imageHint')}</p>
               </div>
@@ -508,7 +528,10 @@ function ProductEditor({
               <p className="text-sm text-muted-foreground">{t('catalog.previewHint')}</p>
               <article className={`product-card${draft.soldOut ? ' is-sold-out' : ''}`}>
                 <div className="product-select">
-                  <ProductImage name={draft.name || '—'} src={draft.imageUrl} />
+                  <ProductImage
+                    name={draft.name || '—'}
+                    src={photo.kind === 'selected' ? photo.preview : photo.path}
+                  />
                   <div className="product-copy">
                     <h3>{draft.name || '—'}</h3>
                     {draft.description ? <p>{draft.description}</p> : null}

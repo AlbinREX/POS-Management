@@ -42,8 +42,12 @@ let browserPort = await unusedPort();
 while (browserPort === port || browserPort === 4000) browserPort = await unusedPort();
 const browserOrigin = `http://localhost:${browserPort}`;
 const suffix = randomBytes(6).toString('hex');
-const clusterDir = resolve('.local', `test-pg-${suffix}`);
+// RIZA_TEST_ROOT optionally places the throwaway cluster elsewhere, for example outside
+// Documents when Windows Controlled folder access refuses the bundled postgres.exe there.
+const testRoot = process.env.RIZA_TEST_ROOT ? resolve(process.env.RIZA_TEST_ROOT) : resolve('.local');
+const clusterDir = resolve(testRoot, `test-pg-${suffix}`);
 await mkdir('.local', { recursive: true });
+await mkdir(testRoot, { recursive: true });
 const dbPassword = randomBytes(32).toString('hex');
 const appPassword = randomBytes(32).toString('hex');
 const ownerPassword = randomBytes(24).toString('base64url');
@@ -94,7 +98,8 @@ try {
       '-D',
       clusterDir,
       '-l',
-      resolve('.local', `pg-${suffix}.log`),
+      // Written by postgres.exe itself, so it lives beside the cluster.
+      resolve(testRoot, `pg-${suffix}.log`),
       '-o',
       `-p ${port} -h 127.0.0.1`,
       '-w',

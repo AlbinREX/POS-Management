@@ -70,11 +70,9 @@ test('manage products, photos, sold-out, offers and order, and see them on the P
   await page.getByRole('button', { name: `Edit ${burger}`, exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'Edit product' });
   const png = await sharp({ create: { width: 600, height: 400, channels: 3, background: '#c0392b' } }).png().toBuffer();
-  await drawer.getByLabel('Upload image').setInputFiles({ name: 'burger.png', mimeType: 'image/png', buffer: png });
-  const uploaded = drawer.locator('.menu-image-preview img');
-  await expect(uploaded).toHaveAttribute('src', /^\/api\/media\/menu\/[0-9a-f-]{36}\.webp$/);
-  const imagePath = await uploaded.getAttribute('src');
-  // Uploading alone changes nothing on the product until Save changes.
+  await drawer.getByLabel('Add photo').setInputFiles({ name: 'burger.png', mimeType: 'image/png', buffer: png });
+  // Choosing only previews locally; nothing is uploaded or saved before Save changes.
+  await expect(drawer.locator('.menu-image-preview img')).toHaveAttribute('src', /^data:image\/png;base64,/);
   const before = await (await page.request.get('/api/menu/products/' + burgerRow.id, { headers })).json();
   expect(before.imageUrl).toBeNull();
   await drawer.getByRole('checkbox', { name: /Temporarily sold out/ }).check();
@@ -83,12 +81,15 @@ test('manage products, photos, sold-out, offers and order, and see them on the P
   await drawer.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByText('Catalog saved.', { exact: true })).toBeVisible();
   await expect(drawer).toHaveCount(0);
+  const saved = await (await page.request.get('/api/menu/products/' + burgerRow.id, { headers })).json();
+  expect(saved.imageUrl).toMatch(/^\/api\/media\/menu\/[0-9a-f-]{36}\.webp$/);
+  const imagePath: string = saved.imageUrl;
 
   // POS: the uploaded photo is shown, sold-out cannot be picked, inactive is hidden.
   await page.getByRole('button', { name: 'POS', exact: true }).click();
   const card = page.getByRole('article', { name: `Product ${burger}` });
   await card.scrollIntoViewIfNeeded();
-  await expect(card.locator('.product-image img')).toHaveAttribute('src', imagePath!);
+  await expect(card.locator('.product-image img')).toHaveAttribute('src', imagePath);
   await expect
     .poll(async () => card.locator('.product-image img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0))
     .toBe(true);

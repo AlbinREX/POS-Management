@@ -10,17 +10,35 @@ export const MENU_MEDIA_PATH =
 export const isMenuMediaPath = (value: string | null | undefined): value is string =>
   typeof value === 'string' && MENU_MEDIA_PATH.test(value);
 
+// A photo bundled with the app under /food/. Its name may contain spaces, but never a
+// separator, drive colon, percent-escape or parent-directory step. Control characters are
+// refused for every value below.
+const BUNDLED_PATH = /^\/food\/(?!.*\.\.)[^\\/%:]+$/;
+// Tabs, newlines and other control characters are stripped by URL parsers, so a value
+// containing one could resolve to something other than what validation saw.
+const hasControlCharacter = (value: string) =>
+  [...value].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  });
+
+/**
+ * Where a product or offer image may point. An absolute http(s) URL can reach a
+ * restaurant's own LAN host. Root-relative values are an allowlist, not a guess: an
+ * uploaded menu image or a photo bundled with the app. That keeps stored rows portable
+ * across localhost, a LAN address and any deployment, and guarantees that a photo chosen
+ * on this PC is stored as its upload, never as a local path in any spelling (C:\...,
+ * /C:/..., /c/Users/..., /C%3A/..., UNC or file:).
+ */
 export const imageUrlSchema = z
   .string()
   .trim()
   .max(2048)
   .refine(
-    // An absolute http(s) URL can point at a restaurant's own LAN host, and a
-    // root-relative path lets images bundled with the app, and uploaded menu images, stay
-    // portable across localhost, a LAN address and any deployment without rewriting
-    // stored rows. Protocol-relative ("//host") and scheme-bearing values such as
-    // javascript: or data: remain rejected.
-    (url) => /^https?:\/\/[^/]/i.test(url) || /^\/[^/]/.test(url),
+    (url) =>
+      !hasControlCharacter(url) &&
+      !url.includes('\\') &&
+      (/^https?:\/\/[^/]/i.test(url) || MENU_MEDIA_PATH.test(url) || BUNDLED_PATH.test(url)),
     'Use an HTTP or HTTPS image URL, or an app path such as /food/burger.webp',
   )
   .nullable()

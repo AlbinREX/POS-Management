@@ -8,7 +8,18 @@ import { Input } from '@restaurant/ui/input';
 import { Label } from '@restaurant/ui/label';
 import { api } from '../lib/api';
 import { formatDateTime, serverMessage, useI18n, type MessageKey } from '../lib/i18n';
-import { Drawer, failure, ImageField, loadAll, selectClass } from './menu-shared';
+import {
+  commitPhoto,
+  currentPhoto,
+  photoForValidation,
+  uploadedPhoto,
+  Drawer,
+  failure,
+  loadAll,
+  PhotoField,
+  selectClass,
+  type PhotoDraft,
+} from './menu-shared';
 import { ProductImage } from './riza-ui';
 
 const STATUS_KEYS: Record<OfferStatus, MessageKey> = {
@@ -175,7 +186,7 @@ function OfferEditor({
   const week = new Date(now.getTime() + 7 * 86400000);
   const [name, setName] = useState(row?.name ?? '');
   const [description, setDescription] = useState(row?.description ?? '');
-  const [imageUrl, setImageUrl] = useState<string | null>(row?.imageUrl ?? null);
+  const [photo, setPhoto] = useState<PhotoDraft>(currentPhoto(row?.imageUrl));
   const [active, setActive] = useState(row?.active ?? true);
   const [kind, setKind] = useState<OfferKind>(row?.kind ?? 'FIXED_PRICE');
   const [offerPrice, setOfferPrice] = useState(row?.offerPrice ?? '');
@@ -194,7 +205,7 @@ function OfferEditor({
     const parsed = offerInputSchema.safeParse({
       name: name.trim(),
       description: description.trim() || null,
-      imageUrl,
+      imageUrl: photoForValidation(photo),
       active,
       kind,
       offerPrice: kind === 'FIXED_PRICE' ? offerPrice.trim() : null,
@@ -210,10 +221,14 @@ function OfferEditor({
     setPending(true);
     setError('');
     try {
+      // Upload only now; a failed upload leaves the offer and its photo unchanged.
+      const imageUrl = await commitPhoto(photo);
+      setPhoto(uploadedPhoto(photo, imageUrl));
+      const data = { ...parsed.data, imageUrl };
       await api(
         `offers${row ? `/${row.id}` : ''}`,
         row ? 'PUT' : 'POST',
-        row ? { version: row.version, data: parsed.data } : parsed.data,
+        row ? { version: row.version, data } : data,
       );
       onSaved();
     } catch (e) {
@@ -234,7 +249,11 @@ function OfferEditor({
     }
   }
   return (
-    <Drawer label={row ? t('catalog.editNamed', { name: row.name }) : t('catalog.newOffer')} onClose={onCancel}>
+    <Drawer
+      label={row ? t('catalog.editNamed', { name: row.name }) : t('catalog.newOffer')}
+      onClose={onCancel}
+      busy={pending}
+    >
       <form onSubmit={(e) => void submit(e)} className="space-y-5" aria-label={t('catalog.offerEditor')}>
         <h3 className="text-lg font-semibold">
           {row ? t('catalog.editNamed', { name: row.name }) : t('catalog.newOffer')}
@@ -319,7 +338,13 @@ function OfferEditor({
               );
             })}
           </fieldset>
-          <ImageField label={t('catalog.offerImage')} name={name} value={imageUrl} onChange={setImageUrl} />
+          <PhotoField
+            label={t('catalog.offerImage')}
+            name={name}
+            saved={row?.imageUrl ?? null}
+            draft={photo}
+            onDraft={setPhoto}
+          />
           <div className="flex flex-wrap gap-3">
             <Button type="submit">{pending ? t('catalog.saving') : t('catalog.saveChanges')}</Button>
             <Button type="button" variant="outline" onClick={onCancel}>
