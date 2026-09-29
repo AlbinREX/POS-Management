@@ -41,6 +41,7 @@ Uploads that are never saved (a failed save after a successful upload) are remov
 
 ### Storage, backup and restore
 
+- nginx keeps its 32 KB request limit everywhere except the upload endpoint itself (`location = /api/media/menu`, 6 MB), so a photo up to the API's 5 MB limit reaches the API, which still validates the size and bytes.
 - The API writes to `MEDIA_ROOT`. Production refuses to start unless it is an absolute path. Docker mounts the named volume `menu_media` at `/var/lib/restaurant/media`, so images survive container restarts, image rebuilds and host reboots. Local development defaults to `.local/media`.
 - `scripts/backup.ps1` archives the volume beside each database dump as `restaurant-<stamp>.media.tar.gz`. It uses the same partial-file, validation, checksum and retention rules, and records the archive in `backup-status.json`. The database container sees the volume read-only for this purpose only.
 - `scripts/restore.ps1 -MediaArchive <name>` verifies the checksum, then **adds** missing images to the live volume without replacing any. Run it at cutover, when the restored database starts referencing them. It can be combined with `-BackupName` / `-NewDatabase`.

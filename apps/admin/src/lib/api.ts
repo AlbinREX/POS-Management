@@ -101,6 +101,12 @@ export async function apiUpload<T>(path: string, file: Blob): Promise<T> {
     await refresh();
     response = await request();
   }
+  // A proxy in front of the API can refuse a large file with its own HTML page; say what
+  // happened rather than reporting the server as unavailable.
+  if (response.status === 413) {
+    const body = (await response.clone().json().catch(() => ({}))) as { message?: string };
+    if (!body.message) throw new ApiFailure('Images must be 5 MB or smaller', 413);
+  }
   return parse<T>(response);
 }
 // Binary sibling of api() for CSV exports: same bearer token and refresh-retry, but the
