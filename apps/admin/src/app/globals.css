@@ -1494,3 +1494,204 @@ details > summary::marker {
   background: #f4c45114;
   color: var(--primary);
 }
+
+/* Menu management: tabs, filters, product rows, the edit drawer, reordering and offers. */
+.menu-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.menu-tabs > [role='group'] {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.menu-filters {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: center;
+}
+.menu-product-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+.sold-out-badge,
+.offer-badge,
+.offer-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.sold-out-badge {
+  margin-left: 6px;
+  color: var(--destructive);
+  border: 1px solid #ff879255;
+  background: #ff87921a;
+}
+.offer-badge {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.offer-status {
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.offer-status[data-status='LIVE'] {
+  color: #5fd38d;
+  border-color: #5fd38d55;
+}
+.offer-status[data-status='SCHEDULED'] {
+  color: var(--primary);
+  border-color: #f4c45155;
+}
+/* An offer shows the normal price struck through beside the price actually charged. */
+.price-tag {
+  font-variant-numeric: tabular-nums;
+}
+.price-tag.has-offer {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.price-tag.has-offer s {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.price-tag.has-offer strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.product-card {
+  position: relative;
+}
+.product-card > .sold-out-badge {
+  position: absolute;
+  top: 18px;
+  left: 14px;
+  z-index: 1;
+  margin: 0;
+  background: #141518;
+}
+/* Sold out stays visible on the POS, clearly unavailable, and cannot be selected. */
+.product-card.is-sold-out .product-image,
+.product-card.is-sold-out .product-copy {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+/* Sized to the dynamic viewport: on phones the layout viewport is taller than the visible
+   area, and a panel sized to it would hide its last controls below the browser toolbar. */
+.menu-drawer-layer {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 50;
+}
+.menu-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #000a;
+}
+.menu-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, 40rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 16px 32px;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px #0006;
+}
+.menu-image-field {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.menu-image-field legend {
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.menu-image-preview {
+  width: min(100%, 220px);
+}
+.menu-image-preview .product-image {
+  aspect-ratio: 1 / 1;
+}
+.menu-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.menu-toggles {
+  display: grid;
+  gap: 6px;
+}
+.menu-preview {
+  display: grid;
+  gap: 10px;
+  max-width: 280px;
+}
+.reorder-list {
+  display: grid;
+  gap: 6px;
+}
+.reorder-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+.reorder-list li[data-dragging] {
+  opacity: 0.5;
+}
+.reorder-handle {
+  cursor: grab;
+  color: var(--muted-foreground);
+  touch-action: none;
+}
+.reorder-position {
+  min-width: 2ch;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.product-card > .card-badge {
+  position: absolute;
+  top: 18px;
+  right: 14px;
+  z-index: 1;
+}
+.product-card .price-tag.has-offer {
+  flex-wrap: nowrap;
+}
+.featured-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  border: 1px solid #f4c45155;
+}

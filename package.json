@@ -27,7 +27,8 @@
     "verify:docker": "docker compose --env-file .env -f infrastructure/docker/compose.yml config --quiet",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "demo:menu": "node scripts/demo-menu.mjs"
+    "demo:menu": "node scripts/demo-menu.mjs",
+    "menu:riza": "node scripts/riza-menu.mjs"
   },
   "overrides": {
     "multer": "2.3.0",

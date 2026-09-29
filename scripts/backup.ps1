@@ -17,8 +17,19 @@ try {
     Move-Item -LiteralPath (Join-Path $backupPath "$name.partial") -Destination (Join-Path $backupPath $name)
     $hash = (Get-FileHash -LiteralPath (Join-Path $backupPath $name) -Algorithm SHA256).Hash
     Set-Content -LiteralPath (Join-Path $backupPath "$name.sha256") -Value $hash
+    # Uploaded menu images live in their own volume, mounted read-only into the database
+    # container. They are archived beside the dump with the same partial-file, validation
+    # and checksum discipline, so a restore brings back the pictures products point at.
+    $mediaName = "restaurant-$stamp.media.tar.gz"
+    docker compose --env-file .env -f infrastructure/docker/compose.yml exec -T -e "MEDIA_FILE=/backups/$mediaName.partial" db sh -c 'tar -C /media -czf "$MEDIA_FILE" .'
+    if ($LASTEXITCODE -ne 0) { throw 'Menu image archive failed; existing backups retained' }
+    docker compose --env-file .env -f infrastructure/docker/compose.yml exec -T db tar -tzf "/backups/$mediaName.partial" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Menu image archive validation failed' }
+    Move-Item -LiteralPath (Join-Path $backupPath "$mediaName.partial") -Destination (Join-Path $backupPath $mediaName)
+    $mediaHash = (Get-FileHash -LiteralPath (Join-Path $backupPath $mediaName) -Algorithm SHA256).Hash
+    Set-Content -LiteralPath (Join-Path $backupPath "$mediaName.sha256") -Value $mediaHash
     $cutoff = (Get-Date).AddDays(-$RetentionDays)
-    Get-ChildItem -LiteralPath $backupPath -File -Filter 'restaurant-*.dump' | Where-Object { $_.LastWriteTime -lt $cutoff -and $_.Name -ne $name } | ForEach-Object {
+    Get-ChildItem -File -Include 'restaurant-*.dump', 'restaurant-*.media.tar.gz' -Path (Join-Path $backupPath '*') | Where-Object { $_.LastWriteTime -lt $cutoff -and $_.Name -ne $name -and $_.Name -ne $mediaName } | ForEach-Object {
         $targetPath = $_.FullName
         if (-not $targetPath.StartsWith($backupPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe retention path' }
         Remove-Item -LiteralPath $targetPath
@@ -33,12 +44,14 @@ try {
         archive       = $name
         sizeBytes     = (Get-Item -LiteralPath (Join-Path $backupPath $name)).Length
         sha256        = $hash
+        mediaArchive  = $mediaName
+        mediaSha256   = $mediaHash
         retentionDays = $RetentionDays
         outcome       = 'success'
         error         = $null
     }
     [IO.File]::WriteAllText((Join-Path $backupPath 'backup-status.json'), ($status | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding $false))
-    Write-Output "Backup saved: $name. Perform a restore drill before relying on this archive."
+    Write-Output "Backup saved: $name and $mediaName. Perform a restore drill before relying on this archive."
 } catch {
     # Record the failure for the operator and the status endpoint, then keep failing:
     # a silent backup failure is the most dangerous outcome in this whole system.

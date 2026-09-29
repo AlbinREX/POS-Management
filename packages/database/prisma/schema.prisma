@@ -194,6 +194,12 @@ model OrderItem {
   total          Decimal             @db.Decimal(14, 2)
   voidedAt       DateTime?           @db.Timestamptz(3)
   voidReason     String?             @db.VarChar(500)
+  /// Base price at the moment of ordering; unitPrice is what was charged.
+  listPrice      Decimal?            @db.Decimal(14, 2)
+  /// The promotion that priced this line, frozen with its name so later edits cannot change history.
+  offerId        String?             @db.Uuid
+  offerName      String?             @db.VarChar(160)
+  offer          Offer?              @relation(fields: [offerId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
   createdAt      DateTime            @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
   order          Order               @relation(fields: [orderId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
@@ -204,6 +210,7 @@ model OrderItem {
   @@unique([id, branchId, organizationId])
   @@index([orderId, branchId, organizationId, createdAt, id])
   @@index([productId, branchId, organizationId])
+  @@index([offerId, branchId, organizationId])
 }
 
 model OrderItemModifier {
@@ -460,6 +467,11 @@ model Product {
   taxRate         Decimal                 @db.Decimal(5, 2)
   taxMode         PriceTaxMode
   imageUrl        String?                 @db.VarChar(2048)
+  /// Temporarily unavailable: still listed, but cannot be ordered. Distinct from active.
+  soldOut         Boolean                 @default(false)
+  /// Display preference only: pinned first within its own category on the POS.
+  featured        Boolean                 @default(false)
+  offers          OfferProduct[]
   category        Category                @relation(fields: [categoryId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
   modifierGroups  ProductModifierGroup[]
   kitchenStations ProductKitchenStation[]
@@ -497,6 +509,51 @@ model ProductKitchenStation {
 
   @@id([productId, stationId])
   @@index([stationId, branchId, organizationId])
+}
+
+enum OfferKind {
+  FIXED_PRICE
+  PERCENT_OFF
+}
+
+/// A time-boxed promotion. It never rewrites Product.sellingPrice: the offer price is
+/// derived at the moment an item is ordered and frozen onto that order line.
+model Offer {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  branchId       String         @db.Uuid
+  name           String         @db.VarChar(160)
+  description    String?        @db.VarChar(2000)
+  imageUrl       String?        @db.VarChar(2048)
+  kind           OfferKind
+  offerPrice     Decimal?       @db.Decimal(14, 2)
+  percentOff     Decimal?       @db.Decimal(5, 2)
+  startsAt       DateTime       @db.Timestamptz(3)
+  endsAt         DateTime       @db.Timestamptz(3)
+  active         Boolean        @default(true)
+  version        Int            @default(1)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  deletedAt      DateTime?      @db.Timestamptz(3)
+  branch         Branch         @relation(fields: [branchId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  products       OfferProduct[]
+  orderItems     OrderItem[]
+
+  @@unique([id, branchId, organizationId])
+  @@index([branchId, organizationId, deletedAt, startsAt, id])
+}
+
+model OfferProduct {
+  offerId        String   @db.Uuid
+  productId      String   @db.Uuid
+  branchId       String   @db.Uuid
+  organizationId String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  offer          Offer    @relation(fields: [offerId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+  product        Product  @relation(fields: [productId, branchId, organizationId], references: [id, branchId, organizationId], onDelete: Restrict)
+
+  @@id([offerId, productId])
+  @@index([productId, branchId, organizationId])
 }
 
 generator client {
@@ -564,6 +621,7 @@ model Branch {
   modifierGroups  ModifierGroup[]
   modifiers       Modifier[]
   kitchenStations KitchenStation[]
+  offers          Offer[]
   id              String             @id @default(uuid()) @db.Uuid
   organizationId  String             @db.Uuid
   code            String             @db.VarChar(40)

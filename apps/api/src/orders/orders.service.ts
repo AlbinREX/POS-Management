@@ -19,6 +19,8 @@ import { audit } from '../audit';
 import { DatabaseService } from '../database.service';
 import { LayoutService } from '../layout/layout.service';
 import { calculateOrder } from './money';
+import { offerUnitPrice } from '@restaurant/validation';
+import { liveOffers, offerTerms } from '../menu/offer-lookup';
 import { cancelKitchenTickets } from '../kitchen/kitchen.transactions';
 
 const scope = (p: Principal) => ({ branchId: p.branchId, organizationId: p.organizationId });
@@ -81,6 +83,9 @@ export function record(r: Row): OrderRecord {
       total: i.total.toFixed(2),
       voidedAt: i.voidedAt?.toISOString() ?? null,
       voidReason: i.voidReason,
+      listPrice: i.listPrice?.toFixed(2) ?? null,
+      offerId: i.offerId,
+      offerName: i.offerName,
       modifiers: i.modifiers.map((m) => ({
         modifierId: m.modifierId,
         groupName: m.groupName,
@@ -356,6 +361,13 @@ export class OrdersService {
     if (!product) throw new NotFoundException('Product not found');
     if (!product.category.active || product.category.deletedAt)
       throw new ConflictException('Product category is unavailable');
+    if (product.soldOut) throw new ConflictException('This product is sold out');
+    // The price is decided here, on the server, at the moment of ordering, and frozen onto
+    // the line with the base price and the offer that produced it. Editing or expiring the
+    // offer later can never change this line.
+    const basePrice = product.sellingPrice.toFixed(2);
+    const offer = (await liveOffers(tx, scope(p), [product.id], new Date())).get(product.id);
+    const unitPrice = offer ? offerUnitPrice(basePrice, offerTerms(offer)) : basePrice;
     const selected = new Set(input.modifierIds);
     const snapshots: {
       modifierId: string;
@@ -395,7 +407,10 @@ export class OrdersService {
         productName: product.name,
         sku: product.sku,
         categoryName: product.category.name,
-        unitPrice: product.sellingPrice,
+        unitPrice,
+        listPrice: basePrice,
+        offerId: offer?.id ?? null,
+        offerName: offer?.name ?? null,
         taxRate: product.taxRate,
         taxMode: product.taxMode,
         quantity: input.quantity,

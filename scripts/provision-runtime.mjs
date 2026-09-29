@@ -36,7 +36,7 @@ export async function provisionRuntime(
       'REVOKE UPDATE, DELETE, TRUNCATE ON "OrderEvent", "OrderItemModifier" FROM restaurant_app',
     );
     await client.query(
-      'GRANT DELETE ON "RolePermission", "UserBranchRole", "ProductModifierGroup", "ProductKitchenStation" TO restaurant_app',
+      'GRANT DELETE ON "RolePermission", "UserBranchRole", "ProductModifierGroup", "ProductKitchenStation", "OfferProduct" TO restaurant_app',
     );
     await client.query(
       'REVOKE UPDATE, DELETE, TRUNCATE ON "InventoryUnit", "RecipeVersion", "RecipeItem", "InventoryPlan", "InventoryPlanItem", "StockMovement", "InventoryEvent" FROM restaurant_app',

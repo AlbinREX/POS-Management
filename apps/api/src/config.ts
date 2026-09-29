@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -9,6 +10,7 @@ const schema = z.object({
   APP_ORIGIN: z.url(),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   TRUST_PROXY: z.enum(['0', '1']).default('0'),
+  MEDIA_ROOT: z.string().min(1).optional(),
 });
 // A production deployment must never start on placeholder or example configuration.
 // The seed already refuses placeholders at bootstrap; this refuses them at every API
@@ -43,6 +45,10 @@ export function getConfig() {
   )
     throw new Error('HTTP is allowed only on loopback');
   assertProductionSecrets(config);
+  // Uploaded menu images must outlive the container. Production therefore names an
+  // absolute directory, which the compose file backs with a persistent volume.
+  if (config.NODE_ENV === 'production' && !(config.MEDIA_ROOT && isAbsolute(config.MEDIA_ROOT)))
+    throw new Error('Production requires MEDIA_ROOT to be an absolute path on a persistent volume');
   return config;
 }
 export const ACCESS_SECONDS = 300;
