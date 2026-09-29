@@ -10,20 +10,29 @@ const size = (value: string) => {
 };
 const limits = (conf: string) =>
   [...conf.matchAll(/client_max_body_size\s+(\S+);/g)].map((m) => size(m[1]!));
+const block = (conf: string, location: string) =>
+  new RegExp(`location ${location.replace(/[/.]/g, '\\$&')} \\{([^}]*)\\}`).exec(conf)?.[1];
+const headers = (body: string) => body.match(/proxy_set_header [^;]+;/g) ?? [];
 
 describe('the reverse proxy lets a menu photo reach the API, and nothing else grows', () => {
   for (const file of ['infrastructure/nginx/default.conf', 'infrastructure/nginx/production.conf']) {
     const conf = readFileSync(file, 'utf8');
     it(`${file}: 32 KB everywhere except the exact upload route`, () => {
-      // Server-wide default stays at the JSON limit the API itself applies.
-      expect(conf).toMatch(/server_tokens off;[\s\S]*?client_max_body_size 32k;/);
-      const upload = /location = \/api\/media\/menu \{([\s\S]*?)\}/.exec(conf);
-      expect(upload, 'dedicated upload location').not.toBeNull();
-      const [uploadLimit] = limits(upload![1]!);
+      // Server-wide default stays at the JSON limit the API itself applies: it is set at
+      // server level, before any location, so every route inherits it.
+      const serverLevel = conf.slice(0, conf.indexOf('location '));
+      expect(limits(serverLevel)).toEqual([32 * 1024]);
+      const upload = block(conf, '= /api/media/menu');
+      expect(upload, 'dedicated upload location').toBeDefined();
+      const [uploadLimit] = limits(upload!);
       // Large enough for the API to see, and so answer, any file up to its own limit.
       expect(uploadLimit).toBeGreaterThanOrEqual(MEDIA_LIMIT_BYTES);
       expect(uploadLimit).toBeLessThanOrEqual(8 * 1024 * 1024);
-      expect(upload![1]).toContain('proxy_pass http://api:4000;');
+      // The canonical path is forwarded, never the client's raw URI, so the larger limit
+      // can only ever reach the upload route.
+      expect(upload).toContain('proxy_pass http://api:4000/api/media/menu;');
+      // Same forwarding headers as every other API call (Origin, client address, scheme).
+      expect(headers(upload!)).toEqual(headers(block(conf, '/api/')!));
       // Exactly two limits in the file: the default and the upload route.
       expect(limits(conf).sort((a, b) => a - b)).toEqual([32 * 1024, uploadLimit]);
     });

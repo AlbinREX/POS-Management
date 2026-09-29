@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { createServer, request as rawRequest } from 'node:http';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -181,15 +182,52 @@ export async function runMenuOffersIntegration(app) {
       await http.get('/api/media/menu/..%2F..%2Fsecret.webp').expect(404);
       await http.get('/api/media/menu/' + randomUUID() + '.webp').expect(404);
     });
+    let cashier;
     await test('menu managers alone may upload images', async () => {
       const role = (await call('post', 'roles').send({ name: 'MO cashier', permissions: ['menu.read', 'order.read'] }).expect(201)).body;
       await call('post', 'users')
         .send({ name: 'MO cashier', email: 'mo-cashier@verification.test', password: credentials.password, roleIds: [role.id] })
         .expect(201);
-      const cashier = (await http.post('/api/auth/login').set('Origin', origin).send({ ...credentials, email: 'mo-cashier@verification.test' }).expect(200)).body.accessToken;
+      cashier = (await http.post('/api/auth/login').set('Origin', origin).send({ ...credentials, email: 'mo-cashier@verification.test' }).expect(200)).body.accessToken;
       await upload(await image('png'), 'image/png', cashier).expect(403);
       await call('post', 'offers', cashier).send({}).expect(403);
       await call('post', 'menu/categories/reorder', cashier).send({ items: [] }).expect(403);
+    });
+    await test('an upload is refused before its body is read unless it comes from a menu manager', async () => {
+      // Send the headers and the first kilobyte of a 4 MB upload, then stop. An answer that
+      // arrives now was decided without reading the body; 'waiting' means the API is reading it.
+      const firstBytes = async (headers) => {
+        const server = createServer(app.getHttpAdapter().getInstance());
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        try {
+          return await new Promise((resolve, reject) => {
+            const req = rawRequest({
+              host: '127.0.0.1',
+              port: server.address().port,
+              method: 'POST',
+              path: '/api/media/menu',
+              headers: { Origin: origin, 'Content-Type': 'image/png', 'Content-Length': String(4 * 1024 * 1024), ...headers },
+            });
+            const timer = setTimeout(() => (resolve('waiting'), req.destroy()), 2000);
+            req.on('response', (res) => {
+              clearTimeout(timer);
+              resolve({ status: res.statusCode, connection: res.headers.connection });
+              req.destroy();
+            });
+            req.on('error', reject);
+            req.write(Buffer.alloc(1024));
+          });
+        } finally {
+          server.closeAllConnections();
+          await new Promise((resolve) => server.close(resolve));
+        }
+      };
+      const refused = (status) => ({ status, connection: 'close' });
+      assert.deepEqual(await firstBytes({}), refused(401));
+      assert.deepEqual(await firstBytes({ Authorization: 'Bearer not-a-token' }), refused(401));
+      assert.deepEqual(await firstBytes({ Authorization: 'Bearer ' + cashier }), refused(403));
+      // Control: a menu manager's upload is read, so the check above really is early.
+      assert.equal(await firstBytes({ Authorization: 'Bearer ' + token }), 'waiting');
     });
     await test('replacing an image removes the old file only after the product stops using it', async () => {
       riza = await update(riza, productData(riza, { imageUrl: png.path }));

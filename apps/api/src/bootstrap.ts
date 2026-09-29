@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { UnauthorizedException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -6,9 +7,10 @@ import { json, raw, type Request, type Response, type NextFunction } from 'expre
 import { randomUUID } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { AppModule } from './app.module';
-import { MEDIA_LIMIT_BYTES } from './media/media.service';
+import { MEDIA_LIMIT_BYTES, MEDIA_UPLOAD_PERMISSIONS } from './media/media.service';
 import { ErrorFilter, logger } from './security';
 import { getConfig } from './config';
+import { AuthService } from './auth/auth.service';
 import type { ApiRequest } from './auth/authorization';
 export async function createApp() {
   const config = getConfig();
@@ -90,6 +92,31 @@ export async function createApp() {
         requestId: req.requestId,
       });
       return;
+    }
+    next();
+  });
+  // An upload is the one request body larger than 32 KB, so it is authorised before any of
+  // it is read: only a signed-in menu manager can make the API buffer a file. The route's
+  // own guard still runs afterwards; this only moves the refusal ahead of the body.
+  const auth = app.get(AuthService);
+  app.use('/api/media/menu', async (req: ApiRequest, res: Response, next: NextFunction) => {
+    if (req.method !== 'POST') return next();
+    const refuse = (status: 401 | 403, message: string) => {
+      // Close rather than drain: the unread body is never pulled into the API.
+      res.setHeader('Connection', 'close');
+      res
+        .status(status)
+        .json({ statusCode: status, code: `HTTP_${status}`, message, requestId: req.requestId });
+    };
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) return refuse(401, 'Authentication required');
+    try {
+      const principal = await auth.authenticate(header.slice(7));
+      if (!MEDIA_UPLOAD_PERMISSIONS.every((key) => principal.permissions.includes(key)))
+        return refuse(403, 'Permission denied');
+    } catch (error) {
+      if (error instanceof UnauthorizedException) return refuse(401, 'Authentication required');
+      return next(error);
     }
     next();
   });

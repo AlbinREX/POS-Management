@@ -9,7 +9,7 @@ import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import sharp from 'sharp';
 import type { Prisma } from '@restaurant/database';
-import type { MenuMediaUpload } from '@restaurant/shared-types';
+import type { MenuMediaUpload, PermissionKey } from '@restaurant/shared-types';
 import { isMenuMediaPath } from '@restaurant/validation';
 import { DatabaseService } from '../database.service';
 
@@ -22,6 +22,8 @@ import { DatabaseService } from '../database.service';
  * server needs no data rewrite.
  */
 export const MEDIA_LIMIT_BYTES = 5 * 1024 * 1024;
+/** Who may upload. Checked before the body is read, and again by the route's guard. */
+export const MEDIA_UPLOAD_PERMISSIONS: PermissionKey[] = ['menu.read', 'menu.manage'];
 export const MENU_IMAGE_SIZE = 1024;
 const MIN_SIDE = 200;
 const MAX_SIDE = 8000;

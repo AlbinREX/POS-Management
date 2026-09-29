@@ -11,7 +11,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import type { Response } from 'express';
 import { type ApiRequest, Public, RequirePermissions } from '../auth/authorization';
-import { MediaError, MediaService } from './media.service';
+import { MEDIA_UPLOAD_PERMISSIONS, MediaError, MediaService } from './media.service';
 
 @Controller('media')
 export class MediaController {
@@ -21,7 +21,7 @@ export class MediaController {
    * an operator can preview an upload and still cancel. A product or offer references the
    * returned path only when it is explicitly saved.
    */
-  @Post('menu') @RequirePermissions('menu.read', 'menu.manage') upload(
+  @Post('menu') @RequirePermissions(...MEDIA_UPLOAD_PERMISSIONS) upload(
     @Req() r: ApiRequest & { body?: unknown },
   ) {
     if (!Buffer.isBuffer(r.body)) throw new MediaError('Choose a PNG, JPEG or WebP image', 415);

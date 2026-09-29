@@ -15,7 +15,7 @@ Settings → Menu has three main tabs: **Products**, **Categories** and **Offers
 
 Products keep using the single `imageUrl` field; offers have an optional one of their own.
 
-1. The browser posts the raw file to `POST /api/media/menu` (`menu.manage`).
+1. The browser posts the raw file to `POST /api/media/menu` (`menu.manage`). The sign-in and permission are checked before any of the file is read, so nobody else can make the API accept an upload.
 2. The API identifies PNG, JPEG or WebP from the bytes; the declared type and filename are ignored. It refuses anything over 5 MB, smaller than 200 × 200 or larger than 8000 px per side, and damaged data. Decoding is bounded against decompression bombs.
 3. It writes a 1024 × 1024 WebP, cropped to cover, under a random UUID name. Embedded metadata such as camera location is dropped. Nothing in the database changes yet.
 4. **Save changes** stores the path (`/api/media/menu/<uuid>.webp`) on the product.
